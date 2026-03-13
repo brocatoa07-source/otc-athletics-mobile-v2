@@ -14,128 +14,21 @@
 import AsyncStorage from '@react-native-async-storage/async-storage';
 import type { MechanicalIssue } from './hitting-mechanical-diagnostic-data';
 import type { MoverType } from './hitting-mover-type-data';
+import {
+  getRecommendedDrills,
+  flattenRecommendation,
+} from '@/lib/recommendation/drillRecommendationEngine';
+import {
+  type QuickFix,
+  QUICK_FIXES,
+  ISSUE_TO_QUICKFIX,
+  ISSUE_SECONDARY_QUICKFIX,
+  QUICKFIX_TO_FOCUS,
+} from './quick-fix-data';
 
-/* ─── Quick Fix Definitions ──────────────────────────── */
-
-export interface QuickFix {
-  key: string;
-  label: string;
-  drills: string[];
-}
-
-export const QUICK_FIXES: Record<string, QuickFix> = {
-  late: {
-    key: 'late',
-    label: 'Late',
-    drills: ['Command Drill', 'Swing at Release', 'Heel Load Drill'],
-  },
-  lunging: {
-    key: 'lunging',
-    label: 'Lunging',
-    drills: ['Step Back Drill', 'Ball Roll Drill', "Belli's Drill"],
-  },
-  stuck: {
-    key: 'stuck',
-    label: 'Stuck',
-    drills: ['Happy Gilmore Drill', "Hook'em Drill", 'Bat on Shoulder Drill Series'],
-  },
-  'losing-posture': {
-    key: 'losing-posture',
-    label: 'Losing Posture',
-    drills: ["Freddie's Drill", 'Mo Vaughn Drill', 'PVC Pipe Swings'],
-  },
-  'pulling-off': {
-    key: 'pulling-off',
-    label: 'Pulling Off',
-    drills: ['Trout Step Drill', 'Finish Over Tee', 'Bat Throws'],
-  },
-  casting: {
-    key: 'casting',
-    label: 'Casting',
-    drills: ['Steering Wheel Turns', 'Reverse Grip Drill', 'Deep Tee Series'],
-  },
-  'rolling-over': {
-    key: 'rolling-over',
-    label: 'Rolling Over',
-    drills: ['No Roll Overs', 'Top Hand Bregman Drill', 'Out Front Tee Drill'],
-  },
-  'barrel-path': {
-    key: 'barrel-path',
-    label: 'Barrel Path',
-    drills: ['Snap Series', 'Top Hand Open / V-Grip Drill', 'Split Grip Stop at Contact'],
-  },
-};
-
-/* ─── Diagnostic Issue → Quick Fix mapping ───────────── */
-
-export const ISSUE_TO_QUICKFIX: Record<MechanicalIssue, string> = {
-  timing: 'late',
-  weight_shift: 'lunging',
-  early_rotation: 'stuck',
-  disconnection: 'casting',
-  swing_plane: 'losing-posture',
-  barrel_path: 'barrel-path',
-};
-
-const ISSUE_SECONDARY_QUICKFIX: Partial<Record<MechanicalIssue, string>> = {
-  early_rotation: 'pulling-off',
-  barrel_path: 'rolling-over',
-  swing_plane: 'barrel-path',
-  disconnection: 'rolling-over',
-};
-
-/* ─── Quick Fix → Focus Area (vault section label) ─── */
-
-export const QUICKFIX_TO_FOCUS: Record<string, string[]> = {
-  late: ['Timing'],
-  lunging: ['Forward Move'],
-  stuck: ['Forward Move', 'Connection'],
-  'losing-posture': ['Posture'],
-  'pulling-off': ['Direction'],
-  casting: ['Barrel Turn'],
-  'rolling-over': ['Extension'],
-  'barrel-path': ['Barrel Turn'],
-};
-
-/* ─── Mover Type → Drill Affinity ────────────────────── */
-// Maps each mover type to the drills (across all quick fix pools)
-// that best align with that movement style.
-// Used to bias drill selection toward the athlete's swing identity.
-
-const MOVER_DRILL_AFFINITY: Record<MoverType, Set<string>> = {
-  torque: new Set([
-    // Rotational acceleration drills
-    'Steering Wheel Turns', 'Reverse Grip Drill', 'Deep Tee Series',
-    'Snap Series', 'Top Hand Open / V-Grip Drill', 'Split Grip Stop at Contact',
-    "Hook'em Drill", 'Bat on Shoulder Drill Series',
-  ]),
-  ground_force: new Set([
-    // Stride and weight transfer drills
-    'Step Back Drill', 'Ball Roll Drill', "Belli's Drill",
-    'Heel Load Drill', 'Trout Step Drill', 'Happy Gilmore Drill',
-  ]),
-  flow: new Set([
-    // Rhythm and connection drills
-    "Freddie's Drill", 'Mo Vaughn Drill', 'PVC Pipe Swings',
-    'Finish Over Tee', 'Bat Throws', 'No Roll Overs',
-  ]),
-  separation: new Set([
-    // Stretch and coil drills
-    'Command Drill', 'Swing at Release',
-    'Top Hand Bregman Drill', 'Out Front Tee Drill',
-    'Trout Step Drill', 'Happy Gilmore Drill',
-  ]),
-};
-
-/* ─── Foundations drills (age ≤ 14 only) ─────────────── */
-
-const FOUNDATIONS_DRILLS = [
-  'Hold Finish',
-  'Slow Motion Swing',
-  'Arráez Drill',
-  'Top Hand Bregman Drill',
-  'Bottom Hand Drill',
-];
+// Re-export so existing consumers don't need to change imports
+export type { QuickFix } from './quick-fix-data';
+export { QUICK_FIXES, ISSUE_TO_QUICKFIX, QUICKFIX_TO_FOCUS };
 
 /* ─── Strength pool ──────────────────────────────────── */
 
@@ -157,6 +50,47 @@ export const MENTAL_POOL = [
   'Pre-AB Plan Reminder',
   'Post-Practice Reflection',
 ];
+
+/* ─── Smart Mental Pools (ISS/HSS-aware) ──────────────── */
+
+/** Tasks prioritized when identity score is low (ISS < 3) */
+export const LOW_ISS_POOL = [
+  'Identity Statement Review',
+  'Confidence Proof Stacking',
+  'Power Cue Repetition',
+  'Self-Talk Reset',
+  'Post-Practice Reflection',
+];
+
+/** Tasks prioritized when habit score is low (HSS < 3.5) */
+export const LOW_HSS_POOL = [
+  'Pre-Game Routine Check',
+  'Daily Habit Tracker',
+  'Habit Stacking Review',
+  'Post-Practice Reflection',
+  'Morning Routine Lock-In',
+];
+
+/**
+ * Pick a mental task using ISS/HSS scores when available.
+ * Falls back to generic pool if no scores provided.
+ */
+export function getSmartMentalTask(
+  dayIndex: number,
+  iss?: number | null,
+  hss?: number | null,
+): string {
+  // ISS < 3 → confidence/identity focus
+  if (iss != null && iss < 3) {
+    return LOW_ISS_POOL[dayIndex % LOW_ISS_POOL.length];
+  }
+  // HSS < 3.5 → routine/habit focus
+  if (hss != null && hss < 3.5) {
+    return LOW_HSS_POOL[dayIndex % LOW_HSS_POOL.length];
+  }
+  // Default rotation
+  return MENTAL_POOL[dayIndex % MENTAL_POOL.length];
+}
 
 /* ─── Weekly Challenges ──────────────────────────────── */
 
@@ -238,24 +172,6 @@ function getLocalDateString(): string {
 }
 
 /**
- * Pick the best drill from a quick fix pool.
- * If a mover type is provided, prefer a drill that matches the affinity.
- * Falls back to day-of-epoch rotation when no affinity match exists.
- */
-export function pickDrill(
-  drills: string[],
-  dayIndex: number,
-  moverType: MoverType | null,
-): string {
-  if (moverType) {
-    const affinity = MOVER_DRILL_AFFINITY[moverType];
-    const match = drills.find((d) => affinity.has(d));
-    if (match) return match;
-  }
-  return drills[dayIndex % drills.length];
-}
-
-/**
  * Generate the unified daily work plan.
  * Deterministic for a given day — same inputs always produce same outputs.
  */
@@ -264,15 +180,26 @@ export function generateUnifiedDailyWork(
   secondaryIssue: MechanicalIssue,
   age: number | null,
   moverType?: MoverType | null,
+  /** Optional mental scores for smarter task selection */
+  mentalScores?: { iss?: number | null; hss?: number | null } | null,
 ): UnifiedDailyWork {
   const dayIndex = Math.floor(Date.now() / 86_400_000);
   const weekIndex = Math.floor(dayIndex / 7);
   const date = getLocalDateString();
 
-  // ── Hitting drills ────────────────────────────────
+  // ── Hitting drills (via recommendation engine) ────
+  const rec = getRecommendedDrills({
+    primaryIssue,
+    secondaryIssue,
+    moverType: moverType ?? null,
+    age,
+    recentDrills: [],
+  });
+  const flat = flattenRecommendation(rec);
+
+  // Resolve quick fix labels for display
   let primaryKey = ISSUE_TO_QUICKFIX[primaryIssue];
   let secondaryKey = ISSUE_TO_QUICKFIX[secondaryIssue];
-
   if (primaryKey === secondaryKey) {
     secondaryKey =
       ISSUE_SECONDARY_QUICKFIX[secondaryIssue] ??
@@ -280,25 +207,14 @@ export function generateUnifiedDailyWork(
       Object.keys(QUICK_FIXES).find((k) => k !== primaryKey) ??
       primaryKey;
   }
-
   const primaryFix = QUICK_FIXES[primaryKey]!;
   const secondaryFix = QUICK_FIXES[secondaryKey]!;
-
-  const mover = moverType ?? null;
-  const mainDrill = pickDrill(primaryFix.drills, dayIndex, mover);
-  const secondaryDrill = pickDrill(secondaryFix.drills, dayIndex, mover);
-
-  // ── Foundation (age ≤ 14) ─────────────────────────
-  const isYouth = age !== null && age <= 14;
-  const foundationDrill = isYouth
-    ? FOUNDATIONS_DRILLS[dayIndex % FOUNDATIONS_DRILLS.length]
-    : null;
 
   // ── Strength ──────────────────────────────────────
   const strengthTask = STRENGTH_POOL[dayIndex % STRENGTH_POOL.length];
 
-  // ── Mental ────────────────────────────────────────
-  const mentalTask = MENTAL_POOL[dayIndex % MENTAL_POOL.length];
+  // ── Mental (smart selection based on ISS/HSS) ───
+  const mentalTask = getSmartMentalTask(dayIndex, mentalScores?.iss, mentalScores?.hss);
 
   // ── Challenge (rotates weekly) ────────────────────
   const challenge = WEEKLY_CHALLENGES[weekIndex % WEEKLY_CHALLENGES.length];
@@ -306,34 +222,37 @@ export function generateUnifiedDailyWork(
   // ── Build items list ──────────────────────────────
   const items: DailyWorkItem[] = [];
 
-  if (foundationDrill) {
-    items.push({
-      id: 'foundation',
-      type: 'foundation',
-      title: foundationDrill,
-      subtitle: 'Foundation drill',
-      tag: 'Start Here',
-      tagColor: '#22c55e',
-    });
+  // Add drills from the recommendation engine
+  for (const entry of flat) {
+    if (entry.role === 'reset') {
+      items.push({
+        id: 'foundation',
+        type: 'foundation',
+        title: entry.name,
+        subtitle: 'Foundation drill',
+        tag: 'Start Here',
+        tagColor: '#22c55e',
+      });
+    } else if (entry.role === 'primary') {
+      items.push({
+        id: `hitting-${items.length + 1}`,
+        type: 'hitting',
+        title: entry.name,
+        subtitle: `Primary fix: ${primaryFix.label}`,
+        tag: primaryFix.label,
+        tagColor: '#E10600',
+      });
+    } else {
+      items.push({
+        id: `hitting-${items.length + 1}`,
+        type: 'hitting',
+        title: entry.name,
+        subtitle: `Secondary fix: ${secondaryFix.label}`,
+        tag: secondaryFix.label,
+        tagColor: '#3b82f6',
+      });
+    }
   }
-
-  items.push({
-    id: 'hitting-1',
-    type: 'hitting',
-    title: mainDrill,
-    subtitle: `Primary fix: ${primaryFix.label}`,
-    tag: primaryFix.label,
-    tagColor: '#E10600',
-  });
-
-  items.push({
-    id: 'hitting-2',
-    type: 'hitting',
-    title: secondaryDrill,
-    subtitle: `Secondary fix: ${secondaryFix.label}`,
-    tag: secondaryFix.label,
-    tagColor: '#3b82f6',
-  });
 
   items.push({
     id: 'strength',
@@ -402,60 +321,4 @@ export async function toggleDailyWorkItem(
   plan.completion[itemId] = !plan.completion[itemId];
   await saveDailyWork(plan);
   return plan;
-}
-
-/* ─── Legacy exports for backward compat ─────────────── */
-
-export interface DailyWorkPlan {
-  primaryFix: QuickFix;
-  secondaryFix: QuickFix;
-  mainDrill: string;
-  secondaryDrill: string;
-  challengeDrill: string;
-  foundationDrill: string | null;
-}
-
-export function generateDailyWork(
-  primaryIssue: MechanicalIssue,
-  secondaryIssue: MechanicalIssue,
-  age: number | null,
-): DailyWorkPlan {
-  const dayIndex = Math.floor(Date.now() / 86_400_000);
-
-  let primaryKey = ISSUE_TO_QUICKFIX[primaryIssue];
-  let secondaryKey = ISSUE_TO_QUICKFIX[secondaryIssue];
-
-  if (primaryKey === secondaryKey) {
-    secondaryKey =
-      ISSUE_SECONDARY_QUICKFIX[secondaryIssue] ??
-      ISSUE_SECONDARY_QUICKFIX[primaryIssue] ??
-      Object.keys(QUICK_FIXES).find((k) => k !== primaryKey) ??
-      primaryKey;
-  }
-
-  const primaryFix = QUICK_FIXES[primaryKey]!;
-  const secondaryFix = QUICK_FIXES[secondaryKey]!;
-
-  const mainDrill = primaryFix.drills[dayIndex % primaryFix.drills.length];
-  const secondaryDrill = secondaryFix.drills[dayIndex % secondaryFix.drills.length];
-
-  const challengePool = [
-    primaryFix.drills[(dayIndex + 2) % primaryFix.drills.length],
-    secondaryFix.drills[(dayIndex + 2) % secondaryFix.drills.length],
-  ];
-  const challengeDrill = challengePool[dayIndex % 2];
-
-  const isYouth = age !== null && age <= 14;
-  const foundationDrill = isYouth
-    ? FOUNDATIONS_DRILLS[dayIndex % FOUNDATIONS_DRILLS.length]
-    : null;
-
-  return {
-    primaryFix,
-    secondaryFix,
-    mainDrill,
-    secondaryDrill,
-    challengeDrill,
-    foundationDrill,
-  };
 }

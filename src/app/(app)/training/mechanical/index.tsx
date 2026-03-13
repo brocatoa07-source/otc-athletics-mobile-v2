@@ -9,28 +9,71 @@ import AsyncStorage from '@react-native-async-storage/async-storage';
 import { colors, radius } from '@/theme';
 import { useTier } from '@/hooks/useTier';
 import { useGating } from '@/hooks/useGating';
-import { HITTING_VAULT_SECTIONS } from '@/data/hitting-vault-sections';
 import { MOVER_TYPES, type MoverTypeData } from '@/data/hitting-mover-type-data';
+import { MECHANICAL_ISSUES, type MechanicalDiagnosticResult } from '@/data/hitting-mechanical-diagnostic-data';
 
 const ACCENT = '#E10600';
+
+interface ExploreItem {
+  key: string;
+  label: string;
+  sub: string;
+  icon: keyof typeof Ionicons.glyphMap;
+  color: string;
+  route: string;
+}
+
+const EXPLORE_ITEMS: ExploreItem[] = [
+  { key: 'foundations', label: 'Foundations', sub: 'Non-negotiable swing basics', icon: 'construct-outline', color: '#E10600', route: '/(app)/training/mechanical/foundations' },
+  { key: 'timing', label: 'Timing', sub: 'Rhythm and sequencing', icon: 'timer-outline', color: '#f59e0b', route: '/(app)/training/mechanical/timing' },
+  { key: 'forward-move', label: 'Forward Move', sub: 'Weight shift and stride', icon: 'arrow-forward-outline', color: '#3b82f6', route: '/(app)/training/mechanical/forward-move' },
+  { key: 'posture', label: 'Posture', sub: 'Stay in your body', icon: 'body-outline', color: '#0891b2', route: '/(app)/training/mechanical/posture' },
+  { key: 'direction', label: 'Direction', sub: 'Control where the ball goes', icon: 'compass-outline', color: '#22c55e', route: '/(app)/training/mechanical/direction' },
+  { key: 'barrel-turn', label: 'Barrel Turn', sub: 'Hand path and bat speed', icon: 'sync-outline', color: '#a855f7', route: '/(app)/training/mechanical/barrel-turn' },
+  { key: 'connection', label: 'Connection', sub: 'Arms, hands, and barrel', icon: 'link-outline', color: '#06b6d4', route: '/(app)/training/mechanical/connection' },
+  { key: 'extension', label: 'Extension', sub: 'Contact zone and follow-through', icon: 'expand-outline', color: '#ec4899', route: '/(app)/training/mechanical/extension' },
+  { key: 'troubleshoot', label: 'Troubleshooting', sub: 'Fix common mechanical issues', icon: 'hammer-outline', color: '#ef4444', route: '/(app)/training/mechanical/troubleshooting' },
+  { key: 'approach', label: 'Approach', sub: 'OTC Hitting Philosophy', icon: 'bulb-outline', color: '#f59e0b', route: '/(app)/training/mechanical/approach' },
+  { key: 'video', label: 'Video Breakdown', sub: 'Swing analysis tools (coming soon)', icon: 'videocam-outline', color: '#64748b', route: '' },
+];
 
 export default function HittingVaultIndex() {
   const { hasLimitedHitting } = useTier();
   const { gate } = useGating();
-  const [moverResult, setMoverResult] = useState<MoverTypeData | null>(null);
+  const [moverResult, setMoverResult] = useState<{ primary: MoverTypeData; secondary: MoverTypeData } | null>(null);
+  const [mechResult, setMechResult] = useState<MechanicalDiagnosticResult | null>(null);
+  const [exploreExpanded, setExploreExpanded] = useState(false);
 
   useEffect(() => {
-    AsyncStorage.getItem('otc:mover-type').then((val) => {
-      if (val) {
+    Promise.all([
+      AsyncStorage.getItem('otc:mover-type'),
+      AsyncStorage.getItem('otc:mechanical-diagnostic'),
+    ]).then(([moverVal, mechVal]) => {
+      if (moverVal) {
         try {
-          const parsed = JSON.parse(val);
-          const slug = parsed.slug ?? parsed;
-          const found = Object.values(MOVER_TYPES).find((m) => m.slug === slug);
-          if (found) setMoverResult(found);
+          const parsed = JSON.parse(moverVal);
+          // Support both new format {primary, secondary} and legacy slug string
+          if (parsed.primary && parsed.secondary) {
+            const primaryData = MOVER_TYPES[parsed.primary as keyof typeof MOVER_TYPES];
+            const secondaryData = MOVER_TYPES[parsed.secondary as keyof typeof MOVER_TYPES];
+            if (primaryData && secondaryData) {
+              setMoverResult({ primary: primaryData, secondary: secondaryData });
+            }
+          } else {
+            // Legacy: plain slug string
+            const slug = parsed.slug ?? parsed;
+            const found = MOVER_TYPES[slug as keyof typeof MOVER_TYPES];
+            if (found) setMoverResult({ primary: found, secondary: found });
+          }
         } catch {}
+      }
+      if (mechVal) {
+        try { setMechResult(JSON.parse(mechVal)); } catch {}
       }
     });
   }, []);
+
+  const hasDiagnostic = gate.hitting.mechanicalDone;
 
   return (
     <SafeAreaView style={styles.safe}>
@@ -51,28 +94,7 @@ export default function HittingVaultIndex() {
         </TouchableOpacity>
       </View>
 
-      <ScrollView
-        contentContainerStyle={styles.content}
-        showsVerticalScrollIndicator={false}
-      >
-        {/* Mover Type Banner */}
-        {moverResult && (
-          <TouchableOpacity
-            style={[styles.moverBanner, { borderColor: moverResult.color + '40' }]}
-            onPress={() => router.push('/(app)/training/mechanical/mover-type-quiz' as any)}
-            activeOpacity={0.8}
-          >
-            <View style={[styles.moverDot, { backgroundColor: moverResult.color }]} />
-            <View style={{ flex: 1 }}>
-              <Text style={styles.moverLabel}>Your Swing Identity</Text>
-              <Text style={[styles.moverType, { color: moverResult.color }]}>
-                {moverResult.name}
-              </Text>
-            </View>
-            <Ionicons name="chevron-forward" size={16} color={colors.textMuted} />
-          </TouchableOpacity>
-        )}
-
+      <ScrollView contentContainerStyle={styles.content} showsVerticalScrollIndicator={false}>
         {/* Walk Tier Banner */}
         {hasLimitedHitting && (
           <TouchableOpacity
@@ -91,92 +113,205 @@ export default function HittingVaultIndex() {
           </TouchableOpacity>
         )}
 
-        {/* My Path Card */}
+        {/* ═══════ SWING PROFILE ═══════ */}
+        <View style={styles.profileCard}>
+          <Text style={styles.profileCardTitle}>SWING PROFILE</Text>
+
+          {/* Mover Type — Primary + Secondary */}
+          <TouchableOpacity
+            style={styles.profileRow}
+            onPress={() => router.push('/(app)/training/mechanical/mover-type-quiz' as any)}
+            activeOpacity={0.8}
+          >
+            <View style={[styles.profileIcon, { backgroundColor: (moverResult?.primary.color ?? '#f59e0b') + '18' }]}>
+              <Ionicons
+                name={moverResult ? 'body-outline' : 'help-circle-outline'}
+                size={18}
+                color={moverResult?.primary.color ?? '#f59e0b'}
+              />
+            </View>
+            <View style={{ flex: 1 }}>
+              {moverResult ? (
+                <View style={styles.moverResults}>
+                  <Text style={styles.profileRowLabel}>Primary Mover</Text>
+                  <Text style={[styles.profileRowValue, { color: moverResult.primary.color }]}>
+                    {moverResult.primary.name}
+                  </Text>
+                  <Text style={styles.moverSecondary}>
+                    Secondary: {moverResult.secondary.name}
+                  </Text>
+                </View>
+              ) : (
+                <>
+                  <Text style={styles.profileRowLabel}>Mover Type</Text>
+                  <Text style={styles.profileRowValue}>Take Hitter Mover Diagnostic</Text>
+                </>
+              )}
+            </View>
+            <Ionicons name="chevron-forward" size={16} color={colors.textMuted} />
+          </TouchableOpacity>
+
+          {/* Mover details — description, cues, MLB comps */}
+          {moverResult && (
+            <View style={styles.moverDetail}>
+              <Text style={styles.moverDesc}>{moverResult.primary.description}</Text>
+
+              <Text style={styles.detailLabel}>MLB COMPARISONS</Text>
+              <View style={styles.mlbRow}>
+                {moverResult.primary.mlbComps.map((comp) => (
+                  <Text key={comp} style={[styles.mlbName, { color: moverResult.primary.color }]}>{comp}</Text>
+                ))}
+              </View>
+
+              <Text style={styles.detailLabel}>PRIMARY CUES</Text>
+              {moverResult.primary.primaryCues.map((cue) => (
+                <View key={cue} style={styles.cueRow}>
+                  <Ionicons name="mic-outline" size={12} color={moverResult.primary.color} />
+                  <Text style={styles.cueText}>{cue}</Text>
+                </View>
+              ))}
+            </View>
+          )}
+
+          {/* Mechanical Profile */}
+          <TouchableOpacity
+            style={styles.profileRow}
+            onPress={() => router.push('/(app)/training/mechanical/diagnostics' as any)}
+            activeOpacity={0.8}
+          >
+            <View style={[styles.profileIcon, { backgroundColor: ACCENT + '18' }]}>
+              <Ionicons
+                name={mechResult ? 'analytics-outline' : 'help-circle-outline'}
+                size={18}
+                color={ACCENT}
+              />
+            </View>
+            <View style={{ flex: 1 }}>
+              <Text style={styles.profileRowLabel}>Mechanical Profile</Text>
+              {mechResult ? (
+                <View style={styles.mechResults}>
+                  <Text style={[styles.profileRowValue, { color: ACCENT }]}>
+                    {MECHANICAL_ISSUES[mechResult.primary]?.label ?? mechResult.primary}
+                  </Text>
+                  <Text style={styles.mechSecondary}>
+                    Secondary: {MECHANICAL_ISSUES[mechResult.secondary]?.label ?? mechResult.secondary}
+                  </Text>
+                </View>
+              ) : (
+                <Text style={styles.profileRowValue}>Take Swing Diagnostic</Text>
+              )}
+            </View>
+            <Ionicons name="chevron-forward" size={16} color={colors.textMuted} />
+          </TouchableOpacity>
+        </View>
+
+        {/* ═══════ APPROACH CONNECTOR ═══════ */}
+        <View style={styles.approachConnector}>
+          <Text style={styles.approachConnectorText}>
+            Your mover type explains HOW your body naturally creates power.{'\n\n'}Your approach determines HOW you compete in the box.
+          </Text>
+          <TouchableOpacity
+            style={styles.approachBtn}
+            onPress={() => router.push('/(app)/training/mechanical/approach' as any)}
+            activeOpacity={0.8}
+          >
+            <Ionicons name="bulb-outline" size={16} color="#f59e0b" />
+            <Text style={styles.approachBtnText}>View Hitting Philosophy</Text>
+            <Ionicons name="chevron-forward" size={14} color="#f59e0b" />
+          </TouchableOpacity>
+        </View>
+
+        {/* ═══════ MY PATH ═══════ */}
         <TouchableOpacity
-          style={styles.myPathCard}
+          style={styles.primaryCard}
           onPress={() => router.push('/(app)/training/mechanical/my-path' as any)}
           activeOpacity={0.8}
         >
-          <View style={[styles.dailyWorkIcon, { backgroundColor: '#3b82f618' }]}>
-            <Ionicons name="map-outline" size={22} color="#3b82f6" />
+          <View style={[styles.primaryIcon, { backgroundColor: '#3b82f618' }]}>
+            <Ionicons name="map-outline" size={24} color="#3b82f6" />
           </View>
           <View style={{ flex: 1 }}>
-            <Text style={styles.dailyWorkLabel}>My Path</Text>
-            <Text style={styles.dailyWorkSub}>
-              {gate.hitting.mechanicalDone
+            <Text style={styles.primaryLabel}>My Path</Text>
+            <Text style={styles.primarySub}>
+              {hasDiagnostic
                 ? 'Your personalized development plan'
                 : 'Complete diagnostics to unlock'}
             </Text>
           </View>
-          <Ionicons name="chevron-forward" size={18} color={colors.textMuted} />
+          <Ionicons name="chevron-forward" size={20} color={colors.textMuted} />
         </TouchableOpacity>
 
-        {/* Daily Work Card */}
+        {/* ═══════ TODAY'S WORK ═══════ */}
         <TouchableOpacity
-          style={styles.dailyWorkCard}
+          style={[styles.primaryCard, { backgroundColor: ACCENT + '06', borderColor: ACCENT + '25' }]}
           onPress={() => router.push('/(app)/training/mechanical/daily-work' as any)}
           activeOpacity={0.8}
         >
-          <View style={styles.dailyWorkIcon}>
-            <Ionicons name="flash" size={22} color={ACCENT} />
+          <View style={[styles.primaryIcon, { backgroundColor: ACCENT + '18' }]}>
+            <Ionicons name="flash" size={24} color={ACCENT} />
           </View>
           <View style={{ flex: 1 }}>
-            <Text style={styles.dailyWorkLabel}>Daily Work</Text>
-            <Text style={styles.dailyWorkSub}>
-              {gate.hitting.mechanicalDone
+            <Text style={styles.primaryLabel}>Today&apos;s Work</Text>
+            <Text style={styles.primarySub}>
+              {hasDiagnostic
                 ? 'Today\'s personalized drills'
                 : 'Complete Swing Diagnostic to unlock'}
             </Text>
           </View>
-          <Ionicons name="chevron-forward" size={18} color={colors.textMuted} />
+          <Ionicons name="chevron-forward" size={20} color={colors.textMuted} />
         </TouchableOpacity>
 
-        {/* Section Cards */}
-        <Text style={styles.sectionHeader}>Sections</Text>
+        {/* ═══════ APPROACH CARD ═══════ */}
+        <View style={styles.approachCard}>
+          <View style={styles.approachCardHeader}>
+            <Ionicons name="bulb-outline" size={18} color="#f59e0b" />
+            <Text style={styles.approachCardTitle}>OTC Hitting Philosophy</Text>
+          </View>
+          <Text style={styles.approachCardText}>
+            Consistent hard contact with backspin that can be driven to all fields. Mechanics are tools — the goal is becoming a hitter who competes and produces results.
+          </Text>
+        </View>
 
-        {HITTING_VAULT_SECTIONS.map((section) => {
-          const drillCount = section.drills.length;
-          const isPlaceholder = section.isPlaceholder;
-          const hasDiagnostic = gate.hitting.mechanicalDone;
+        {/* ═══════ EXPLORE MORE ═══════ */}
+        <TouchableOpacity
+          style={styles.exploreHeader}
+          onPress={() => setExploreExpanded(!exploreExpanded)}
+          activeOpacity={0.7}
+        >
+          <Ionicons name="compass-outline" size={20} color={ACCENT} />
+          <Text style={styles.exploreHeaderText}>Explore More</Text>
+          <View style={{ flex: 1 }} />
+          <Text style={styles.exploreCount}>{EXPLORE_ITEMS.length} areas</Text>
+          <Ionicons
+            name={exploreExpanded ? 'chevron-up' : 'chevron-down'}
+            size={18}
+            color={colors.textMuted}
+          />
+        </TouchableOpacity>
 
-          return (
-            <TouchableOpacity
-              key={section.key}
-              style={styles.sectionCard}
-              onPress={() => router.push(`/(app)/training/mechanical/${section.key}` as any)}
-              activeOpacity={0.8}
-            >
-              <View style={[styles.sectionIcon, { backgroundColor: section.color + '18' }]}>
-                <Ionicons name={section.icon} size={22} color={section.color} />
-              </View>
-              <View style={styles.sectionContent}>
-                <Text style={styles.sectionLabel}>{section.label}</Text>
-                <Text style={styles.sectionDesc} numberOfLines={2}>
-                  {section.description}
-                </Text>
-                <View style={styles.sectionMeta}>
-                  {isPlaceholder ? (
-                    <Text style={[styles.metaText, { color: section.color }]}>
-                      {hasDiagnostic ? 'Personalized fixes' : 'Take Swing Diagnostic to unlock'}
-                    </Text>
-                  ) : (
-                    <>
-                      <Text style={styles.metaText}>
-                        {drillCount} drill{drillCount !== 1 ? 's' : ''}
-                      </Text>
-                      {hasLimitedHitting && section.freeCount > 0 && (
-                        <Text style={[styles.metaFree, { color: section.color }]}>
-                          {section.freeCount} free
-                        </Text>
-                      )}
-                    </>
-                  )}
-                </View>
-              </View>
-              <Ionicons name="chevron-forward" size={18} color={colors.textMuted} />
-            </TouchableOpacity>
-          );
-        })}
+        {exploreExpanded && (
+          <View style={styles.exploreGrid}>
+            {EXPLORE_ITEMS.map((item) => {
+              const isPlaceholder = !item.route;
+              return (
+                <TouchableOpacity
+                  key={item.key}
+                  style={[styles.exploreCard, isPlaceholder && { opacity: 0.5 }]}
+                  onPress={() => {
+                    if (!isPlaceholder) router.push(item.route as any);
+                  }}
+                  activeOpacity={isPlaceholder ? 1 : 0.8}
+                >
+                  <View style={[styles.exploreIcon, { backgroundColor: item.color + '15' }]}>
+                    <Ionicons name={item.icon} size={20} color={item.color} />
+                  </View>
+                  <Text style={styles.exploreLabel}>{item.label}</Text>
+                  <Text style={styles.exploreSub} numberOfLines={1}>{item.sub}</Text>
+                </TouchableOpacity>
+              );
+            })}
+          </View>
+        )}
       </ScrollView>
     </SafeAreaView>
   );
@@ -186,142 +321,117 @@ const styles = StyleSheet.create({
   safe: { flex: 1, backgroundColor: colors.bg },
 
   header: {
-    flexDirection: 'row',
-    alignItems: 'center',
-    gap: 10,
-    paddingHorizontal: 16,
-    paddingVertical: 12,
-    borderBottomWidth: 1,
-    borderBottomColor: colors.border,
+    flexDirection: 'row', alignItems: 'center', gap: 10,
+    paddingHorizontal: 16, paddingVertical: 12,
+    borderBottomWidth: 1, borderBottomColor: colors.border,
   },
   backBtn: { padding: 2 },
-  headerSup: {
-    fontSize: 9,
-    fontWeight: '900',
-    letterSpacing: 1.5,
-    color: ACCENT,
-  },
-  headerTitle: {
-    fontSize: 20,
-    fontWeight: '900',
-    color: colors.textPrimary,
-  },
+  headerSup: { fontSize: 9, fontWeight: '900', letterSpacing: 1.5, color: ACCENT },
+  headerTitle: { fontSize: 20, fontWeight: '900', color: colors.textPrimary },
   diagBtn: {
-    width: 36,
-    height: 36,
-    borderRadius: 10,
-    backgroundColor: ACCENT + '15',
-    alignItems: 'center',
-    justifyContent: 'center',
+    width: 36, height: 36, borderRadius: 10,
+    backgroundColor: ACCENT + '15', alignItems: 'center', justifyContent: 'center',
   },
 
-  content: { padding: 16, paddingBottom: 60, gap: 10 },
-
-  moverBanner: {
-    flexDirection: 'row',
-    alignItems: 'center',
-    gap: 12,
-    backgroundColor: colors.surface,
-    borderWidth: 1,
-    borderRadius: radius.lg,
-    padding: 14,
-  },
-  moverDot: { width: 10, height: 10, borderRadius: 5 },
-  moverLabel: {
-    fontSize: 10,
-    fontWeight: '800',
-    color: colors.textMuted,
-    letterSpacing: 0.8,
-  },
-  moverType: { fontSize: 16, fontWeight: '900' },
+  content: { padding: 16, paddingBottom: 60, gap: 12 },
 
   upgradeBanner: {
-    flexDirection: 'row',
-    alignItems: 'center',
-    gap: 12,
-    backgroundColor: ACCENT + '08',
-    borderWidth: 1,
-    borderColor: ACCENT + '30',
-    borderRadius: radius.lg,
-    padding: 14,
+    flexDirection: 'row', alignItems: 'center', gap: 12,
+    backgroundColor: ACCENT + '08', borderWidth: 1, borderColor: ACCENT + '30',
+    borderRadius: radius.lg, padding: 14,
   },
-  upgradeTitle: {
-    fontSize: 13,
-    fontWeight: '800',
-    color: colors.textPrimary,
-  },
-  upgradeSub: {
-    fontSize: 11,
-    color: colors.textSecondary,
-    lineHeight: 16,
-    marginTop: 2,
-  },
+  upgradeTitle: { fontSize: 13, fontWeight: '800', color: colors.textPrimary },
+  upgradeSub: { fontSize: 11, color: colors.textSecondary, lineHeight: 16, marginTop: 2 },
 
-  myPathCard: {
-    flexDirection: 'row',
-    alignItems: 'center',
-    gap: 14,
-    backgroundColor: '#3b82f608',
-    borderWidth: 1,
-    borderColor: '#3b82f625',
-    borderRadius: radius.lg,
-    padding: 16,
+  /* ── Swing Profile ────────────────────────── */
+  profileCard: {
+    backgroundColor: colors.surface, borderWidth: 1, borderColor: colors.border,
+    borderRadius: radius.lg, padding: 16, gap: 12,
   },
-  dailyWorkCard: {
-    flexDirection: 'row',
-    alignItems: 'center',
-    gap: 14,
-    backgroundColor: ACCENT + '08',
-    borderWidth: 1,
-    borderColor: ACCENT + '25',
-    borderRadius: radius.lg,
-    padding: 16,
+  profileCardTitle: { fontSize: 10, fontWeight: '900', letterSpacing: 1.5, color: colors.textMuted },
+  profileRow: {
+    flexDirection: 'row', alignItems: 'center', gap: 12,
+    paddingTop: 4,
   },
-  dailyWorkIcon: {
-    width: 44,
-    height: 44,
-    borderRadius: 12,
-    backgroundColor: ACCENT + '18',
-    alignItems: 'center',
-    justifyContent: 'center',
+  profileIcon: {
+    width: 40, height: 40, borderRadius: 12,
+    alignItems: 'center', justifyContent: 'center',
   },
-  dailyWorkLabel: { fontSize: 15, fontWeight: '800', color: colors.textPrimary },
-  dailyWorkSub: { fontSize: 12, color: colors.textSecondary, lineHeight: 17, marginTop: 2 },
+  profileRowLabel: { fontSize: 10, fontWeight: '800', color: colors.textMuted, letterSpacing: 0.8 },
+  profileRowValue: { fontSize: 15, fontWeight: '900', color: colors.textSecondary },
 
-  sectionHeader: {
-    fontSize: 13,
-    fontWeight: '800',
-    color: colors.textMuted,
-    marginTop: 8,
-    marginBottom: 2,
-  },
+  moverResults: { gap: 1 },
+  moverSecondary: { fontSize: 11, color: colors.textMuted },
 
-  sectionCard: {
-    flexDirection: 'row',
-    alignItems: 'center',
-    gap: 14,
-    backgroundColor: colors.surface,
-    borderWidth: 1,
-    borderColor: colors.border,
-    borderRadius: radius.lg,
-    padding: 16,
+  moverDetail: {
+    backgroundColor: colors.bg, borderRadius: radius.md,
+    padding: 14, gap: 8, marginTop: 4,
   },
-  sectionIcon: {
-    width: 44,
-    height: 44,
-    borderRadius: 12,
-    alignItems: 'center',
-    justifyContent: 'center',
+  moverDesc: { fontSize: 13, color: colors.textSecondary, lineHeight: 19 },
+  detailLabel: { fontSize: 9, fontWeight: '900', letterSpacing: 1.2, color: colors.textMuted, marginTop: 4 },
+  mlbRow: { flexDirection: 'row', flexWrap: 'wrap', gap: 8 },
+  mlbName: { fontSize: 13, fontWeight: '700' },
+  cueRow: { flexDirection: 'row', alignItems: 'center', gap: 8 },
+  cueText: { fontSize: 13, fontWeight: '600', color: colors.textPrimary },
+
+  mechResults: { gap: 1 },
+  mechSecondary: { fontSize: 11, color: colors.textMuted },
+
+  /* ── Approach Connector ────────────────────── */
+  approachConnector: {
+    backgroundColor: colors.surface, borderWidth: 1, borderColor: colors.border,
+    borderRadius: radius.lg, padding: 16, gap: 12,
   },
-  sectionContent: { flex: 1, gap: 3 },
-  sectionLabel: { fontSize: 15, fontWeight: '800', color: colors.textPrimary },
-  sectionDesc: { fontSize: 12, color: colors.textSecondary, lineHeight: 17 },
-  sectionMeta: {
-    flexDirection: 'row',
-    alignItems: 'center',
-    gap: 8,
-    marginTop: 4,
+  approachConnectorText: { fontSize: 13, color: colors.textSecondary, lineHeight: 20 },
+  approachBtn: {
+    flexDirection: 'row', alignItems: 'center', justifyContent: 'center',
+    gap: 8, paddingVertical: 10, borderRadius: radius.sm,
+    backgroundColor: '#f59e0b15',
   },
-  metaText: { fontSize: 11, fontWeight: '700', color: colors.textMuted },
-  metaFree: { fontSize: 11, fontWeight: '800' },
+  approachBtnText: { fontSize: 13, fontWeight: '800', color: '#f59e0b' },
+
+  /* ── Primary blocks (My Path, Today's Work) ─── */
+  primaryCard: {
+    flexDirection: 'row', alignItems: 'center', gap: 14,
+    backgroundColor: colors.surface, borderWidth: 1, borderColor: colors.border,
+    borderRadius: radius.lg, padding: 18,
+  },
+  primaryIcon: {
+    width: 48, height: 48, borderRadius: 14,
+    alignItems: 'center', justifyContent: 'center',
+  },
+  primaryLabel: { fontSize: 17, fontWeight: '900', color: colors.textPrimary },
+  primarySub: { fontSize: 13, color: colors.textSecondary, marginTop: 2 },
+
+  /* ── Approach Card ─────────────────────────── */
+  approachCard: {
+    backgroundColor: '#f59e0b08', borderWidth: 1, borderColor: '#f59e0b25',
+    borderRadius: radius.lg, padding: 16, gap: 8,
+  },
+  approachCardHeader: { flexDirection: 'row', alignItems: 'center', gap: 8 },
+  approachCardTitle: { fontSize: 14, fontWeight: '900', color: '#f59e0b' },
+  approachCardText: { fontSize: 13, color: colors.textSecondary, lineHeight: 20 },
+
+  /* ── Explore More ──────────────────────────── */
+  exploreHeader: {
+    flexDirection: 'row', alignItems: 'center', gap: 8,
+    paddingVertical: 12, paddingHorizontal: 4, marginTop: 4,
+  },
+  exploreHeaderText: { fontSize: 16, fontWeight: '900', color: colors.textPrimary },
+  exploreCount: { fontSize: 11, fontWeight: '700', color: colors.textMuted },
+
+  exploreGrid: {
+    flexDirection: 'row', flexWrap: 'wrap', gap: 10,
+  },
+  exploreCard: {
+    width: '48%' as any,
+    backgroundColor: colors.surface, borderWidth: 1, borderColor: colors.border,
+    borderRadius: radius.lg, padding: 14, gap: 8,
+  },
+  exploreIcon: {
+    width: 40, height: 40, borderRadius: 12,
+    alignItems: 'center', justifyContent: 'center',
+  },
+  exploreLabel: { fontSize: 14, fontWeight: '800', color: colors.textPrimary },
+  exploreSub: { fontSize: 11, color: colors.textSecondary, lineHeight: 15 },
 });

@@ -1,5 +1,6 @@
 import { useAuthStore } from '@/store/auth.store';
 import type { AthleteTier } from '@/types/database';
+import { useDevTierOverride } from '@/lib/dev-tier-override';
 
 export type CanonicalTier = AthleteTier;
 
@@ -25,9 +26,12 @@ function normalize(raw: string | null | undefined): CanonicalTier {
 export function useTier() {
   const athlete = useAuthStore((s) => s.athlete);
   const coach = useAuthStore((s) => s.coach);
+  const devTierOverride = useDevTierOverride();
 
   const isCoach = !!coach;
-  const tier: CanonicalTier = normalize(athlete?.tier);
+
+  // DEV override: when active, use the overridden tier instead of the real one
+  const tier: CanonicalTier = devTierOverride ?? normalize(athlete?.tier);
 
   // Tier booleans
   const isWalk    = !isCoach && tier === 'WALK';
@@ -47,9 +51,9 @@ export function useTier() {
   const hasFullLifting = isCoach || isDouble || isTriple || isHomeRun;
 
   // ── Mental Vault ───────────────────────────────────
-  // Walk+Single: none, Double: limited, Triple+: complete
-  const hasLimitedMental = isDouble;
-  const hasFullMental = isCoach || isTriple || isHomeRun;
+  // Walk: none, Single: limited (preview), Double+: complete
+  const hasLimitedMental = isSingle;
+  const hasFullMental = isCoach || isDouble || isTriple || isHomeRun;
 
   // ── Guided Program ─────────────────────────────────
   // Home Run only: full guided lifting + hitting + mental system

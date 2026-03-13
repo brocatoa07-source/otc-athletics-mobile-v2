@@ -31,7 +31,7 @@ export const ARCHETYPE_PATHS: Record<string, ArchetypePath> = {
     recommendedCourse: {
       id: 'emotional-control',
       label: 'Emotional Control',
-      route: '/(app)/training/mental/emotional-control-course',
+      route: '/(app)/training/mental/course?id=emotional-control',
     },
     topTools: ['At-Bat Reset', 'Breathing & Regulation', 'Visualization'],
     journalType: { key: 'daily', label: 'Daily Entry' },
@@ -45,7 +45,7 @@ export const ARCHETYPE_PATHS: Record<string, ArchetypePath> = {
     recommendedCourse: {
       id: 'focus',
       label: 'Focus',
-      route: '/(app)/training/mental/focus-course',
+      route: '/(app)/training/mental/course?id=focus',
     },
     topTools: ['At-Bat Reset', 'Breathing & Regulation', 'Self-Talk'],
     journalType: { key: 'mental_reset', label: 'Daily Mental Reset' },
@@ -59,7 +59,7 @@ export const ARCHETYPE_PATHS: Record<string, ArchetypePath> = {
     recommendedCourse: {
       id: 'confidence',
       label: 'Confidence',
-      route: '/(app)/training/mental/confidence-course',
+      route: '/(app)/training/mental/course?id=confidence',
     },
     topTools: ['Self-Talk', 'Visualization', 'Pre-Game Routine'],
     journalType: { key: 'game_day', label: 'Game Day' },
@@ -73,7 +73,7 @@ export const ARCHETYPE_PATHS: Record<string, ArchetypePath> = {
     recommendedCourse: {
       id: 'awareness',
       label: 'Awareness',
-      route: '/(app)/training/mental/awareness-course',
+      route: '/(app)/training/mental/course?id=awareness',
     },
     topTools: ['Self-Talk', 'Pre-Game Routine', 'Post-Game Review'],
     journalType: { key: 'weekly_reflection', label: 'Weekly Reflection' },
@@ -87,7 +87,7 @@ export const ARCHETYPE_PATHS: Record<string, ArchetypePath> = {
     recommendedCourse: {
       id: 'confidence',
       label: 'Confidence',
-      route: '/(app)/training/mental/confidence-course',
+      route: '/(app)/training/mental/course?id=confidence',
     },
     topTools: ['Self-Talk', 'Visualization', 'Breathing & Regulation'],
     journalType: { key: 'daily', label: 'Daily Entry' },
@@ -101,7 +101,7 @@ export const ARCHETYPE_PATHS: Record<string, ArchetypePath> = {
     recommendedCourse: {
       id: 'awareness',
       label: 'Awareness',
-      route: '/(app)/training/mental/awareness-course',
+      route: '/(app)/training/mental/course?id=awareness',
     },
     topTools: ['Post-Game Review', 'Breathing & Regulation', 'Pre-Game Routine'],
     journalType: { key: 'weekly', label: 'Weekly Review' },

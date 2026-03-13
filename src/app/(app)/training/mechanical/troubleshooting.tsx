@@ -11,50 +11,23 @@ import { useGating } from '@/hooks/useGating';
 import { useTier } from '@/hooks/useTier';
 import { hasTroubleshootingPreviewOnly, WALK_TROUBLESHOOTING_DRILL_LIMIT, getUpgradeTargetLabel } from '@/lib/tier-content';
 import {
-  MECHANICAL_ISSUES,
-  type MechanicalIssue,
   type MechanicalDiagnosticResult,
 } from '@/data/hitting-mechanical-diagnostic-data';
 import type { MoverType } from '@/data/hitting-mover-type-data';
 import {
-  ISSUE_TO_QUICKFIX,
-  QUICK_FIXES,
-  pickDrill,
-} from '@/data/daily-work';
-import {
   HITTING_VAULT_SECTIONS,
   type DrillCard,
 } from '@/data/hitting-vault-sections';
+import {
+  getTroubleshootingIssuesForDiagnostic,
+  type TroubleshootingIssueData,
+} from '@/data/troubleshooting-issues';
+import {
+  getRecommendedDrills as getEngineRecommendation,
+  flattenRecommendation,
+} from '@/lib/recommendation/drillRecommendationEngine';
 
 const ACCENT = '#f97316'; // matches troubleshooting section color
-
-/* ─── Issue → user-facing Quick Fix label ─────────── */
-
-const ISSUE_DISPLAY: Record<MechanicalIssue, string> = {
-  timing: 'Late',
-  weight_shift: 'Lunging',
-  early_rotation: 'Stuck',
-  swing_plane: 'Losing Posture',
-  disconnection: 'Casting',
-  barrel_path: 'Barrel Path',
-};
-
-/* ─── Why descriptions (short athlete-friendly) ───── */
-
-const ISSUE_WHY: Record<MechanicalIssue, string> = {
-  timing:
-    'Your timing is off because your load and stride aren\'t syncing with pitch speed. The fix is getting your front foot down earlier and letting the ball travel deeper.',
-  weight_shift:
-    'Your weight is drifting forward instead of staying back and driving through. This kills your balance and your ability to adjust mid-swing.',
-  early_rotation:
-    'Your hips are firing before your weight shift is complete. The barrel drags through the zone and you lose both power and direction.',
-  disconnection:
-    'Your arms are working independently from your body rotation. The swing becomes all arms — you lose the chain of force from the ground up.',
-  swing_plane:
-    'Your barrel isn\'t matching the pitch plane. You\'re either too steep or too flat, which leads to pop-ups, weak grounders, and inconsistent contact.',
-  barrel_path:
-    'Your barrel is cutting across the ball or taking a long path to the zone. You foul off pitches you should crush and miss barrels consistently.',
-};
 
 /* ─── Focus label → vault section key ─────────────── */
 
@@ -81,58 +54,41 @@ function findDrillInVault(drillName: string): { drill: DrillCard; sectionKey: st
 }
 
 /**
- * Build 5 recommended drills: 2 from primary, 2 from secondary, 1 bonus.
- * Uses mover-type bias via pickDrill when available.
+ * Build recommended drills via the recommendation engine,
+ * then tag each drill with the matching troubleshooting issue
+ * label and color for display.
  */
 function getTroubleshootingDrills(
-  primary: MechanicalIssue,
-  secondary: MechanicalIssue,
+  issues: TroubleshootingIssueData[],
+  diagnostic: MechanicalDiagnosticResult,
   moverType: MoverType | null,
-): { name: string; source: 'primary' | 'secondary' | 'bonus' }[] {
-  const primaryKey = ISSUE_TO_QUICKFIX[primary];
-  const secondaryKey = ISSUE_TO_QUICKFIX[secondary];
-  const primaryPool = QUICK_FIXES[primaryKey]?.drills ?? [];
-  const secondaryPool = QUICK_FIXES[secondaryKey]?.drills ?? [];
+): { name: string; issueLabel: string; issueColor: string }[] {
+  const rec = getEngineRecommendation({
+    primaryIssue: diagnostic.primary,
+    secondaryIssue: diagnostic.secondary,
+    moverType,
+    age: null,
+    recentDrills: [],
+  });
+  const flat = flattenRecommendation(rec);
 
-  const dayIndex = Math.floor(Date.now() / 86_400_000);
-  const picked = new Set<string>();
-  const results: { name: string; source: 'primary' | 'secondary' | 'bonus' }[] = [];
+  // Find the first matching troubleshooting issue for coloring
+  const primaryIssue = issues.find((i) => i.diagnosticIssue === diagnostic.primary);
+  const secondaryIssue = issues.find((i) => i.diagnosticIssue === diagnostic.secondary);
+  const fallback = issues[0];
 
-  // 2 from primary
-  const p1 = pickDrill(primaryPool, dayIndex, moverType);
-  picked.add(p1);
-  results.push({ name: p1, source: 'primary' });
-
-  const primaryRemaining = primaryPool.filter((d) => !picked.has(d));
-  const p2 = primaryRemaining.length > 0
-    ? pickDrill(primaryRemaining, dayIndex + 1, moverType)
-    : primaryPool[(dayIndex + 1) % primaryPool.length];
-  picked.add(p2);
-  results.push({ name: p2, source: 'primary' });
-
-  // 2 from secondary (avoid duplicates if same pool)
-  const s1Pool = secondaryPool.filter((d) => !picked.has(d));
-  const s1 = s1Pool.length > 0
-    ? pickDrill(s1Pool, dayIndex, moverType)
-    : secondaryPool[dayIndex % secondaryPool.length];
-  picked.add(s1);
-  results.push({ name: s1, source: 'secondary' });
-
-  const s2Pool = secondaryPool.filter((d) => !picked.has(d));
-  const s2 = s2Pool.length > 0
-    ? pickDrill(s2Pool, dayIndex + 1, moverType)
-    : secondaryPool[(dayIndex + 1) % secondaryPool.length];
-  picked.add(s2);
-  results.push({ name: s2, source: 'secondary' });
-
-  // 1 bonus — pick from whichever pool has remaining options
-  const bonusPool = [...primaryPool, ...secondaryPool].filter((d) => !picked.has(d));
-  if (bonusPool.length > 0) {
-    const bonus = pickDrill(bonusPool, dayIndex + 2, moverType);
-    results.push({ name: bonus, source: 'bonus' });
-  }
-
-  return results;
+  return flat.map((entry) => {
+    const issue = entry.role === 'primary'
+      ? (primaryIssue ?? fallback)
+      : entry.role === 'secondary'
+        ? (secondaryIssue ?? fallback)
+        : fallback;
+    return {
+      name: entry.name,
+      issueLabel: entry.role === 'reset' ? 'Foundation' : issue.label,
+      issueColor: entry.role === 'reset' ? '#22c55e' : issue.color,
+    };
+  });
 }
 
 /* ─── Screen ──────────────────────────────────────── */
@@ -156,7 +112,7 @@ export default function TroubleshootingScreen() {
       if (!val) return;
       try {
         const parsed = JSON.parse(val);
-        setMoverType((parsed.slug ?? parsed) as MoverType);
+        setMoverType((parsed.primary ?? parsed.slug ?? parsed) as MoverType);
       } catch {}
     });
   }, []);
@@ -195,11 +151,11 @@ export default function TroubleshootingScreen() {
   }
 
   // ── Diagnostic complete — full screen ──────────────
-  const primaryData = MECHANICAL_ISSUES[diagnostic.primary];
-  const secondaryData = MECHANICAL_ISSUES[diagnostic.secondary];
-  const allDrills = getTroubleshootingDrills(diagnostic.primary, diagnostic.secondary, moverType);
+  const { primary: primaryIssues, secondary: secondaryIssues } =
+    getTroubleshootingIssuesForDiagnostic(diagnostic.primary, diagnostic.secondary);
+  const allIssues = [...primaryIssues, ...secondaryIssues];
+  const allDrills = getTroubleshootingDrills(allIssues, diagnostic, moverType);
   const drills = isPreviewOnly ? allDrills.slice(0, WALK_TROUBLESHOOTING_DRILL_LIMIT) : allDrills;
-
 
   return (
     <SafeAreaView style={styles.safe}>
@@ -223,97 +179,82 @@ export default function TroubleshootingScreen() {
         contentContainerStyle={styles.content}
         showsVerticalScrollIndicator={false}
       >
-        {/* ── Primary Issue ────────────────────────── */}
-        <Text style={styles.sectionLabel}>PRIMARY ISSUE</Text>
-        <View style={[styles.issueCard, { borderColor: primaryData.color + '30' }]}>
-          <View style={styles.issueHeader}>
-            <View style={[styles.issueDot, { backgroundColor: primaryData.color }]} />
-            <Text style={[styles.issueTitle, { color: primaryData.color }]}>
-              {ISSUE_DISPLAY[diagnostic.primary]}
-            </Text>
-          </View>
-          <Text style={styles.issueDesc}>{primaryData.description}</Text>
-          <View style={[styles.cueBadge, { borderColor: primaryData.color + '40' }]}>
-            <Text style={[styles.cueLabel, { color: primaryData.color }]}>CUE</Text>
-            <Text style={styles.cueText}>"{primaryData.cue}"</Text>
-          </View>
-          <View style={styles.areaRow}>
-            {primaryData.areas.map((area) => (
-              <TouchableOpacity
-                key={area}
-                style={[styles.areaChip, { borderColor: primaryData.color + '40' }]}
-                onPress={() => {
-                  const key = FOCUS_TO_SECTION_KEY[area];
-                  if (key) router.push(`/(app)/training/mechanical/${key}` as any);
-                }}
-              >
-                <Text style={[styles.areaChipText, { color: primaryData.color }]}>{area}</Text>
-              </TouchableOpacity>
-            ))}
-          </View>
-        </View>
+        {/* ── Issues from diagnostic ─────────────────── */}
+        {allIssues.map((issue, idx) => {
+          const isPrimary = idx < primaryIssues.length;
+          return (
+            <View key={issue.slug}>
+              <Text style={styles.sectionLabel}>
+                {isPrimary ? 'PRIMARY ISSUE' : 'SECONDARY ISSUE'}
+              </Text>
+              <View style={[styles.issueCard, { borderColor: issue.color + '30' }]}>
+                {/* Header */}
+                <View style={styles.issueHeader}>
+                  <View style={[styles.issueDot, { backgroundColor: issue.color }]} />
+                  <Text style={[styles.issueTitle, { color: issue.color }]}>
+                    {issue.label}
+                  </Text>
+                </View>
 
-        {/* ── Secondary Issue ──────────────────────── */}
-        <Text style={styles.sectionLabel}>SECONDARY ISSUE</Text>
-        <View style={[styles.issueCard, { borderColor: secondaryData.color + '30' }]}>
-          <View style={styles.issueHeader}>
-            <View style={[styles.issueDot, { backgroundColor: secondaryData.color }]} />
-            <Text style={[styles.issueTitle, { color: secondaryData.color }]}>
-              {ISSUE_DISPLAY[diagnostic.secondary]}
-            </Text>
-          </View>
-          <Text style={styles.issueDesc}>{secondaryData.description}</Text>
-          <View style={[styles.cueBadge, { borderColor: secondaryData.color + '40' }]}>
-            <Text style={[styles.cueLabel, { color: secondaryData.color }]}>CUE</Text>
-            <Text style={styles.cueText}>"{secondaryData.cue}"</Text>
-          </View>
-          <View style={styles.areaRow}>
-            {secondaryData.areas.map((area) => (
-              <TouchableOpacity
-                key={area}
-                style={[styles.areaChip, { borderColor: secondaryData.color + '40' }]}
-                onPress={() => {
-                  const key = FOCUS_TO_SECTION_KEY[area];
-                  if (key) router.push(`/(app)/training/mechanical/${key}` as any);
-                }}
-              >
-                <Text style={[styles.areaChipText, { color: secondaryData.color }]}>{area}</Text>
-              </TouchableOpacity>
-            ))}
-          </View>
-        </View>
+                {/* Description */}
+                <Text style={styles.issueDesc}>{issue.description}</Text>
 
-        {/* ── Why This Happens ─────────────────────── */}
-        <Text style={styles.sectionLabel}>WHY THIS HAPPENS</Text>
-        <View style={styles.whyCard}>
-          <View style={styles.whyRow}>
-            <View style={[styles.whyDot, { backgroundColor: primaryData.color }]} />
-            <Text style={styles.whyText}>{ISSUE_WHY[diagnostic.primary]}</Text>
-          </View>
-          {diagnostic.primary !== diagnostic.secondary && (
-            <>
-              <View style={styles.whyDivider} />
-              <View style={styles.whyRow}>
-                <View style={[styles.whyDot, { backgroundColor: secondaryData.color }]} />
-                <Text style={styles.whyText}>{ISSUE_WHY[diagnostic.secondary]}</Text>
+                {/* Symptoms */}
+                <View style={styles.symptomList}>
+                  <Text style={[styles.symptomLabel, { color: issue.color }]}>SYMPTOMS</Text>
+                  {issue.symptoms.map((s) => (
+                    <View key={s} style={styles.symptomRow}>
+                      <View style={[styles.symptomBullet, { backgroundColor: issue.color }]} />
+                      <Text style={styles.symptomText}>{s}</Text>
+                    </View>
+                  ))}
+                </View>
+
+                {/* Why */}
+                <View style={[styles.whyInline, { borderColor: issue.color + '30' }]}>
+                  <Text style={[styles.whyInlineLabel, { color: issue.color }]}>WHY THIS HAPPENS</Text>
+                  <Text style={styles.whyInlineText}>{issue.why}</Text>
+                </View>
+
+                {/* What It Leads To */}
+                <View style={[styles.leadsToBox, { borderColor: issue.color + '30' }]}>
+                  <Text style={[styles.leadsToLabel, { color: issue.color }]}>WHAT IT LEADS TO</Text>
+                  <Text style={styles.leadsToText}>{issue.whatItLeadsTo}</Text>
+                </View>
+
+                {/* Cue */}
+                <View style={[styles.cueBadge, { borderColor: issue.color + '40' }]}>
+                  <Text style={[styles.cueLabel, { color: issue.color }]}>CUE</Text>
+                  <Text style={styles.cueText}>"{issue.cue}"</Text>
+                </View>
+
+                {/* Area chips */}
+                <View style={styles.areaRow}>
+                  {issue.areas.map((area: string) => (
+                    <TouchableOpacity
+                      key={area}
+                      style={[styles.areaChip, { borderColor: issue.color + '40' }]}
+                      onPress={() => {
+                        const sKey = FOCUS_TO_SECTION_KEY[area];
+                        if (sKey) router.push(`/(app)/training/mechanical/${sKey}` as any);
+                      }}
+                    >
+                      <Text style={[styles.areaChipText, { color: issue.color }]}>{area}</Text>
+                    </TouchableOpacity>
+                  ))}
+                </View>
               </View>
-            </>
-          )}
-        </View>
+            </View>
+          );
+        })}
 
         {/* ── Recommended Fixes ────────────────────── */}
         <Text style={styles.sectionLabel}>RECOMMENDED FIXES</Text>
 
-        {drills.map(({ name, source }) => {
+        {drills.map(({ name, issueLabel, issueColor }) => {
           const vaultMatch = findDrillInVault(name);
           const drillCard = vaultMatch?.drill ?? null;
           const isExpanded = expandedDrill === name;
-          const sourceColor = source === 'primary' ? primaryData.color
-            : source === 'secondary' ? secondaryData.color
-            : ACCENT;
-          const sourceLabel = source === 'primary' ? 'Primary Fix'
-            : source === 'secondary' ? 'Secondary Fix'
-            : 'Bonus';
 
           return (
             <TouchableOpacity
@@ -324,13 +265,13 @@ export default function TroubleshootingScreen() {
             >
               {/* Drill header */}
               <View style={styles.drillHeader}>
-                <View style={[styles.drillIcon, { backgroundColor: sourceColor + '18' }]}>
-                  <Ionicons name="baseball-outline" size={16} color={sourceColor} />
+                <View style={[styles.drillIcon, { backgroundColor: issueColor + '18' }]}>
+                  <Ionicons name="baseball-outline" size={16} color={issueColor} />
                 </View>
                 <View style={{ flex: 1 }}>
                   <View style={styles.drillMeta}>
-                    <View style={[styles.drillTag, { backgroundColor: sourceColor + '18' }]}>
-                      <Text style={[styles.drillTagText, { color: sourceColor }]}>{sourceLabel}</Text>
+                    <View style={[styles.drillTag, { backgroundColor: issueColor + '18' }]}>
+                      <Text style={[styles.drillTagText, { color: issueColor }]}>{issueLabel}</Text>
                     </View>
                   </View>
                   <Text style={styles.drillName}>{name}</Text>
@@ -346,15 +287,15 @@ export default function TroubleshootingScreen() {
               {isExpanded && drillCard && (
                 <View style={styles.drillBody}>
                   <View style={styles.fieldRow}>
-                    <Text style={[styles.fieldLabel, { color: sourceColor }]}>FIXES</Text>
+                    <Text style={[styles.fieldLabel, { color: issueColor }]}>FIXES</Text>
                     <Text style={styles.fieldText}>{drillCard.fixes}</Text>
                   </View>
                   <View style={styles.fieldRow}>
-                    <Text style={[styles.fieldLabel, { color: sourceColor }]}>HOW TO DO IT</Text>
+                    <Text style={[styles.fieldLabel, { color: issueColor }]}>HOW TO DO IT</Text>
                     <Text style={styles.fieldText}>{drillCard.howTo}</Text>
                   </View>
-                  <View style={[styles.focusBadge, { borderColor: sourceColor + '40' }]}>
-                    <Text style={[styles.focusLabel, { color: sourceColor }]}>FOCUS</Text>
+                  <View style={[styles.focusBadge, { borderColor: issueColor + '40' }]}>
+                    <Text style={[styles.focusLabel, { color: issueColor }]}>FOCUS</Text>
                     <Text style={styles.focusText}>{drillCard.focus}</Text>
                   </View>
                   <TouchableOpacity
@@ -510,19 +451,34 @@ const styles = StyleSheet.create({
   },
   areaChipText: { fontSize: 12, fontWeight: '700' },
 
-  /* Why card */
-  whyCard: {
-    backgroundColor: colors.surface,
+  /* Symptoms */
+  symptomList: { gap: 6 },
+  symptomLabel: { fontSize: 9, fontWeight: '900', letterSpacing: 1.2, marginBottom: 2 },
+  symptomRow: { flexDirection: 'row', alignItems: 'flex-start', gap: 8 },
+  symptomBullet: { width: 5, height: 5, borderRadius: 3, marginTop: 6 },
+  symptomText: { flex: 1, fontSize: 13, color: colors.textSecondary, lineHeight: 19 },
+
+  /* Why inline */
+  whyInline: {
     borderWidth: 1,
-    borderColor: colors.border,
-    borderRadius: radius.lg,
-    padding: 16,
-    gap: 12,
+    borderRadius: radius.sm,
+    padding: 10,
+    backgroundColor: colors.bg,
+    gap: 4,
   },
-  whyRow: { flexDirection: 'row', gap: 10 },
-  whyDot: { width: 6, height: 6, borderRadius: 3, marginTop: 6 },
-  whyText: { flex: 1, fontSize: 13, color: colors.textSecondary, lineHeight: 19 },
-  whyDivider: { height: 1, backgroundColor: colors.border },
+  whyInlineLabel: { fontSize: 9, fontWeight: '900', letterSpacing: 1.2 },
+  whyInlineText: { fontSize: 13, color: colors.textSecondary, lineHeight: 19 },
+
+  /* Leads to */
+  leadsToBox: {
+    borderWidth: 1,
+    borderRadius: radius.sm,
+    padding: 10,
+    backgroundColor: colors.bg,
+    gap: 4,
+  },
+  leadsToLabel: { fontSize: 9, fontWeight: '900', letterSpacing: 1.2 },
+  leadsToText: { fontSize: 13, color: colors.textSecondary, lineHeight: 19 },
 
   /* Drill cards */
   drillCard: {

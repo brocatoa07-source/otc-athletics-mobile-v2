@@ -62,11 +62,16 @@ export default function DiagnosticQuizScreen() {
         const result = scoreByType(diagType, orderedValues);
 
         // 2. Record diagnostic submission (single source of truth for gating)
+        //    Store full scored result so profile generation can read it back
         await submitDiagnostic(supabase, {
           userId: resolvedId,
           vaultType: 'mental',
           diagnosticType: diagType,
-          resultPayload: { answersCount: Object.keys(finalAnswers).length },
+          resultPayload: {
+            answersCount: Object.keys(finalAnswers).length,
+            answers: orderedValues,
+            scored: result as unknown as Record<string, unknown>,
+          },
         });
 
         queryClient.invalidateQueries({ queryKey: ['gate-state', resolvedId] });

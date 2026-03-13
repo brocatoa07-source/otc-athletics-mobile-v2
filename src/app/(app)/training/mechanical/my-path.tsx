@@ -21,14 +21,17 @@ import {
 } from '@/data/hitting-mover-type-data';
 import {
   ISSUE_TO_QUICKFIX,
-  QUICK_FIXES,
   QUICKFIX_TO_FOCUS,
-  pickDrill,
 } from '@/data/daily-work';
 import {
   HITTING_VAULT_SECTIONS,
   type DrillCard,
 } from '@/data/hitting-vault-sections';
+import {
+  getRecommendedDrills as getEngineRecommendation,
+  flattenRecommendation,
+  type FlatDrill,
+} from '@/lib/recommendation/drillRecommendationEngine';
 
 const ACCENT = '#E10600';
 
@@ -55,16 +58,6 @@ const FOCUS_TO_SECTION_KEY: Record<string, string> = {
   Extension: 'extension',
 };
 
-/* ─── Foundations drill pool (age ≤ 14) ───────────── */
-
-const FOUNDATIONS_DRILLS = [
-  'Hold Finish',
-  'Slow Motion Swing',
-  'Arráez Drill',
-  'Top Hand Bregman Drill',
-  'Bottom Hand Drill',
-];
-
 /* ─── Helpers ─────────────────────────────────────── */
 
 function findDrillInVault(drillName: string): { drill: DrillCard; sectionKey: string } | null {
@@ -79,35 +72,16 @@ function getRecommendedDrills(
   primary: MechanicalIssue,
   secondary: MechanicalIssue,
   moverType: MoverType | null = null,
-): string[] {
-  const primaryKey = ISSUE_TO_QUICKFIX[primary];
-  const secondaryKey = ISSUE_TO_QUICKFIX[secondary];
-  const primaryPool = QUICK_FIXES[primaryKey]?.drills ?? [];
-  const secondaryPool = QUICK_FIXES[secondaryKey]?.drills ?? [];
-
-  const dayIndex = Math.floor(Date.now() / 86_400_000);
-
-  if (primaryKey === secondaryKey) {
-    // Same pool — pick best via affinity, then rotate remaining
-    const pick1 = pickDrill(primaryPool, dayIndex, moverType);
-    const remaining = primaryPool.filter((d) => d !== pick1);
-    const pick2 = pickDrill(remaining, dayIndex + 1, moverType);
-    const rest = remaining.filter((d) => d !== pick2);
-    const pick3 = rest.length > 0
-      ? rest[dayIndex % rest.length]
-      : primaryPool[(dayIndex + 2) % primaryPool.length];
-    return [pick1, pick2, pick3];
-  }
-
-  // 1 from primary (mover-biased), 2 from secondary (mover-biased)
-  const pick1 = pickDrill(primaryPool, dayIndex, moverType);
-  const pick2 = pickDrill(secondaryPool, dayIndex, moverType);
-  const secondaryRemaining = secondaryPool.filter((d) => d !== pick2);
-  const pick3 = secondaryRemaining.length > 0
-    ? pickDrill(secondaryRemaining, dayIndex + 1, moverType)
-    : secondaryPool[(dayIndex + 1) % secondaryPool.length];
-
-  return [pick1, pick2, pick3];
+  age: number | null = null,
+): FlatDrill[] {
+  const rec = getEngineRecommendation({
+    primaryIssue: primary,
+    secondaryIssue: secondary,
+    moverType,
+    age,
+    recentDrills: [],
+  });
+  return flattenRecommendation(rec);
 }
 
 function getFocusAreas(primary: MechanicalIssue, secondary: MechanicalIssue): string[] {
@@ -129,14 +103,19 @@ export default function MyPathScreen() {
   const [diagnostic, setDiagnostic] = useState<MechanicalDiagnosticResult | null>(null);
 
   useEffect(() => {
-    // Load mover type
+    // Load mover type (supports new {primary,secondary} and legacy slug formats)
     AsyncStorage.getItem('otc:mover-type').then((val) => {
       if (!val) return;
       try {
         const parsed = JSON.parse(val);
-        const slug: MoverType = parsed.slug ?? parsed;
-        const found = MOVER_TYPES[slug];
-        if (found) setMoverData(found);
+        if (parsed.primary) {
+          const found = MOVER_TYPES[parsed.primary as MoverType];
+          if (found) setMoverData(found);
+        } else {
+          const slug: MoverType = parsed.slug ?? parsed;
+          const found = MOVER_TYPES[slug];
+          if (found) setMoverData(found);
+        }
       } catch {}
     });
 
@@ -151,7 +130,6 @@ export default function MyPathScreen() {
 
   const hasMover = gate.hitting.moverDone && moverData;
   const hasMechanical = gate.hitting.mechanicalDone && diagnostic;
-  const isYouth = athlete?.age != null && athlete.age <= 14;
 
   // ── No diagnostics — show CTA ──────────────────────
   if (!hasMover && !hasMechanical) {
@@ -187,9 +165,9 @@ export default function MyPathScreen() {
   // Derived data
   const focusAreas = hasMechanical ? getFocusAreas(diagnostic.primary, diagnostic.secondary) : [];
   const moverSlug: MoverType | null = moverData?.slug ?? null;
-  const recommended = hasMechanical ? getRecommendedDrills(diagnostic.primary, diagnostic.secondary, moverSlug) : [];
-  const dayIndex = Math.floor(Date.now() / 86_400_000);
-  const foundationDrill = isYouth ? FOUNDATIONS_DRILLS[dayIndex % FOUNDATIONS_DRILLS.length] : null;
+  const recommended = hasMechanical
+    ? getRecommendedDrills(diagnostic.primary, diagnostic.secondary, moverSlug, athlete?.age ?? null)
+    : [];
 
   return (
     <SafeAreaView style={styles.safe}>
@@ -228,8 +206,10 @@ export default function MyPathScreen() {
               </View>
 
               <View style={[styles.cueBadge, { borderColor: moverData.color + '40' }]}>
-                <Text style={[styles.cueLabel, { color: moverData.color }]}>PRIMARY CUE</Text>
-                <Text style={styles.cueText}>"{moverData.primaryCue}"</Text>
+                <Text style={[styles.cueLabel, { color: moverData.color }]}>PRIMARY CUES</Text>
+                {moverData.primaryCues.map((cue) => (
+                  <Text key={cue} style={styles.cueText}>"{cue}"</Text>
+                ))}
               </View>
 
               <TouchableOpacity
@@ -327,11 +307,11 @@ export default function MyPathScreen() {
         )}
 
         {/* ── 4. Recommended Drills ───────────────── */}
-        {(recommended.length > 0 || foundationDrill) && (
+        {recommended.length > 0 && (
           <>
             <Text style={styles.sectionLabel}>RECOMMENDED DRILLS</Text>
 
-            {isYouth && foundationDrill && (
+            {recommended.some((d) => d.role === 'reset') && (
               <View style={[styles.youthNote, { marginBottom: 8 }]}>
                 <Ionicons name="star-outline" size={12} color="#22c55e" />
                 <Text style={styles.youthNoteText}>
@@ -340,43 +320,21 @@ export default function MyPathScreen() {
               </View>
             )}
 
-            {/* Foundation drill (youth only) */}
-            {foundationDrill && (() => {
-              const vaultMatch = findDrillInVault(foundationDrill);
-              return (
-                <TouchableOpacity
-                  key="foundation"
-                  style={[styles.drillCard, { borderColor: '#22c55e30' }]}
-                  onPress={() => {
-                    if (vaultMatch) {
-                      router.push(`/(app)/training/mechanical/${vaultMatch.sectionKey}` as any);
-                    }
-                  }}
-                  activeOpacity={0.8}
-                >
-                  <View style={[styles.drillIcon, { backgroundColor: '#22c55e18' }]}>
-                    <Ionicons name="construct-outline" size={18} color="#22c55e" />
-                  </View>
-                  <View style={{ flex: 1 }}>
-                    <Text style={styles.drillTypeLabel}>FOUNDATION</Text>
-                    <Text style={styles.drillName}>{foundationDrill}</Text>
-                  </View>
-                  <Ionicons name="chevron-forward" size={16} color={colors.textMuted} />
-                </TouchableOpacity>
-              );
-            })()}
-
-            {/* Recommended hitting drills */}
-            {recommended.map((drillName, idx) => {
-              const vaultMatch = findDrillInVault(drillName);
-              const isPrimary = idx === 0;
-              const tagColor = isPrimary ? ACCENT : '#3b82f6';
-              const tagLabel = isPrimary ? 'Primary Fix' : 'Secondary Fix';
+            {recommended.map((entry) => {
+              const vaultMatch = findDrillInVault(entry.name);
+              const tagColor = entry.role === 'reset' ? '#22c55e'
+                : entry.role === 'primary' ? ACCENT
+                : '#3b82f6';
+              const tagLabel = entry.role === 'reset' ? 'Foundation'
+                : entry.role === 'primary' ? 'Primary Fix'
+                : 'Secondary Fix';
+              const iconName = entry.role === 'reset' ? 'construct-outline' as const : 'baseball-outline' as const;
+              const typeLabel = entry.role === 'reset' ? 'FOUNDATION' : 'HITTING';
 
               return (
                 <TouchableOpacity
-                  key={drillName}
-                  style={styles.drillCard}
+                  key={entry.name}
+                  style={[styles.drillCard, entry.role === 'reset' && { borderColor: '#22c55e30' }]}
                   onPress={() => {
                     if (vaultMatch) {
                       router.push(`/(app)/training/mechanical/${vaultMatch.sectionKey}` as any);
@@ -385,16 +343,16 @@ export default function MyPathScreen() {
                   activeOpacity={0.8}
                 >
                   <View style={[styles.drillIcon, { backgroundColor: tagColor + '18' }]}>
-                    <Ionicons name="baseball-outline" size={18} color={tagColor} />
+                    <Ionicons name={iconName} size={18} color={tagColor} />
                   </View>
                   <View style={{ flex: 1 }}>
                     <View style={styles.drillMeta}>
-                      <Text style={[styles.drillTypeLabel, { color: tagColor }]}>HITTING</Text>
+                      <Text style={[styles.drillTypeLabel, { color: tagColor }]}>{typeLabel}</Text>
                       <View style={[styles.drillTag, { backgroundColor: tagColor + '18' }]}>
                         <Text style={[styles.drillTagText, { color: tagColor }]}>{tagLabel}</Text>
                       </View>
                     </View>
-                    <Text style={styles.drillName}>{drillName}</Text>
+                    <Text style={styles.drillName}>{entry.name}</Text>
                   </View>
                   <Ionicons name="chevron-forward" size={16} color={colors.textMuted} />
                 </TouchableOpacity>

@@ -1,17 +1,30 @@
+import { useState } from 'react';
 import {
   ScrollView,
   View,
   Text,
   TouchableOpacity,
   StyleSheet,
+  ActivityIndicator,
+  Alert,
 } from 'react-native';
 import { SafeAreaView } from 'react-native-safe-area-context';
 import { router } from 'expo-router';
 import { Ionicons } from '@expo/vector-icons';
+import { useQueryClient } from '@tanstack/react-query';
+import AsyncStorage from '@react-native-async-storage/async-storage';
 import { colors, accents, radius } from '@/theme';
 import { DIAGNOSTIC_META, DIAGNOSTIC_ORDER } from '@/data/mental-diagnostics-data';
 import type { DiagnosticType } from '@/data/mental-diagnostics-data';
 import { useGating } from '@/hooks/useGating';
+import { supabase } from '@/lib/supabase';
+import { getLiveUser } from '@/utils/getLiveUser';
+import {
+  scoreArchetype,
+  scoreIdentity,
+  scoreHabits,
+  buildMentalProfilePayload,
+} from '@/utils/mentalDiagnosticScoring';
 
 const ACCENT = accents.mental;
 
@@ -74,6 +87,8 @@ function StepCard({
 
 export default function DiagnosticsEntryScreen() {
   const { gate } = useGating();
+  const queryClient = useQueryClient();
+  const [generating, setGenerating] = useState(false);
 
   // Derive step completion from gate state (diagnostic_submissions)
   const completedTypes = new Set<DiagnosticType>([
@@ -159,12 +174,104 @@ export default function DiagnosticsEntryScreen() {
         {allDiagnosticsComplete && (
           <TouchableOpacity
             style={[styles.generateBtn, { borderColor: ACCENT + '60', shadowColor: ACCENT }]}
-            onPress={() => router.push('/(app)/training/mental' as any)}
+            onPress={async () => {
+              if (generating) return;
+              setGenerating(true);
+              try {
+                const liveUser = await getLiveUser();
+                if (!liveUser) {
+                  Alert.alert('Session Expired', 'Please sign in again.');
+                  setGenerating(false);
+                  return;
+                }
+
+                // Fetch all 3 diagnostic submissions to get stored answers
+                const { data: submissions, error: fetchErr } = await supabase
+                  .from('diagnostic_submissions')
+                  .select('diagnostic_type, result_payload')
+                  .eq('user_id', liveUser.id)
+                  .eq('vault_type', 'mental');
+
+                if (fetchErr || !submissions) {
+                  throw new Error(fetchErr?.message ?? 'Could not fetch diagnostics');
+                }
+
+                const byType: Record<string, any> = {};
+                for (const s of submissions) {
+                  byType[s.diagnostic_type] = s.result_payload;
+                }
+
+                // Re-score from stored answers (or use stored scored results)
+                const archetypePayload = byType.archetype;
+                const identityPayload = byType.identity;
+                const habitsPayload = byType.habits;
+
+                if (!archetypePayload || !identityPayload || !habitsPayload) {
+                  throw new Error('Missing diagnostic data. Please retake diagnostics.');
+                }
+
+                const archetypeResult = archetypePayload.answers
+                  ? scoreArchetype(archetypePayload.answers)
+                  : archetypePayload.scored;
+                const identityResult = identityPayload.answers
+                  ? scoreIdentity(identityPayload.answers)
+                  : identityPayload.scored;
+                const habitsResult = habitsPayload.answers
+                  ? scoreHabits(habitsPayload.answers)
+                  : habitsPayload.scored;
+
+                const profilePayload = buildMentalProfilePayload(
+                  archetypeResult,
+                  identityResult,
+                  habitsResult,
+                );
+
+                // Upsert to mental_profiles
+                const { error: upsertErr } = await supabase
+                  .from('mental_profiles')
+                  .upsert(
+                    {
+                      user_id: liveUser.id,
+                      ...profilePayload,
+                      updated_at: new Date().toISOString(),
+                    },
+                    { onConflict: 'user_id' },
+                  );
+
+                if (upsertErr) {
+                  throw new Error(upsertErr.message);
+                }
+
+                // Cache ISS/HSS scores locally for smart Daily Work generation
+                if (profilePayload.iss != null || profilePayload.hss != null) {
+                  AsyncStorage.setItem('otc:mental-profile-scores', JSON.stringify({
+                    iss: profilePayload.iss ?? null,
+                    hss: profilePayload.hss ?? null,
+                  }));
+                }
+
+                // Invalidate profile query so MentalProfileCard picks up new data
+                queryClient.invalidateQueries({ queryKey: ['mental-profile', liveUser.id] });
+
+                router.push('/(app)/training/mental' as any);
+              } catch (err: any) {
+                Alert.alert('Profile Error', err?.message ?? 'Could not generate profile.');
+              } finally {
+                setGenerating(false);
+              }
+            }}
             activeOpacity={0.85}
+            disabled={generating}
           >
-            <Ionicons name="enter-outline" size={22} color={ACCENT} />
-            <Text style={[styles.generateBtnText, { color: ACCENT }]}>Enter Mental Vault</Text>
-            <Ionicons name="arrow-forward" size={18} color={ACCENT} />
+            {generating ? (
+              <ActivityIndicator size="small" color={ACCENT} />
+            ) : (
+              <Ionicons name="sparkles-outline" size={22} color={ACCENT} />
+            )}
+            <Text style={[styles.generateBtnText, { color: ACCENT }]}>
+              {generating ? 'Generating Profile…' : 'Generate Profile & Enter Vault'}
+            </Text>
+            {!generating && <Ionicons name="arrow-forward" size={18} color={ACCENT} />}
           </TouchableOpacity>
         )}
 

@@ -64,21 +64,29 @@ export default function DailyWorkScreen() {
     try {
       const result: MechanicalDiagnosticResult = JSON.parse(raw);
 
-      // Load mover type for drill affinity bias
+      // Load mover type for drill affinity bias (supports new + legacy format)
       let moverType: MoverType | null = null;
       const moverRaw = await AsyncStorage.getItem('otc:mover-type');
       if (moverRaw) {
         try {
           const parsed = JSON.parse(moverRaw);
-          moverType = (parsed.slug ?? parsed) as MoverType;
+          moverType = (parsed.primary ?? parsed.slug ?? parsed) as MoverType;
         } catch {}
       }
+
+      // Load mental scores for smart task selection
+      let mentalScores: { iss?: number | null; hss?: number | null } | null = null;
+      try {
+        const mentalRaw = await AsyncStorage.getItem('otc:mental-profile-scores');
+        if (mentalRaw) mentalScores = JSON.parse(mentalRaw);
+      } catch {}
 
       const generated = generateUnifiedDailyWork(
         result.primary,
         result.secondary,
         athlete?.age ?? null,
         moverType,
+        mentalScores,
       );
       await saveDailyWork(generated);
       setPlan(generated);

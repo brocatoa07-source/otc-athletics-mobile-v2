@@ -17,7 +17,10 @@ import {
   MOVER_TYPES,
   scoreMoverTypeQuiz,
   type MoverTypeData,
+  type MoverDiagnosticResult,
+  type OptionLetter,
 } from '@/data/hitting-mover-type-data';
+import { getMlbComparisons, type MlbComparison } from '@/data/mover-mlb-comparisons';
 
 const STORAGE_KEY = 'otc:mover-type';
 const ACCENT = '#E10600';
@@ -29,8 +32,8 @@ const MOVER_LIST = Object.values(MOVER_TYPES);
 export default function MoverTypeQuizScreen() {
   const [screen, setScreen] = useState<Screen>('intro');
   const [currentQ, setCurrentQ] = useState(0);
-  const [answers, setAnswers] = useState<('a' | 'b' | 'c' | 'd')[]>([]);
-  const [result, setResult] = useState<MoverTypeData | null>(null);
+  const [answers, setAnswers] = useState<OptionLetter[]>([]);
+  const [result, setResult] = useState<MoverDiagnosticResult | null>(null);
   const [mechAlreadyDone, setMechAlreadyDone] = useState(false);
   const user = useAuthStore((s) => s.user);
   const queryClient = useQueryClient();
@@ -41,15 +44,21 @@ export default function MoverTypeQuizScreen() {
     });
   }, []);
 
-  async function handleAnswer(letter: 'a' | 'b' | 'c' | 'd') {
+  const primaryData: MoverTypeData | null = result ? MOVER_TYPES[result.primary] : null;
+  const secondaryData: MoverTypeData | null = result ? MOVER_TYPES[result.secondary] : null;
+
+  async function handleAnswer(letter: OptionLetter) {
     const next = [...answers, letter];
     setAnswers(next);
 
     if (next.length >= MOVER_TYPE_QUESTIONS.length) {
-      const slug = scoreMoverTypeQuiz(next);
-      setResult(MOVER_TYPES[slug]);
+      const scored = scoreMoverTypeQuiz(next);
+      setResult(scored);
       setScreen('results');
-      AsyncStorage.setItem(STORAGE_KEY, slug);
+
+      // Persist full result (primary + secondary)
+      AsyncStorage.setItem(STORAGE_KEY, JSON.stringify(scored));
+
       const liveUser = await getLiveUser();
       const resolvedId = liveUser?.id ?? user?.id;
       if (resolvedId) {
@@ -58,7 +67,7 @@ export default function MoverTypeQuizScreen() {
             userId: resolvedId,
             vaultType: 'hitting',
             diagnosticType: 'mover-type',
-            resultPayload: { moverType: slug },
+            resultPayload: { primary: scored.primary, secondary: scored.secondary },
           });
         } catch (err) {
           if (__DEV__) console.warn('[hitting-quiz] submitDiagnostic error:', err);
@@ -93,7 +102,7 @@ export default function MoverTypeQuizScreen() {
         </TouchableOpacity>
         <View style={{ flex: 1 }}>
           <Text style={styles.eyebrow}>HITTING VAULT</Text>
-          <Text style={styles.title}>Find Your Mover Type</Text>
+          <Text style={styles.title}>Hitter Mover Diagnostic</Text>
         </View>
         {screen === 'quiz' && (
           <View style={styles.progressBadge}>
@@ -106,19 +115,20 @@ export default function MoverTypeQuizScreen() {
 
       <ScrollView contentContainerStyle={styles.content} showsVerticalScrollIndicator={false}>
 
+        {/* ═══════ INTRO ═══════ */}
         {screen === 'intro' && (
           <>
             <View style={styles.introCard}>
               <View style={[styles.introIconWrap, { backgroundColor: ACCENT + '15' }]}>
                 <Ionicons name="baseball-outline" size={40} color={ACCENT} />
               </View>
-              <Text style={styles.introTitle}>What Kind of Mover Are You?</Text>
+              <Text style={styles.introTitle}>Find Your Movement Pattern</Text>
               <Text style={styles.introDesc}>
-                8 questions · 4 choices each{'\n'}Understand how you naturally generate power.
+                15 questions · 6 choices each{'\n'}Identify how your body naturally creates power.
               </Text>
             </View>
 
-            <Text style={styles.sectionLabel}>4 MOVER TYPES</Text>
+            <Text style={styles.sectionLabel}>6 MOVER TYPES</Text>
 
             {MOVER_LIST.map((mt) => (
               <View key={mt.slug} style={styles.typePreview}>
@@ -137,8 +147,8 @@ export default function MoverTypeQuizScreen() {
             >
               <Ionicons name="play-circle" size={20} color="#fff" />
               <View style={{ flex: 1 }}>
-                <Text style={styles.startBtnTitle}>Start Assessment</Text>
-                <Text style={styles.startBtnSub}>8 questions — under 2 minutes</Text>
+                <Text style={styles.startBtnTitle}>Start Diagnostic</Text>
+                <Text style={styles.startBtnSub}>15 questions — under 3 minutes</Text>
               </View>
               <Ionicons name="chevron-forward" size={18} color="#fff" />
             </TouchableOpacity>
@@ -152,6 +162,7 @@ export default function MoverTypeQuizScreen() {
           </>
         )}
 
+        {/* ═══════ QUIZ ═══════ */}
         {screen === 'quiz' && (
           <>
             <View style={styles.progressBar}>
@@ -193,38 +204,62 @@ export default function MoverTypeQuizScreen() {
           </>
         )}
 
-        {screen === 'results' && result && (
+        {/* ═══════ RESULTS ═══════ */}
+        {screen === 'results' && primaryData && secondaryData && (
           <>
-            <Text style={[styles.resultsEyebrow, { color: result.color }]}>
+            <Text style={[styles.resultsEyebrow, { color: primaryData.color }]}>
               YOUR MOVER TYPE
             </Text>
 
-            <View style={[styles.resultCard, { borderColor: result.color + '40' }]}>
-              <View style={[styles.resultBadge, { backgroundColor: result.color + '20' }]}>
-                <Text style={[styles.resultBadgeText, { color: result.color }]}>
-                  {result.name}
+            {/* Primary result */}
+            <View style={[styles.resultCard, { borderColor: primaryData.color + '40' }]}>
+              <View style={[styles.resultBadge, { backgroundColor: primaryData.color + '20' }]}>
+                <Text style={[styles.resultBadgeText, { color: primaryData.color }]}>
+                  {primaryData.name}
                 </Text>
               </View>
-              <Text style={styles.resultDesc}>{result.description}</Text>
+              <Text style={styles.resultDesc}>{primaryData.description}</Text>
             </View>
 
-            <View style={[styles.cueCard, { backgroundColor: result.color + '10', borderColor: result.color + '30' }]}>
-              <Ionicons name="mic-outline" size={16} color={result.color} />
-              <View style={{ flex: 1 }}>
-                <Text style={[styles.cueLabel, { color: result.color }]}>PRIMARY CUE</Text>
-                <Text style={styles.cueText}>{result.primaryCue}</Text>
+            {/* Secondary result */}
+            <View style={[styles.secondaryCard, { borderColor: secondaryData.color + '30' }]}>
+              <Text style={styles.secondaryLabel}>SECONDARY MOVER</Text>
+              <View style={styles.secondaryRow}>
+                <View style={[styles.secondaryDot, { backgroundColor: secondaryData.color }]} />
+                <Text style={[styles.secondaryName, { color: secondaryData.color }]}>
+                  {secondaryData.name}
+                </Text>
               </View>
             </View>
 
-            <Text style={styles.sectionLabel}>MLB SIMILAR MOVERS</Text>
-            <View style={styles.mlbRow}>
-              {result.mlbComps.map((name) => (
-                <View key={name} style={[styles.mlbChip, { borderColor: result.color + '40' }]}>
-                  <Text style={[styles.mlbChipText, { color: result.color }]}>{name}</Text>
+            {/* Coaching cues */}
+            <Text style={styles.sectionLabel}>PRIMARY COACHING CUES</Text>
+            {primaryData.primaryCues.map((cue) => (
+              <View key={cue} style={[styles.cueCard, { backgroundColor: primaryData.color + '10', borderColor: primaryData.color + '30' }]}>
+                <Ionicons name="mic-outline" size={16} color={primaryData.color} />
+                <Text style={styles.cueText}>{cue}</Text>
+              </View>
+            ))}
+
+            {/* MLB comparisons */}
+            <Text style={styles.sectionLabel}>MLB MOVERS LIKE YOU</Text>
+            {getMlbComparisons(primaryData.slug).map((comp: MlbComparison) => (
+              <View key={comp.name} style={[styles.mlbCard, { borderColor: primaryData.color + '25' }]}>
+                <View style={styles.mlbCardHeader}>
+                  <View style={[styles.mlbDot, { backgroundColor: primaryData.color }]} />
+                  <Text style={[styles.mlbName, { color: primaryData.color }]}>{comp.name}</Text>
                 </View>
-              ))}
+                <Text style={styles.mlbStudyNote}>{comp.studyNote}</Text>
+              </View>
+            ))}
+            <View style={styles.mlbCaption}>
+              <Ionicons name="eye-outline" size={13} color={colors.textMuted} />
+              <Text style={styles.mlbCaptionText}>
+                Study how these hitters move. Notice rhythm, timing, and how their body works through the swing.
+              </Text>
             </View>
 
+            {/* Navigation */}
             {mechAlreadyDone ? (
               <TouchableOpacity
                 style={[styles.nextBtn, { backgroundColor: '#22c55e' }]}
@@ -265,12 +300,12 @@ export default function MoverTypeQuizScreen() {
             )}
 
             <TouchableOpacity
-              style={[styles.retakeBtn, { borderColor: result.color }]}
+              style={[styles.retakeBtn, { borderColor: primaryData.color }]}
               onPress={retake}
               activeOpacity={0.75}
             >
-              <Ionicons name="refresh" size={15} color={result.color} />
-              <Text style={[styles.retakeBtnText, { color: result.color }]}>Retake</Text>
+              <Ionicons name="refresh" size={15} color={primaryData.color} />
+              <Text style={[styles.retakeBtnText, { color: primaryData.color }]}>Retake</Text>
             </TouchableOpacity>
           </>
         )}
@@ -352,17 +387,32 @@ const styles = StyleSheet.create({
   resultBadge: { paddingHorizontal: 20, paddingVertical: 8, borderRadius: 20 },
   resultBadgeText: { fontSize: 18, fontWeight: '900' },
   resultDesc: { fontSize: 14, color: colors.textSecondary, textAlign: 'center', lineHeight: 22 },
+
+  secondaryCard: {
+    backgroundColor: colors.surface, borderWidth: 1, borderRadius: radius.md,
+    padding: 14, gap: 6,
+  },
+  secondaryLabel: { fontSize: 9, fontWeight: '900', letterSpacing: 1.2, color: colors.textMuted },
+  secondaryRow: { flexDirection: 'row', alignItems: 'center', gap: 8 },
+  secondaryDot: { width: 8, height: 8, borderRadius: 4 },
+  secondaryName: { fontSize: 15, fontWeight: '800' },
+
   cueCard: {
     flexDirection: 'row', gap: 12, padding: 14, borderWidth: 1, borderRadius: radius.md,
+    alignItems: 'center',
   },
-  cueLabel: { fontSize: 10, fontWeight: '900', letterSpacing: 1.2, marginBottom: 3 },
-  cueText: { fontSize: 14, fontWeight: '700', color: colors.textPrimary, lineHeight: 20 },
-  mlbRow: { flexDirection: 'row', flexWrap: 'wrap', gap: 8 },
-  mlbChip: {
-    paddingVertical: 6, paddingHorizontal: 14, borderRadius: radius.full,
-    borderWidth: 1, backgroundColor: colors.surface,
+  cueText: { flex: 1, fontSize: 14, fontWeight: '700', color: colors.textPrimary, lineHeight: 20 },
+
+  mlbCard: {
+    backgroundColor: colors.surface, borderWidth: 1, borderRadius: radius.md,
+    padding: 12, gap: 6,
   },
-  mlbChipText: { fontSize: 13, fontWeight: '700' },
+  mlbCardHeader: { flexDirection: 'row', alignItems: 'center', gap: 8 },
+  mlbDot: { width: 8, height: 8, borderRadius: 4 },
+  mlbName: { fontSize: 15, fontWeight: '800' },
+  mlbStudyNote: { fontSize: 13, color: colors.textSecondary, lineHeight: 19, paddingLeft: 16 },
+  mlbCaption: { flexDirection: 'row', alignItems: 'flex-start', gap: 8 },
+  mlbCaptionText: { flex: 1, fontSize: 12, color: colors.textMuted, lineHeight: 17 },
   nextCard: {
     flexDirection: 'row', alignItems: 'center', gap: 12,
     padding: 14, backgroundColor: '#22c55e10',

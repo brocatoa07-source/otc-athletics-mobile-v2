@@ -15,12 +15,23 @@ import { useTier } from '@/hooks/useTier';
 import { Colors } from '@/constants/colors';
 import { TierBadge } from '@/components/common/TierBadge';
 import { UpgradeDropdown } from '@/components/common/UpgradeDropdown';
+import { useDevTierOverride, setDevTierOverride, type TierOverride } from '@/lib/dev-tier-override';
+
+const DEV_TIER_OPTIONS: { label: string; value: TierOverride }[] = [
+  { label: 'Use Real Tier', value: null },
+  { label: 'Walk', value: 'WALK' },
+  { label: 'Single', value: 'SINGLE' },
+  { label: 'Double', value: 'DOUBLE' },
+  { label: 'Triple', value: 'TRIPLE' },
+  { label: 'Home Run', value: 'HOME_RUN' },
+];
 
 export default function ProfileScreen() {
   const user = useAuthStore((s) => s.user);
   const athlete = useAuthStore((s) => s.athlete);
   const clearAuth = useAuthStore((s) => s.clearAuth);
   const { isCoach, tier } = useTier();
+  const devTierOverride = useDevTierOverride();
 
   const displayName = (user?.user_metadata?.full_name as string | undefined) ?? 'Athlete';
   const initials = displayName.split(' ').map((n: string) => n[0]).join('').toUpperCase().slice(0, 2);
@@ -97,6 +108,17 @@ export default function ProfileScreen() {
           {!isCoach && (
             <TouchableOpacity
               style={styles.menuItem}
+              onPress={() => router.push('/(app)/profile/activity' as any)}
+            >
+              <Ionicons name="time-outline" size={20} color="#3b82f6" />
+              <Text style={styles.menuLabel}>Activity & History</Text>
+              <Ionicons name="chevron-forward" size={16} color={Colors.textMuted} />
+            </TouchableOpacity>
+          )}
+
+          {!isCoach && (
+            <TouchableOpacity
+              style={styles.menuItem}
               onPress={() => router.push('/(app)/profile/connect-coach' as any)}
             >
               <Ionicons name="key" size={20} color="#8b5cf6" />
@@ -124,6 +146,33 @@ export default function ProfileScreen() {
         </TouchableOpacity>
 
         <Text style={styles.version}>OTC Lab v2.0.0</Text>
+
+        {/* DEV-only tier override */}
+        {__DEV__ && (
+          <View style={styles.devSection}>
+            <Text style={styles.devHeader}>DEV TIER OVERRIDE</Text>
+            <Text style={styles.devHint}>
+              {devTierOverride ? `Overriding to: ${devTierOverride}` : 'Using real tier from DB'}
+            </Text>
+            <View style={styles.devGrid}>
+              {DEV_TIER_OPTIONS.map((opt) => {
+                const isActive = devTierOverride === opt.value;
+                return (
+                  <TouchableOpacity
+                    key={opt.label}
+                    style={[styles.devChip, isActive && styles.devChipActive]}
+                    onPress={() => setDevTierOverride(opt.value)}
+                    activeOpacity={0.7}
+                  >
+                    <Text style={[styles.devChipText, isActive && styles.devChipTextActive]}>
+                      {opt.label}
+                    </Text>
+                  </TouchableOpacity>
+                );
+              })}
+            </View>
+          </View>
+        )}
       </ScrollView>
     </SafeAreaView>
   );
@@ -195,4 +244,49 @@ const styles = StyleSheet.create({
   },
   signOutText: { fontSize: 15, fontWeight: '700', color: Colors.error },
   version: { textAlign: 'center', fontSize: 12, color: Colors.textMuted },
+
+  // DEV-only styles
+  devSection: {
+    borderWidth: 1,
+    borderColor: '#f59e0b40',
+    backgroundColor: '#f59e0b08',
+    borderRadius: 12,
+    padding: 14,
+    gap: 8,
+  },
+  devHeader: {
+    fontSize: 10,
+    fontWeight: '900',
+    letterSpacing: 1.5,
+    color: '#f59e0b',
+  },
+  devHint: {
+    fontSize: 12,
+    color: Colors.textMuted,
+  },
+  devGrid: {
+    flexDirection: 'row',
+    flexWrap: 'wrap',
+    gap: 8,
+  },
+  devChip: {
+    paddingHorizontal: 12,
+    paddingVertical: 8,
+    borderRadius: 8,
+    borderWidth: 1,
+    borderColor: Colors.border,
+    backgroundColor: Colors.bgCard,
+  },
+  devChipActive: {
+    borderColor: '#f59e0b',
+    backgroundColor: '#f59e0b20',
+  },
+  devChipText: {
+    fontSize: 13,
+    fontWeight: '700',
+    color: Colors.textSecondary,
+  },
+  devChipTextActive: {
+    color: '#f59e0b',
+  },
 });
