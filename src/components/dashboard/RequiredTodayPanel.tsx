@@ -6,12 +6,12 @@ import { router } from 'expo-router';
 import { Ionicons } from '@expo/vector-icons';
 import { colors, radius } from '@/theme';
 import { useMyProgram } from '@/hooks/useMyProgram';
-import { useReadiness } from '@/hooks/useReadiness';
 import { useAccountability } from '@/hooks/useAccountability';
 import {
   useRequiredTodayConfig,
   REQUIRED_TODAY_ORDER,
   REQUIRED_TODAY_META,
+  LOCKED_KEYS,
   type RequiredTodayItemKey,
 } from '@/hooks/useRequiredTodayConfig';
 
@@ -20,14 +20,12 @@ export function RequiredTodayPanel() {
 
   const { enabled, toggle } = useRequiredTodayConfig();
   const { todayPlan, completedToday } = useMyProgram();
-  const { readiness } = useReadiness();
-  const { skillWorkDoneToday, habitsDoneToday, addonsDoneToday, mentalDoneToday, journalDoneToday } = useAccountability();
+  const { otcCheckedInToday, skillWorkDoneToday, habitsDoneToday, addonsDoneToday, mentalDoneToday, journalDoneToday } = useAccountability();
 
   const hasTrainingToday = todayPlan?.type === 'training';
-  const readinessDone   = !!readiness;
 
   const completions: Record<RequiredTodayItemKey, boolean> = {
-    readiness: readinessDone,
+    readiness: otcCheckedInToday,
     training:  completedToday,
     skillWork: skillWorkDoneToday,
     mental:    mentalDoneToday,
@@ -36,8 +34,9 @@ export function RequiredTodayPanel() {
     addons:    addonsDoneToday,
   };
 
-  // Only show items that are enabled; hide 'training' on rest days
+  // Always show locked items (readiness); filter others by enabled state
   const visibleItems = REQUIRED_TODAY_ORDER.filter((key) => {
+    if (LOCKED_KEYS.has(key)) return true;
     if (!enabled[key]) return false;
     if (key === 'training' && !hasTrainingToday) return false;
     return true;
@@ -86,7 +85,12 @@ export function RequiredTodayPanel() {
                     color={done ? '#22c55e' : colors.textSecondary}
                   />
                 </View>
-                <Text style={[styles.label, done && styles.labelDone]}>{meta.label}</Text>
+                <View style={{ flex: 1 }}>
+                  <Text style={[styles.label, done && styles.labelDone]}>{meta.label}</Text>
+                  {key === 'readiness' && done && (
+                    <Text style={styles.completedSub}>Completed today</Text>
+                  )}
+                </View>
                 {done ? (
                   <Ionicons name="checkmark-circle" size={20} color="#22c55e" />
                 ) : (
@@ -122,6 +126,7 @@ export function RequiredTodayPanel() {
           {REQUIRED_TODAY_ORDER.map((key) => {
             const meta = REQUIRED_TODAY_META[key];
             const isOn = enabled[key];
+            const locked = LOCKED_KEYS.has(key);
             return (
               <View key={key} style={styles.toggleRow}>
                 <View style={[styles.toggleIcon, { backgroundColor: isOn ? '#22c55e15' : colors.surfaceElevated }]}>
@@ -135,11 +140,14 @@ export function RequiredTodayPanel() {
                   <Text style={[styles.toggleLabel, !isOn && styles.toggleLabelOff]}>
                     {meta.label}
                   </Text>
-                  <Text style={styles.toggleDesc}>{meta.description}</Text>
+                  <Text style={styles.toggleDesc}>
+                    {locked ? 'Always on — foundation of your daily standard' : meta.description}
+                  </Text>
                 </View>
                 <Switch
                   value={isOn}
                   onValueChange={() => toggle(key)}
+                  disabled={locked}
                   trackColor={{ true: '#22c55e', false: colors.border }}
                   thumbColor={colors.white}
                 />
@@ -200,6 +208,7 @@ const styles = StyleSheet.create({
   iconWrapDone: { backgroundColor: '#22c55e12' },
   label: { flex: 1, fontSize: 14, fontWeight: '700', color: colors.textPrimary },
   labelDone: { color: colors.textSecondary },
+  completedSub: { fontSize: 11, color: '#22c55e', fontWeight: '600', marginTop: 1 },
   emptyCircle: {
     width: 20,
     height: 20,

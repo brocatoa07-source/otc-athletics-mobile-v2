@@ -16,6 +16,7 @@ import {
   type FlatMentalTool,
 } from '@/lib/recommendation/mentalRecommendationEngine';
 import { SKILL_JOURNAL_CONFIG, type SkillJournalType } from '@/data/skill-journal-prompts';
+import { useAccountability } from '@/hooks/useAccountability';
 
 const ACCENT = '#8b5cf6';
 const STORAGE_KEY = 'otc:mental-daily-work';
@@ -112,6 +113,7 @@ function generateMentalDailyPlan(
 
 export default function MentalDailyWorkScreen() {
   const { gate } = useGating();
+  const { markMentalDoneToday } = useAccountability();
   const [profile, setProfile] = useState<MentalProfileData | null>(null);
   const [diagnostic, setDiagnostic] = useState<MentalDiagnosticResult | null>(null);
   const [plan, setPlan] = useState<MentalDailyPlan | null>(null);
@@ -159,13 +161,17 @@ export default function MentalDailyWorkScreen() {
 
   const toggleItem = useCallback(async (itemId: string) => {
     if (!plan) return;
+    const nowDone = !plan.completion[itemId];
     const updated = {
       ...plan,
-      completion: { ...plan.completion, [itemId]: !plan.completion[itemId] },
+      completion: { ...plan.completion, [itemId]: nowDone },
     };
     setPlan(updated);
     await AsyncStorage.setItem(STORAGE_KEY, JSON.stringify(updated));
-  }, [plan]);
+    if (nowDone) {
+      await markMentalDoneToday();
+    }
+  }, [plan, markMentalDoneToday]);
 
   // ── Empty state ───────────────────────────────────
   if (!diagnostic) {

@@ -14,7 +14,6 @@ import { useAuthStore } from '@/store/auth.store';
 import { supabase } from '@/lib/supabase';
 import { useTier } from '@/hooks/useTier';
 import { useMyProgram } from '@/hooks/useMyProgram';
-import { useReadiness } from '@/hooks/useReadiness';
 import { useAccountability } from '@/hooks/useAccountability';
 import { useMetricsStatus } from '@/hooks/useMetricsStatus';
 import { useAthleteScProfile } from '@/hooks/useAthleteScProfile';
@@ -22,13 +21,11 @@ import { useAssessment } from '@/hooks/useAssessment';
 import { useRequiredTodayConfig } from '@/hooks/useRequiredTodayConfig';
 import { getNextPriority } from '@/data/next-priority-engine';
 import { TierBadge } from '@/components/common/TierBadge';
-import { IdentityStandardBanner } from '@/components/dashboard/IdentityStandardBanner';
 import { PerformanceTrendCard } from '@/components/dashboard/PerformanceTrendCard';
 import { StandardEngineCard } from '@/components/dashboard/StandardEngineCard';
 import { RequiredTodayPanel } from '@/components/dashboard/RequiredTodayPanel';
 import { loadDailyWork, type UnifiedDailyWork } from '@/data/daily-work';
 import { filterDailyWorkItems } from '@/lib/tier-content';
-import { loadTodayCheckIn } from '@/data/own-the-cost-checkin';
 import { loadGames } from '@/data/at-bat-accountability';
 
 /* ────────────────────────────────────────────────
@@ -49,11 +46,9 @@ export default function DashboardScreen() {
 
   // Daily Work state
   const [dailyWork, setDailyWork] = useState<UnifiedDailyWork | null>(null);
-  const [otcCheckedIn, setOtcCheckedIn] = useState<boolean | null>(null);
   const [showAbCard, setShowAbCard] = useState(false);
   useEffect(() => {
     loadDailyWork().then((plan) => { if (plan) setDailyWork(plan); });
-    loadTodayCheckIn().then((log) => setOtcCheckedIn(!!log));
     // Show AB card if a game was logged today or yesterday
     loadGames().then((games) => {
       if (games.length === 0) return;
@@ -66,8 +61,7 @@ export default function DashboardScreen() {
   }, []);
 
   const { todayPlan, hasProfile, completedToday } = useMyProgram();
-  const { readiness } = useReadiness();
-  const { result: accountability, skillWorkDoneToday, habitsDoneToday, addonsDoneToday } = useAccountability();
+  const { result: accountability, loaded: accountabilityLoaded, otcCheckedInToday, skillWorkDoneToday, mentalDoneToday, journalDoneToday, habitsDoneToday, addonsDoneToday } = useAccountability();
   const { profile: _scProfile } = useAthleteScProfile();
   const { assessment } = useAssessment();
   const { enabled } = useRequiredTodayConfig();
@@ -76,27 +70,20 @@ export default function DashboardScreen() {
     standardStatus,
     keyMetrics,
     daysSinceLastKeyMetric,
-    isLoading: metricsLoading,
   } = useMetricsStatus();
 
   const displayName = user?.user_metadata?.full_name as string | undefined ?? 'Athlete';
   const firstName = displayName.split(' ')[0];
   const tierValue = isCoach ? 'COACH' : (tier ?? 'WALK');
 
-  const TIER_LABELS: Record<string, string> = {
-    WALK: 'Walk', SINGLE: 'Single', DOUBLE: 'Double',
-    TRIPLE: 'Triple', HOME_RUN: 'Home Run', COACH: 'Coach',
-  };
-  const tierLabel = TIER_LABELS[tierValue] ?? tierValue;
-
-  // Build completions map for Next Up
+  // Build completions map for Next Up — uses same daily flags as RequiredTodayPanel
   const hasTrainingToday = todayPlan?.type === 'training';
   const completions = {
-    readiness: !!readiness,
+    readiness: otcCheckedInToday,
     training:  completedToday,
     skillWork: skillWorkDoneToday,
-    mental:    (accountability?.checklist.courseSessionsDone ?? 0) > 0,
-    journal:   (accountability?.checklist.journalEntries ?? 0) > 0,
+    mental:    mentalDoneToday,
+    journal:   journalDoneToday,
     habits:    habitsDoneToday,
     addons:    addonsDoneToday,
   };
@@ -144,11 +131,11 @@ export default function DashboardScreen() {
         </View>
 
         {/* ── Own The Cost Check-In ─────────────── */}
-        {otcCheckedIn !== null && (
+        {accountabilityLoaded && (
           <TouchableOpacity
             style={styles.otcCard}
             onPress={() => router.push(
-              otcCheckedIn
+              otcCheckedInToday
                 ? '/(app)/training/own-the-cost-summary' as any
                 : '/(app)/training/own-the-cost-checkin' as any,
             )}
@@ -159,7 +146,7 @@ export default function DashboardScreen() {
               <Text style={styles.otcLabel}>OWN THE COST</Text>
               <View style={styles.otcRow}>
                 <View style={styles.otcIconWrap}>
-                  {otcCheckedIn ? (
+                  {otcCheckedInToday ? (
                     <Ionicons name="checkmark-circle" size={22} color={colors.success} />
                   ) : (
                     <Ionicons name="shield-checkmark" size={22} color="#f59e0b" />
@@ -168,13 +155,13 @@ export default function DashboardScreen() {
                 <View style={{ flex: 1 }}>
                   <Text style={styles.otcTitle}>Daily Check-In</Text>
                   <Text style={styles.otcSub}>
-                    {otcCheckedIn ? 'Completed — tap to review' : 'Hold yourself accountable'}
+                    {otcCheckedInToday ? 'Completed — tap to review' : 'Hold yourself accountable'}
                   </Text>
                 </View>
                 <Ionicons
                   name="arrow-forward-circle"
                   size={28}
-                  color={otcCheckedIn ? colors.success : '#f59e0b'}
+                  color={otcCheckedInToday ? colors.success : '#f59e0b'}
                 />
               </View>
             </View>
@@ -245,15 +232,7 @@ export default function DashboardScreen() {
           </TouchableOpacity>
         )}
 
-        {/* ── 1. Identity + Standard Banner ───────── */}
-        <IdentityStandardBanner
-          tierLabel={tierLabel}
-          developmentStatus={developmentStatus}
-          standardStatus={standardStatus}
-          isLoading={metricsLoading}
-        />
-
-        {/* ── 2. Performance Trend Card ───────────── */}
+        {/* ── 1. Performance Trend Card ───────────── */}
         <PerformanceTrendCard
           keyMetrics={keyMetrics}
           daysSinceLastKeyMetric={daysSinceLastKeyMetric}

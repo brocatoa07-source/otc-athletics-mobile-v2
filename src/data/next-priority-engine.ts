@@ -38,8 +38,8 @@ export interface NextPriority {
 /** Map each RequiredToday key → NextPriority display data */
 const ITEM_PRIORITY: Record<RequiredTodayItemKey, Omit<NextPriority, 'action'>> = {
   readiness: {
-    title: 'Daily Readiness Check',
-    subtitle: 'Quick 4-question check-in before training',
+    title: 'OTC Check-In',
+    subtitle: 'Complete your daily check-in before training',
     route: '/(app)/training/own-the-cost-checkin',
     icon: 'pulse-outline',
     color: '#22c55e',
@@ -132,12 +132,7 @@ export interface NextPriorityInput {
 }
 
 export function getNextPriority(input: NextPriorityInput): NextPriority {
-  // 1. Assessment gate
-  if (!input.hasScProfile || !input.hasAssessment) {
-    return { action: 'complete_assessment', ...STATIC.complete_assessment };
-  }
-
-  // 2. First enabled + incomplete Required Today item
+  // 1. First enabled + incomplete Required Today item
   for (const key of REQUIRED_TODAY_ORDER) {
     if (!input.enabled[key]) continue;
     if (key === 'training' && !input.hasTrainingToday) continue;

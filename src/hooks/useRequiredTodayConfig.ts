@@ -30,10 +30,10 @@ export const REQUIRED_TODAY_META: Record<
   { label: string; icon: string; route: string; description: string }
 > = {
   readiness: {
-    label: 'Readiness Check',
+    label: 'OTC Check-In',
     icon: 'pulse-outline',
     route: '/(app)/training/own-the-cost-checkin',
-    description: 'Daily 4-question check-in before training',
+    description: 'Daily 4-question check-in — always required',
   },
   training: {
     label: "Today's Session",
@@ -73,6 +73,9 @@ export const REQUIRED_TODAY_META: Record<
   },
 };
 
+/** Keys that are always enabled and cannot be toggled off */
+export const LOCKED_KEYS: ReadonlySet<RequiredTodayItemKey> = new Set(['readiness']);
+
 const DEFAULT_ENABLED: RequiredTodayEnabled = {
   readiness: true,
   training: true,
@@ -91,7 +94,7 @@ export function useRequiredTodayConfig() {
     const raw = await AsyncStorage.getItem(CONFIG_KEY);
     if (raw) {
       try {
-        setEnabled({ ...DEFAULT_ENABLED, ...JSON.parse(raw) });
+        setEnabled({ ...DEFAULT_ENABLED, ...JSON.parse(raw), readiness: true });
       } catch {}
     }
     setLoaded(true);
@@ -100,8 +103,10 @@ export function useRequiredTodayConfig() {
   useEffect(() => { load(); }, [load]);
 
   const toggle = async (key: RequiredTodayItemKey) => {
+    // OTC Check-In (readiness) is always on — cannot be toggled off
+    if (key === 'readiness') return;
     const next = { ...enabled, [key]: !enabled[key] };
-    // Require at least 1 item to remain enabled
+    // Require at least 1 item to remain enabled (readiness always counts)
     if (Object.values(next).some(Boolean)) {
       setEnabled(next);
       await AsyncStorage.setItem(CONFIG_KEY, JSON.stringify(next));

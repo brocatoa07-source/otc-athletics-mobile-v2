@@ -9,6 +9,7 @@ import {
   type AccountabilityResult,
   type WeeklyChecklist,
 } from '@/data/accountability-engine';
+import { loadTodayCheckIn } from '@/data/own-the-cost-checkin';
 import { useAthleteScProfile } from '@/hooks/useAthleteScProfile';
 import { useRequiredTodayConfig } from '@/hooks/useRequiredTodayConfig';
 
@@ -18,6 +19,7 @@ const HABITS_KEY      = 'otc:habits-date';
 const ADDONS_KEY      = 'otc:addons-date';
 const MENTAL_KEY      = 'otc:mental-session-date';
 const JOURNAL_KEY     = 'otc:journal-date';
+const READINESS_KEY   = 'otc:readiness-date';
 
 function todayStr(): string {
   return new Date().toISOString().slice(0, 10);
@@ -38,29 +40,48 @@ export function useAccountability() {
   const [addonsDate, setAddonsDate] = useState<string | null>(null);
   const [mentalDate, setMentalDate] = useState<string | null>(null);
   const [journalDate, setJournalDate] = useState<string | null>(null);
+  const [readinessDate, setReadinessDate] = useState<string | null>(null);
 
   const weekStart = getWeekStart();
   const daysPerWeek = profile?.daysPerWeek ?? 4;
 
   const loadChecklist = useCallback(async () => {
-    const [raw, skillRaw, habitsRaw, addonsRaw, mentalRaw, journalRaw] = await Promise.all([
+    const [raw, skillRaw, habitsRaw, addonsRaw, mentalRaw, journalRaw, readinessRaw, otcLog] = await Promise.all([
       AsyncStorage.getItem(CHECKLIST_KEY),
       AsyncStorage.getItem(SKILL_WORK_KEY),
       AsyncStorage.getItem(HABITS_KEY),
       AsyncStorage.getItem(ADDONS_KEY),
       AsyncStorage.getItem(MENTAL_KEY),
       AsyncStorage.getItem(JOURNAL_KEY),
+      AsyncStorage.getItem(READINESS_KEY),
+      loadTodayCheckIn(),
     ]);
+
+    let cl: WeeklyChecklist;
     if (raw) {
       try {
         const stored = JSON.parse(raw);
-        setChecklist(stored._weekStart === weekStart ? stored : buildDefaultChecklist(daysPerWeek));
+        cl = stored._weekStart === weekStart ? stored : buildDefaultChecklist(daysPerWeek);
       } catch {
-        setChecklist(buildDefaultChecklist(daysPerWeek));
+        cl = buildDefaultChecklist(daysPerWeek);
       }
     } else {
-      setChecklist(buildDefaultChecklist(daysPerWeek));
+      cl = buildDefaultChecklist(daysPerWeek);
     }
+
+    // Auto-sync: if OTC check-in was completed today but readiness not yet counted,
+    // increment the weekly readiness count so Standard Engine stays in sync.
+    const today = todayStr();
+    if (otcLog && readinessRaw !== today) {
+      cl = { ...cl, readinessCheckins: cl.readinessCheckins + 1 };
+      await AsyncStorage.setItem(READINESS_KEY, today);
+      await AsyncStorage.setItem(CHECKLIST_KEY, JSON.stringify({ ...cl, _weekStart: weekStart }));
+      setReadinessDate(today);
+    } else {
+      setReadinessDate(readinessRaw);
+    }
+
+    setChecklist(cl);
     setSkillWorkDate(skillRaw);
     setHabitsDate(habitsRaw);
     setAddonsDate(addonsRaw);
@@ -148,6 +169,7 @@ export function useAccountability() {
   };
 
   const today = todayStr();
+  const otcCheckedInToday  = readinessDate === today;
   const skillWorkDoneToday = skillWorkDate === today;
   const habitsDoneToday    = habitsDate === today;
   const addonsDoneToday    = addonsDate === today;
@@ -167,6 +189,7 @@ export function useAccountability() {
     incrementReadiness,
     incrementMetrics,
     incrementCourse,
+    otcCheckedInToday,
     skillWorkDoneToday,
     habitsDoneToday,
     addonsDoneToday,

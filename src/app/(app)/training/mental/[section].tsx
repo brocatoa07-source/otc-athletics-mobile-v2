@@ -1,4 +1,4 @@
-import { useState } from 'react';
+import { useState, useEffect } from 'react';
 import {
   View, Text, ScrollView, TouchableOpacity, StyleSheet,
 } from 'react-native';
@@ -8,11 +8,16 @@ import { Ionicons } from '@expo/vector-icons';
 import { colors, radius } from '@/theme';
 import { useTier } from '@/hooks/useTier';
 import { MENTAL_VAULT_SECTIONS, type MentalToolCard } from '@/data/mental-vault-sections';
+import { useAccountability } from '@/hooks/useAccountability';
 
 export default function MentalSectionScreen() {
   const { section: sectionKey } = useLocalSearchParams<{ section: string }>();
   const { hasLimitedMental, hasFullMental, isCoach } = useTier();
+  const { markMentalDoneToday } = useAccountability();
   const [expanded, setExpanded] = useState<number | null>(null);
+
+  // Viewing a mental vault section counts as a mental session
+  useEffect(() => { markMentalDoneToday(); }, []);
 
   const section = MENTAL_VAULT_SECTIONS.find((s) => s.key === sectionKey);
   if (!section) {

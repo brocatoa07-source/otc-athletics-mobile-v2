@@ -10,6 +10,7 @@ import {
   useRequiredTodayConfig,
   REQUIRED_TODAY_ORDER,
   REQUIRED_TODAY_META,
+  LOCKED_KEYS,
   type RequiredTodayItemKey,
 } from '@/hooks/useRequiredTodayConfig';
 
@@ -43,7 +44,7 @@ interface BarConfig {
 
 const BAR_CONFIG: Record<RequiredTodayItemKey, BarConfig> = {
   readiness: {
-    label: 'Readiness',
+    label: 'OTC Check-In',
     color: '#8b5cf6',
     done: (c) => c.readinessCheckins,
     target: (c) => c.readinessTarget,
@@ -108,8 +109,8 @@ export function StandardEngineCard({ accountability, developmentStatus, standard
   const verified = developmentStatus === 'verified';
   const gradeColor = accountability ? (GRADE_COLOR[accountability.grade] ?? colors.textPrimary) : colors.textMuted;
 
-  // Only show bars for enabled items (in config order)
-  const enabledBars = REQUIRED_TODAY_ORDER.filter((k) => enabled[k]);
+  // Always show locked items (readiness); filter others by enabled state
+  const enabledBars = REQUIRED_TODAY_ORDER.filter((k) => LOCKED_KEYS.has(k) || enabled[k]);
 
   return (
     <>
@@ -213,6 +214,7 @@ export function StandardEngineCard({ accountability, developmentStatus, standard
           {REQUIRED_TODAY_ORDER.map((key) => {
             const meta = REQUIRED_TODAY_META[key];
             const isOn = enabled[key];
+            const locked = LOCKED_KEYS.has(key);
             return (
               <View key={key} style={styles.toggleRow}>
                 <View style={[styles.toggleIcon, { backgroundColor: isOn ? '#22c55e15' : colors.surfaceElevated }]}>
@@ -226,11 +228,14 @@ export function StandardEngineCard({ accountability, developmentStatus, standard
                   <Text style={[styles.toggleLabel, !isOn && styles.toggleLabelOff]}>
                     {meta.label}
                   </Text>
-                  <Text style={styles.toggleDesc}>{meta.description}</Text>
+                  <Text style={styles.toggleDesc}>
+                    {locked ? 'Always on — foundation of your daily standard' : meta.description}
+                  </Text>
                 </View>
                 <Switch
                   value={isOn}
                   onValueChange={() => toggle(key)}
+                  disabled={locked}
                   trackColor={{ true: '#22c55e', false: colors.border }}
                   thumbColor={colors.white}
                 />
@@ -307,7 +312,7 @@ const styles = StyleSheet.create({
     fontSize: 12,
     fontWeight: '600',
     color: colors.textSecondary,
-    width: 68,
+    width: 80,
   },
   checklistTrack: {
     flex: 1,

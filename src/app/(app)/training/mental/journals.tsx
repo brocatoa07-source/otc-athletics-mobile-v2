@@ -11,6 +11,7 @@ import { colors, radius } from '@/theme';
 import { MENTAL_SKILLS } from '@/data/skillsJournal';
 import { SKILL_JOURNAL_CONFIG, type SkillJournalType } from '@/data/skill-journal-prompts';
 import { useTier } from '@/hooks/useTier';
+import { useAccountability } from '@/hooks/useAccountability';
 
 const ACCENT = '#8b5cf6';
 
@@ -34,6 +35,7 @@ interface JournalTarget {
 export default function JournalsScreen() {
   const { hasFullMental, isCoach } = useTier();
   const canAccess = hasFullMental || isCoach;
+  const { markJournalDoneToday } = useAccountability();
 
   const [screen, setScreen] = useState<Screen>('list');
   const [target, setTarget] = useState<JournalTarget | null>(null);
@@ -53,6 +55,7 @@ export default function JournalsScreen() {
     if (!entry.trim() || !target) return;
     const key = `otc:journal:${target.key}:${dayIdx}`;
     await AsyncStorage.setItem(key, JSON.stringify({ entry, timestamp: Date.now() }));
+    await markJournalDoneToday();
     setSaved(true);
   };
 
