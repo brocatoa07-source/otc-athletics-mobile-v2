@@ -27,7 +27,7 @@ export function PerformanceTrendCard({ keyMetrics, daysSinceLastKeyMetric }: Pro
   return (
     <TouchableOpacity
       style={styles.card}
-      onPress={() => router.push('/(app)/training/metrics-log' as any)}
+      onPress={() => router.push('/(app)/progress' as any)}
       activeOpacity={0.85}
     >
       <View style={styles.header}>

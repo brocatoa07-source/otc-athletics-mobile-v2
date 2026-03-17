@@ -14,6 +14,7 @@
 
 import type { MechanicalIssue } from '@/data/hitting-mechanical-diagnostic-data';
 import type { MoverType } from '@/data/hitting-mover-type-data';
+import type { HittingMovementType, HittingBatPathType } from '@/data/hitting-identity-data';
 import {
   QUICK_FIXES,
   ISSUE_TO_QUICKFIX,
@@ -22,6 +23,7 @@ import {
   getDrillMeta,
   getFoundationDrills,
   type DrillMeta,
+  type DrillDifficulty,
 } from '@/data/drill-catalog';
 
 /* ─── Types ───────────────────────────────────────── */
@@ -29,7 +31,12 @@ import {
 export interface RecommendationInput {
   primaryIssue: MechanicalIssue;
   secondaryIssue: MechanicalIssue;
+  /** @deprecated — use movementType + batPathType instead */
   moverType: MoverType | null;
+  /** New 2-axis: movement pattern (springy/grounded) */
+  movementType?: HittingMovementType | null;
+  /** New 2-axis: bat path preference (horizontal/vertical) */
+  batPathType?: HittingBatPathType | null;
   age: number | null;
   recentDrills: string[];
 }
@@ -48,6 +55,10 @@ export interface DrillRecommendation {
 /* ─── Scoring constants ───────────────────────────── */
 
 const MOVER_AFFINITY_BOOST = 3;
+const MOVEMENT_AFFINITY_BOOST = 2;
+const BAT_PATH_AFFINITY_BOOST = 2;
+const MECHANICAL_FOCUS_BOOST = 2;
+const DIFFICULTY_MATCH_BOOST = 1;
 const RECENT_DRILL_PENALTY = -5;
 const ROLE_PRIMARY_BOOST = 1;
 const ROLE_SUPPORT_BOOST = 0;
@@ -69,16 +80,40 @@ interface ScoredDrill {
   score: number;
 }
 
+/** Map athlete age to expected difficulty level for scoring. */
+function ageToDifficulty(age: number | null): DrillDifficulty {
+  if (age !== null && age <= 12) return 'beginner';
+  if (age !== null && age <= 16) return 'intermediate';
+  return 'advanced';
+}
+
 /**
  * Score and rank drills from a pool.
  * Higher score = better fit for this athlete.
+ *
+ * Scoring:
+ *   +2 movementAffinity match (0 for 'any')
+ *   +2 batPathAffinity match (0 for 'any')
+ *   +2 mechanicalFocus match (drill targets diagnosed issue)
+ *   +1 difficulty match (drill matches athlete age band)
+ *   +1 role boost (primary role)
+ *   -5 recently used
+ *
+ * Falls back to legacy moverAffinity (+3) when only moverType is available.
  */
 function rankDrills(
   pool: string[],
   moverType: MoverType | null,
+  movementType: HittingMovementType | null | undefined,
+  batPathType: HittingBatPathType | null | undefined,
   recentDrills: Set<string>,
   dayIndex: number,
+  targetIssue?: MechanicalIssue | null,
+  age?: number | null,
 ): ScoredDrill[] {
+  const useNewAffinity = movementType != null || batPathType != null;
+  const expectedDifficulty = ageToDifficulty(age ?? null);
+
   return pool
     .map((name, idx) => {
       const meta = getDrillMeta(name);
@@ -87,9 +122,28 @@ function rankDrills(
       // Day-based rotation: slight preference for today's rotation slot
       if (idx === dayIndex % pool.length) score += 1;
 
-      // Mover affinity boost
-      if (moverType && meta?.moverAffinity.includes(moverType)) {
+      // ── Affinity scoring ────────────────────────────
+      if (useNewAffinity) {
+        // New 2-axis affinity (single value; 'any' = 0 boost)
+        if (movementType && meta?.movementAffinity === movementType) {
+          score += MOVEMENT_AFFINITY_BOOST;
+        }
+        if (batPathType && meta?.batPathAffinity === batPathType) {
+          score += BAT_PATH_AFFINITY_BOOST;
+        }
+      } else if (moverType && meta?.moverAffinity.includes(moverType)) {
+        // Legacy mover affinity fallback
         score += MOVER_AFFINITY_BOOST;
+      }
+
+      // ── Mechanical focus scoring ────────────────────
+      if (targetIssue && meta?.mechanicalFocus.includes(targetIssue)) {
+        score += MECHANICAL_FOCUS_BOOST;
+      }
+
+      // ── Difficulty scoring ──────────────────────────
+      if (meta?.difficulty === expectedDifficulty) {
+        score += DIFFICULTY_MATCH_BOOST;
       }
 
       // Recency penalty
@@ -175,6 +229,8 @@ export function getRecommendedDrills(
     primaryIssue,
     secondaryIssue,
     moverType,
+    movementType,
+    batPathType,
     age,
     recentDrills,
   } = input;
@@ -202,8 +258,12 @@ export function getRecommendedDrills(
   const rankedPrimary = rankDrills(
     filterRecentDrills(primaryPool, recentSet),
     moverType,
+    movementType,
+    batPathType,
     recentSet,
     dayIndex,
+    primaryIssue,
+    age,
   );
 
   // Pick top 2 from primary
@@ -220,8 +280,12 @@ export function getRecommendedDrills(
   const rankedSecondary = rankDrills(
     filterRecentDrills(secondaryPool, recentSet),
     moverType,
+    movementType,
+    batPathType,
     recentSet,
     dayIndex,
+    secondaryIssue,
+    age,
   );
 
   // Pick top 1 from secondary (avoid duplicates)

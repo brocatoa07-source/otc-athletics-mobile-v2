@@ -13,27 +13,25 @@ import { useAuthStore } from '@/store/auth.store';
 import { getLiveUser } from '@/utils/getLiveUser';
 import { submitDiagnostic } from '@/lib/gating/diagnosticService';
 import {
-  MOVER_TYPE_QUESTIONS,
-  MOVER_TYPES,
-  scoreMoverTypeQuiz,
-  type MoverTypeData,
-  type MoverDiagnosticResult,
-  type OptionLetter,
-} from '@/data/hitting-mover-type-data';
-import { getMlbComparisons, type MlbComparison } from '@/data/mover-mlb-comparisons';
+  HITTING_IDENTITY_QUESTIONS,
+  MOVEMENT_PROFILES,
+  BAT_PATH_PROFILES,
+  COMBINED_PROFILE_SUMMARIES,
+  HITTING_IDENTITY_STORAGE_KEY,
+  scoreHittingIdentity,
+  type HittingIdentityDiagnosticResult,
+} from '@/data/hitting-identity-data';
 
-const STORAGE_KEY = 'otc:mover-type';
 const ACCENT = '#E10600';
+const TOTAL_QUESTIONS = HITTING_IDENTITY_QUESTIONS.length;
 
 type Screen = 'intro' | 'quiz' | 'results';
 
-const MOVER_LIST = Object.values(MOVER_TYPES);
-
-export default function MoverTypeQuizScreen() {
+export default function HittingIdentityQuizScreen() {
   const [screen, setScreen] = useState<Screen>('intro');
   const [currentQ, setCurrentQ] = useState(0);
-  const [answers, setAnswers] = useState<OptionLetter[]>([]);
-  const [result, setResult] = useState<MoverDiagnosticResult | null>(null);
+  const [answers, setAnswers] = useState<('a' | 'b')[]>([]);
+  const [result, setResult] = useState<HittingIdentityDiagnosticResult | null>(null);
   const [mechAlreadyDone, setMechAlreadyDone] = useState(false);
   const user = useAuthStore((s) => s.user);
   const queryClient = useQueryClient();
@@ -44,21 +42,24 @@ export default function MoverTypeQuizScreen() {
     });
   }, []);
 
-  const primaryData: MoverTypeData | null = result ? MOVER_TYPES[result.primary] : null;
-  const secondaryData: MoverTypeData | null = result ? MOVER_TYPES[result.secondary] : null;
+  const question = HITTING_IDENTITY_QUESTIONS[currentQ];
+  const isMovementSection = currentQ < 6;
+  const sectionLabel = isMovementSection ? 'MOVEMENT PATTERN' : 'BAT PATH';
+  const sectionColor = isMovementSection ? '#a855f7' : '#22c55e';
 
-  async function handleAnswer(letter: OptionLetter) {
+  async function handleAnswer(letter: 'a' | 'b') {
     const next = [...answers, letter];
     setAnswers(next);
 
-    if (next.length >= MOVER_TYPE_QUESTIONS.length) {
-      const scored = scoreMoverTypeQuiz(next);
+    if (next.length >= TOTAL_QUESTIONS) {
+      const scored = scoreHittingIdentity(next);
       setResult(scored);
       setScreen('results');
 
-      // Persist full result (primary + secondary)
-      AsyncStorage.setItem(STORAGE_KEY, JSON.stringify(scored));
+      // Persist locally
+      AsyncStorage.setItem(HITTING_IDENTITY_STORAGE_KEY, JSON.stringify(scored));
 
+      // Submit to Supabase as the new diagnostic type
       const liveUser = await getLiveUser();
       const resolvedId = liveUser?.id ?? user?.id;
       if (resolvedId) {
@@ -66,11 +67,17 @@ export default function MoverTypeQuizScreen() {
           await submitDiagnostic(supabase, {
             userId: resolvedId,
             vaultType: 'hitting',
-            diagnosticType: 'mover-type',
-            resultPayload: { primary: scored.primary, secondary: scored.secondary },
+            diagnosticType: 'hitting-identity-v2',
+            resultPayload: {
+              movementType: scored.movementType,
+              batPathType: scored.batPathType,
+              combinedProfile: scored.combinedProfile,
+              movementScores: scored.movementScores,
+              batPathScores: scored.batPathScores,
+            },
           });
         } catch (err) {
-          if (__DEV__) console.warn('[hitting-quiz] submitDiagnostic error:', err);
+          if (__DEV__) console.warn('[hitting-identity] submitDiagnostic error:', err);
         }
         queryClient.invalidateQueries({ queryKey: ['gate-state', resolvedId] });
       }
@@ -87,9 +94,12 @@ export default function MoverTypeQuizScreen() {
   }
 
   function retake() {
-    AsyncStorage.removeItem(STORAGE_KEY);
+    AsyncStorage.removeItem(HITTING_IDENTITY_STORAGE_KEY);
     startQuiz();
   }
+
+  const mv = result ? MOVEMENT_PROFILES[result.movementType] : null;
+  const bp = result ? BAT_PATH_PROFILES[result.batPathType] : null;
 
   return (
     <SafeAreaView style={styles.safe}>
@@ -102,12 +112,12 @@ export default function MoverTypeQuizScreen() {
         </TouchableOpacity>
         <View style={{ flex: 1 }}>
           <Text style={styles.eyebrow}>HITTING VAULT</Text>
-          <Text style={styles.title}>Hitter Mover Diagnostic</Text>
+          <Text style={styles.title}>Hitting Identity Diagnostic</Text>
         </View>
         {screen === 'quiz' && (
           <View style={styles.progressBadge}>
             <Text style={styles.progressBadgeText}>
-              {currentQ + 1} / {MOVER_TYPE_QUESTIONS.length}
+              {currentQ + 1} / {TOTAL_QUESTIONS}
             </Text>
           </View>
         )}
@@ -122,23 +132,33 @@ export default function MoverTypeQuizScreen() {
               <View style={[styles.introIconWrap, { backgroundColor: ACCENT + '15' }]}>
                 <Ionicons name="baseball-outline" size={40} color={ACCENT} />
               </View>
-              <Text style={styles.introTitle}>Find Your Movement Pattern</Text>
+              <Text style={styles.introTitle}>Find Your Hitting Identity</Text>
               <Text style={styles.introDesc}>
-                15 questions · 6 choices each{'\n'}Identify how your body naturally creates power.
+                12 questions · 2 sections{'\n'}Discover how you move and how your barrel works.
               </Text>
             </View>
 
-            <Text style={styles.sectionLabel}>6 MOVER TYPES</Text>
+            <Text style={styles.introPhilosophy}>
+              Hunt your pitch. Find the barrel. Backspin the ball.
+            </Text>
 
-            {MOVER_LIST.map((mt) => (
-              <View key={mt.slug} style={styles.typePreview}>
-                <View style={[styles.typeDot, { backgroundColor: mt.color }]} />
-                <View style={{ flex: 1 }}>
-                  <Text style={[styles.typeName, { color: mt.color }]}>{mt.name}</Text>
-                  <Text style={styles.typeTagline}>{mt.tagline}</Text>
-                </View>
+            <Text style={styles.sectionLabel}>2 AXES</Text>
+
+            <View style={styles.typePreview}>
+              <View style={[styles.typeDot, { backgroundColor: '#a855f7' }]} />
+              <View style={{ flex: 1 }}>
+                <Text style={[styles.typeName, { color: '#a855f7' }]}>Movement Pattern</Text>
+                <Text style={styles.typeTagline}>Springy or Grounded — how you organize force</Text>
               </View>
-            ))}
+            </View>
+
+            <View style={styles.typePreview}>
+              <View style={[styles.typeDot, { backgroundColor: '#22c55e' }]} />
+              <View style={{ flex: 1 }}>
+                <Text style={[styles.typeName, { color: '#22c55e' }]}>Bat Path / Action</Text>
+                <Text style={styles.typeTagline}>Horizontal or Vertical — how your barrel works</Text>
+              </View>
+            </View>
 
             <TouchableOpacity
               style={[styles.startBtn, { backgroundColor: ACCENT }]}
@@ -148,7 +168,7 @@ export default function MoverTypeQuizScreen() {
               <Ionicons name="play-circle" size={20} color="#fff" />
               <View style={{ flex: 1 }}>
                 <Text style={styles.startBtnTitle}>Start Diagnostic</Text>
-                <Text style={styles.startBtnSub}>15 questions — under 3 minutes</Text>
+                <Text style={styles.startBtnSub}>12 questions — under 2 minutes</Text>
               </View>
               <Ionicons name="chevron-forward" size={18} color="#fff" />
             </TouchableOpacity>
@@ -156,44 +176,48 @@ export default function MoverTypeQuizScreen() {
             <View style={styles.noteCard}>
               <Ionicons name="information-circle-outline" size={15} color={colors.textMuted} />
               <Text style={styles.noteText}>
-                Pick what feels most true. There are no wrong answers — just honest ones.
+                Pick what feels most true. There are no wrong answers — this identifies how you naturally hit, not what you should become.
               </Text>
             </View>
           </>
         )}
 
         {/* ═══════ QUIZ ═══════ */}
-        {screen === 'quiz' && (
+        {screen === 'quiz' && question && (
           <>
             <View style={styles.progressBar}>
               <View
                 style={[
                   styles.progressFill,
                   {
-                    width: `${(currentQ / MOVER_TYPE_QUESTIONS.length) * 100}%`,
-                    backgroundColor: ACCENT,
+                    width: `${(currentQ / TOTAL_QUESTIONS) * 100}%`,
+                    backgroundColor: sectionColor,
                   },
                 ]}
               />
             </View>
 
-            <Text style={[styles.questionNum, { color: ACCENT }]}>
-              QUESTION {currentQ + 1} OF {MOVER_TYPE_QUESTIONS.length}
+            <View style={[styles.sectionBadge, { backgroundColor: sectionColor + '18' }]}>
+              <Text style={[styles.sectionBadgeText, { color: sectionColor }]}>
+                {sectionLabel}
+              </Text>
+            </View>
+
+            <Text style={[styles.questionNum, { color: sectionColor }]}>
+              QUESTION {currentQ + 1} OF {TOTAL_QUESTIONS}
             </Text>
-            <Text style={styles.questionText}>
-              {MOVER_TYPE_QUESTIONS[currentQ].q}
-            </Text>
+            <Text style={styles.questionText}>{question.q}</Text>
 
             <View style={styles.optionsList}>
-              {MOVER_TYPE_QUESTIONS[currentQ].options.map((opt) => (
+              {question.options.map((opt) => (
                 <TouchableOpacity
                   key={opt.letter}
                   style={styles.optionBtn}
                   onPress={() => handleAnswer(opt.letter)}
                   activeOpacity={0.7}
                 >
-                  <View style={[styles.optionLetter, { backgroundColor: ACCENT + '20' }]}>
-                    <Text style={[styles.optionLetterText, { color: ACCENT }]}>
+                  <View style={[styles.optionLetter, { backgroundColor: sectionColor + '20' }]}>
+                    <Text style={[styles.optionLetterText, { color: sectionColor }]}>
                       {opt.letter.toUpperCase()}
                     </Text>
                   </View>
@@ -205,61 +229,129 @@ export default function MoverTypeQuizScreen() {
         )}
 
         {/* ═══════ RESULTS ═══════ */}
-        {screen === 'results' && primaryData && secondaryData && (
+        {screen === 'results' && result && mv && bp && (
           <>
-            <Text style={[styles.resultsEyebrow, { color: primaryData.color }]}>
-              YOUR MOVER TYPE
-            </Text>
-
-            {/* Primary result */}
-            <View style={[styles.resultCard, { borderColor: primaryData.color + '40' }]}>
-              <View style={[styles.resultBadge, { backgroundColor: primaryData.color + '20' }]}>
-                <Text style={[styles.resultBadgeText, { color: primaryData.color }]}>
-                  {primaryData.name}
-                </Text>
-              </View>
-              <Text style={styles.resultDesc}>{primaryData.description}</Text>
-            </View>
-
-            {/* Secondary result */}
-            <View style={[styles.secondaryCard, { borderColor: secondaryData.color + '30' }]}>
-              <Text style={styles.secondaryLabel}>SECONDARY MOVER</Text>
-              <View style={styles.secondaryRow}>
-                <View style={[styles.secondaryDot, { backgroundColor: secondaryData.color }]} />
-                <Text style={[styles.secondaryName, { color: secondaryData.color }]}>
-                  {secondaryData.name}
-                </Text>
-              </View>
-            </View>
-
-            {/* Coaching cues */}
-            <Text style={styles.sectionLabel}>PRIMARY COACHING CUES</Text>
-            {primaryData.primaryCues.map((cue) => (
-              <View key={cue} style={[styles.cueCard, { backgroundColor: primaryData.color + '10', borderColor: primaryData.color + '30' }]}>
-                <Ionicons name="mic-outline" size={16} color={primaryData.color} />
-                <Text style={styles.cueText}>{cue}</Text>
-              </View>
-            ))}
-
-            {/* MLB comparisons */}
-            <Text style={styles.sectionLabel}>MLB MOVERS LIKE YOU</Text>
-            {getMlbComparisons(primaryData.slug).map((comp: MlbComparison) => (
-              <View key={comp.name} style={[styles.mlbCard, { borderColor: primaryData.color + '25' }]}>
-                <View style={styles.mlbCardHeader}>
-                  <View style={[styles.mlbDot, { backgroundColor: primaryData.color }]} />
-                  <Text style={[styles.mlbName, { color: primaryData.color }]}>{comp.name}</Text>
-                </View>
-                <Text style={styles.mlbStudyNote}>{comp.studyNote}</Text>
-              </View>
-            ))}
-            <View style={styles.mlbCaption}>
-              <Ionicons name="eye-outline" size={13} color={colors.textMuted} />
-              <Text style={styles.mlbCaptionText}>
-                Study how these hitters move. Notice rhythm, timing, and how their body works through the swing.
+            {/* 1. Header */}
+            <Text style={styles.resultsEyebrow}>YOUR HITTING IDENTITY</Text>
+            <View style={styles.summaryCard}>
+              <Text style={styles.summaryLabel}>{result.summaryLabel}</Text>
+              <Text style={styles.summaryDesc}>
+                {COMBINED_PROFILE_SUMMARIES[result.combinedProfile]}
               </Text>
             </View>
 
-            {/* Navigation */}
+            {/* 2. Movement Pattern section */}
+            <Text style={[styles.sectionLabel, { color: mv.color }]}>MOVEMENT PATTERN</Text>
+            <View style={[styles.resultSection, { borderColor: mv.color + '30' }]}>
+              <View style={[styles.resultBadge, { backgroundColor: mv.color + '20' }]}>
+                <Text style={[styles.resultBadgeText, { color: mv.color }]}>{mv.label}</Text>
+              </View>
+              <Text style={styles.resultDesc}>{mv.description}</Text>
+
+              <Text style={[styles.subLabel, { color: mv.color }]}>WHAT YOU DO WELL</Text>
+              {mv.strengths.map((s) => (
+                <View key={s} style={styles.bulletRow}>
+                  <View style={[styles.bulletDot, { backgroundColor: mv.color }]} />
+                  <Text style={styles.bulletText}>{s}</Text>
+                </View>
+              ))}
+
+              <Text style={[styles.subLabel, { color: mv.color }]}>WHAT YOU MAY STRUGGLE WITH</Text>
+              {mv.struggles.map((s) => (
+                <View key={s} style={styles.bulletRow}>
+                  <View style={[styles.bulletDot, { backgroundColor: mv.color + '60' }]} />
+                  <Text style={styles.bulletText}>{s}</Text>
+                </View>
+              ))}
+
+              <Text style={[styles.subLabel, { color: mv.color }]}>WHAT TO WORK ON</Text>
+              {mv.workOns.map((w) => (
+                <View key={w} style={styles.bulletRow}>
+                  <Ionicons name="checkmark-circle-outline" size={14} color={mv.color} />
+                  <Text style={styles.bulletText}>{w}</Text>
+                </View>
+              ))}
+
+              <Text style={[styles.subLabel, { color: mv.color }]}>MOVEMENT CUES</Text>
+              {mv.cues.map((cue) => (
+                <View key={cue} style={[styles.cueCard, { backgroundColor: mv.color + '10', borderColor: mv.color + '30' }]}>
+                  <Ionicons name="mic-outline" size={14} color={mv.color} />
+                  <Text style={styles.cueText}>{cue}</Text>
+                </View>
+              ))}
+
+              <Text style={[styles.subLabel, { color: mv.color }]}>MLB MOVEMENT EXAMPLES</Text>
+              <Text style={styles.mlbExampleNote}>How these hitters organize movement</Text>
+              {mv.mlbExamples.map((name) => (
+                <View key={name} style={styles.mlbRow}>
+                  <View style={[styles.mlbDot, { backgroundColor: mv.color }]} />
+                  <Text style={[styles.mlbName, { color: mv.color }]}>{name}</Text>
+                </View>
+              ))}
+            </View>
+
+            {/* 3. Bat Path / Action section */}
+            <Text style={[styles.sectionLabel, { color: bp.color }]}>BAT PATH / ACTION</Text>
+            <View style={[styles.resultSection, { borderColor: bp.color + '30' }]}>
+              <View style={[styles.resultBadge, { backgroundColor: bp.color + '20' }]}>
+                <Text style={[styles.resultBadgeText, { color: bp.color }]}>{bp.label}</Text>
+              </View>
+              <Text style={styles.resultDesc}>{bp.description}</Text>
+
+              <Text style={[styles.subLabel, { color: bp.color }]}>WHAT YOU DO WELL</Text>
+              {bp.strengths.map((s) => (
+                <View key={s} style={styles.bulletRow}>
+                  <View style={[styles.bulletDot, { backgroundColor: bp.color }]} />
+                  <Text style={styles.bulletText}>{s}</Text>
+                </View>
+              ))}
+
+              <Text style={[styles.subLabel, { color: bp.color }]}>WHAT YOU MAY STRUGGLE WITH</Text>
+              {bp.struggles.map((s) => (
+                <View key={s} style={styles.bulletRow}>
+                  <View style={[styles.bulletDot, { backgroundColor: bp.color + '60' }]} />
+                  <Text style={styles.bulletText}>{s}</Text>
+                </View>
+              ))}
+
+              <Text style={[styles.subLabel, { color: bp.color }]}>WHAT TO WORK ON</Text>
+              {bp.workOns.map((w) => (
+                <View key={w} style={styles.bulletRow}>
+                  <Ionicons name="checkmark-circle-outline" size={14} color={bp.color} />
+                  <Text style={styles.bulletText}>{w}</Text>
+                </View>
+              ))}
+
+              <Text style={[styles.subLabel, { color: bp.color }]}>BAT PATH CUES</Text>
+              {bp.cues.map((cue) => (
+                <View key={cue} style={[styles.cueCard, { backgroundColor: bp.color + '10', borderColor: bp.color + '30' }]}>
+                  <Ionicons name="mic-outline" size={14} color={bp.color} />
+                  <Text style={styles.cueText}>{cue}</Text>
+                </View>
+              ))}
+
+              <Text style={[styles.subLabel, { color: bp.color }]}>MLB BAT PATH EXAMPLES</Text>
+              <Text style={styles.mlbExampleNote}>How these hitters' barrels tend to work</Text>
+              {bp.mlbExamples.map((name) => (
+                <View key={name} style={styles.mlbRow}>
+                  <View style={[styles.mlbDot, { backgroundColor: bp.color }]} />
+                  <Text style={[styles.mlbName, { color: bp.color }]}>{name}</Text>
+                </View>
+              ))}
+            </View>
+
+            {/* 4. Combined profile teaching */}
+            <View style={styles.teachingCard}>
+              <Ionicons name="school-outline" size={18} color={colors.textMuted} />
+              <Text style={styles.teachingText}>
+                Your Hitting Identity has two parts:{'\n\n'}
+                <Text style={{ fontWeight: '800' }}>Movement Pattern</Text> describes how you organize your body and create force.{'\n\n'}
+                <Text style={{ fontWeight: '800' }}>Bat Path</Text> describes how your barrel tends to work to the ball.{'\n\n'}
+                Neither is better or worse. Your goal is to organize your identity better, not force yourself into someone else's model.
+              </Text>
+            </View>
+
+            {/* 5. Navigation CTAs */}
             {mechAlreadyDone ? (
               <TouchableOpacity
                 style={[styles.nextBtn, { backgroundColor: '#22c55e' }]}
@@ -300,12 +392,12 @@ export default function MoverTypeQuizScreen() {
             )}
 
             <TouchableOpacity
-              style={[styles.retakeBtn, { borderColor: primaryData.color }]}
+              style={[styles.retakeBtn, { borderColor: ACCENT }]}
               onPress={retake}
               activeOpacity={0.75}
             >
-              <Ionicons name="refresh" size={15} color={primaryData.color} />
-              <Text style={[styles.retakeBtnText, { color: primaryData.color }]}>Retake</Text>
+              <Ionicons name="refresh" size={15} color={ACCENT} />
+              <Text style={[styles.retakeBtnText, { color: ACCENT }]}>Retake</Text>
             </TouchableOpacity>
           </>
         )}
@@ -341,6 +433,11 @@ const styles = StyleSheet.create({
   },
   introTitle: { fontSize: 20, fontWeight: '900', color: colors.textPrimary, textAlign: 'center' },
   introDesc: { fontSize: 14, color: colors.textSecondary, textAlign: 'center', lineHeight: 21 },
+  introPhilosophy: {
+    fontSize: 16, fontWeight: '900', color: ACCENT, textAlign: 'center',
+    fontStyle: 'italic', lineHeight: 24,
+  },
+
   sectionLabel: { fontSize: 10, fontWeight: '900', color: ACCENT, letterSpacing: 1.5, marginTop: 4 },
   typePreview: {
     flexDirection: 'row', alignItems: 'flex-start', gap: 12,
@@ -362,13 +459,16 @@ const styles = StyleSheet.create({
   },
   noteText: { flex: 1, fontSize: 13, color: colors.textMuted, lineHeight: 19 },
 
+  /* Quiz */
   progressBar: { height: 4, backgroundColor: colors.border, borderRadius: 2, overflow: 'hidden' },
   progressFill: { height: '100%', borderRadius: 2 },
-  questionNum: { fontSize: 10, fontWeight: '900', letterSpacing: 1.5, marginTop: 6 },
+  sectionBadge: { alignSelf: 'flex-start', paddingHorizontal: 10, paddingVertical: 4, borderRadius: 8 },
+  sectionBadgeText: { fontSize: 10, fontWeight: '900', letterSpacing: 1.2 },
+  questionNum: { fontSize: 10, fontWeight: '900', letterSpacing: 1.5, marginTop: 2 },
   questionText: { fontSize: 20, fontWeight: '900', color: colors.textPrimary, lineHeight: 28 },
-  optionsList: { gap: 8, marginTop: 4 },
+  optionsList: { gap: 10, marginTop: 4 },
   optionBtn: {
-    flexDirection: 'row', alignItems: 'center', gap: 14, padding: 16,
+    flexDirection: 'row', alignItems: 'center', gap: 14, padding: 18,
     backgroundColor: colors.surface, borderWidth: 1,
     borderColor: colors.border, borderRadius: radius.lg,
   },
@@ -377,42 +477,48 @@ const styles = StyleSheet.create({
     alignItems: 'center', justifyContent: 'center', flexShrink: 0,
   },
   optionLetterText: { fontSize: 13, fontWeight: '900' },
-  optionText: { flex: 1, fontSize: 15, fontWeight: '600', color: colors.textPrimary, lineHeight: 21 },
+  optionText: { flex: 1, fontSize: 16, fontWeight: '600', color: colors.textPrimary, lineHeight: 22 },
 
-  resultsEyebrow: { fontSize: 11, fontWeight: '900', letterSpacing: 2, textAlign: 'center' },
-  resultCard: {
-    alignItems: 'center', gap: 12, padding: 24,
-    backgroundColor: colors.surface, borderWidth: 2, borderRadius: radius.lg,
+  /* Results */
+  resultsEyebrow: { fontSize: 11, fontWeight: '900', letterSpacing: 2, textAlign: 'center', color: ACCENT },
+  summaryCard: {
+    alignItems: 'center', gap: 10, padding: 20,
+    backgroundColor: colors.surface, borderWidth: 2, borderColor: ACCENT + '30', borderRadius: radius.lg,
   },
-  resultBadge: { paddingHorizontal: 20, paddingVertical: 8, borderRadius: 20 },
-  resultBadgeText: { fontSize: 18, fontWeight: '900' },
-  resultDesc: { fontSize: 14, color: colors.textSecondary, textAlign: 'center', lineHeight: 22 },
+  summaryLabel: { fontSize: 22, fontWeight: '900', color: colors.textPrimary, textAlign: 'center' },
+  summaryDesc: { fontSize: 14, color: colors.textSecondary, textAlign: 'center', lineHeight: 22 },
 
-  secondaryCard: {
-    backgroundColor: colors.surface, borderWidth: 1, borderRadius: radius.md,
-    padding: 14, gap: 6,
+  resultSection: {
+    backgroundColor: colors.surface, borderWidth: 1, borderRadius: radius.lg,
+    padding: 16, gap: 10,
   },
-  secondaryLabel: { fontSize: 9, fontWeight: '900', letterSpacing: 1.2, color: colors.textMuted },
-  secondaryRow: { flexDirection: 'row', alignItems: 'center', gap: 8 },
-  secondaryDot: { width: 8, height: 8, borderRadius: 4 },
-  secondaryName: { fontSize: 15, fontWeight: '800' },
+  resultBadge: { alignSelf: 'flex-start', paddingHorizontal: 16, paddingVertical: 6, borderRadius: 16 },
+  resultBadgeText: { fontSize: 16, fontWeight: '900' },
+  resultDesc: { fontSize: 13, color: colors.textSecondary, lineHeight: 20 },
+
+  subLabel: { fontSize: 9, fontWeight: '900', letterSpacing: 1.2, marginTop: 6 },
+  bulletRow: { flexDirection: 'row', alignItems: 'flex-start', gap: 8 },
+  bulletDot: { width: 6, height: 6, borderRadius: 3, marginTop: 6 },
+  bulletText: { flex: 1, fontSize: 13, color: colors.textSecondary, lineHeight: 19 },
 
   cueCard: {
-    flexDirection: 'row', gap: 12, padding: 14, borderWidth: 1, borderRadius: radius.md,
+    flexDirection: 'row', gap: 10, padding: 10, borderWidth: 1, borderRadius: radius.md,
     alignItems: 'center',
   },
-  cueText: { flex: 1, fontSize: 14, fontWeight: '700', color: colors.textPrimary, lineHeight: 20 },
+  cueText: { flex: 1, fontSize: 13, fontWeight: '700', color: colors.textPrimary, lineHeight: 18 },
 
-  mlbCard: {
-    backgroundColor: colors.surface, borderWidth: 1, borderRadius: radius.md,
-    padding: 12, gap: 6,
+  mlbExampleNote: { fontSize: 11, color: colors.textMuted, fontStyle: 'italic' },
+  mlbRow: { flexDirection: 'row', alignItems: 'center', gap: 8 },
+  mlbDot: { width: 7, height: 7, borderRadius: 4 },
+  mlbName: { fontSize: 14, fontWeight: '800' },
+
+  teachingCard: {
+    flexDirection: 'row', gap: 12, padding: 16,
+    backgroundColor: colors.surface, borderWidth: 1,
+    borderColor: colors.border, borderRadius: radius.lg, alignItems: 'flex-start',
   },
-  mlbCardHeader: { flexDirection: 'row', alignItems: 'center', gap: 8 },
-  mlbDot: { width: 8, height: 8, borderRadius: 4 },
-  mlbName: { fontSize: 15, fontWeight: '800' },
-  mlbStudyNote: { fontSize: 13, color: colors.textSecondary, lineHeight: 19, paddingLeft: 16 },
-  mlbCaption: { flexDirection: 'row', alignItems: 'flex-start', gap: 8 },
-  mlbCaptionText: { flex: 1, fontSize: 12, color: colors.textMuted, lineHeight: 17 },
+  teachingText: { flex: 1, fontSize: 13, color: colors.textSecondary, lineHeight: 20 },
+
   nextCard: {
     flexDirection: 'row', alignItems: 'center', gap: 12,
     padding: 14, backgroundColor: '#22c55e10',

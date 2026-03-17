@@ -67,7 +67,7 @@ export function PhaseControlPanel({
         </Text>
         <TouchableOpacity
           style={styles.setupBtn}
-          onPress={() => router.push('/(app)/training/sc/sc-profile-setup' as any)}
+          onPress={() => router.push('/(app)/training/sc/diagnostics' as any)}
           activeOpacity={0.85}
         >
           <Text style={styles.setupBtnText}>Set Up Profile</Text>
@@ -106,9 +106,9 @@ export function PhaseControlPanel({
       </View>
 
       <View style={styles.statusRow}>
-        <View style={[styles.statusDot, { backgroundColor: verified ? '#22c55e' : '#f59e0b' }]} />
-        <Text style={[styles.statusText, { color: verified ? '#22c55e' : '#f59e0b' }]}>
-          {verified ? 'Development Verified' : 'Development Unverified'}
+        <View style={[styles.statusDot, { backgroundColor: verified ? '#22c55e' : colors.textMuted }]} />
+        <Text style={[styles.statusText, { color: verified ? '#22c55e' : colors.textMuted }]}>
+          {verified ? 'Metrics Verified' : 'No recent test'}
         </Text>
       </View>
     </View>

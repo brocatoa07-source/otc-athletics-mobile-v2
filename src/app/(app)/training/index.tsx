@@ -1,4 +1,4 @@
-import { ScrollView, Text, View, TouchableOpacity, StyleSheet } from 'react-native';
+import { ActivityIndicator, ScrollView, Text, View, TouchableOpacity, StyleSheet } from 'react-native';
 import { SafeAreaView } from 'react-native-safe-area-context';
 import { router } from 'expo-router';
 import { Ionicons } from '@expo/vector-icons';
@@ -39,7 +39,21 @@ const VAULT_TILES = [
 ];
 
 export default function TrainingHub() {
-  const { gate } = useGating();
+  const { gate, isLoading } = useGating();
+
+  if (isLoading) {
+    return (
+      <SafeAreaView style={styles.safe}>
+        <View style={styles.header}>
+          <Text style={styles.heading}>Lab</Text>
+          <Text style={styles.headingSub}>Hub + Execution</Text>
+        </View>
+        <View style={styles.loadingContainer}>
+          <ActivityIndicator size="small" color={colors.textMuted} />
+        </View>
+      </SafeAreaView>
+    );
+  }
 
   return (
     <SafeAreaView style={styles.safe}>
@@ -232,5 +246,10 @@ const styles = StyleSheet.create({
     color: '#22c55e',
     textDecorationLine: 'line-through',
     opacity: 0.7,
+  },
+  loadingContainer: {
+    flex: 1,
+    justifyContent: 'center' as const,
+    alignItems: 'center' as const,
   },
 });

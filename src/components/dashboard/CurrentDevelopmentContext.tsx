@@ -40,7 +40,7 @@ export function CurrentDevelopmentContext() {
   return (
     <TouchableOpacity
       style={styles.banner}
-      onPress={() => router.push('/(app)/training/metrics-log' as any)}
+      onPress={() => router.push('/(app)/progress' as any)}
       activeOpacity={0.85}
     >
       <View style={styles.topRow}>

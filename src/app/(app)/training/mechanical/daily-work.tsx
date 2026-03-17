@@ -13,6 +13,7 @@ import {
   generateUnifiedDailyWork,
   loadDailyWork,
   saveDailyWork,
+  getStrengthTaskForToday,
   type UnifiedDailyWork,
   type DailyWorkItem,
 } from '@/data/daily-work';
@@ -22,6 +23,10 @@ import {
 } from '@/data/hitting-vault-sections';
 import type { MechanicalDiagnosticResult } from '@/data/hitting-mechanical-diagnostic-data';
 import type { MoverType } from '@/data/hitting-mover-type-data';
+import {
+  HITTING_IDENTITY_STORAGE_KEY,
+  type HittingIdentityDiagnosticResult,
+} from '@/data/hitting-identity-data';
 import { useTier } from '@/hooks/useTier';
 import { filterDailyWorkItems, getLockedTypes, getUpgradeTargetLabel } from '@/lib/tier-content';
 
@@ -64,14 +69,24 @@ export default function DailyWorkScreen() {
     try {
       const result: MechanicalDiagnosticResult = JSON.parse(raw);
 
-      // Load mover type for drill affinity bias (supports new + legacy format)
+      // Load identity (new 2-axis) or legacy mover type for drill affinity
       let moverType: MoverType | null = null;
-      const moverRaw = await AsyncStorage.getItem('otc:mover-type');
-      if (moverRaw) {
+      let identity: { movementType: HittingIdentityDiagnosticResult['movementType']; batPathType: HittingIdentityDiagnosticResult['batPathType'] } | null = null;
+      const identityRaw = await AsyncStorage.getItem(HITTING_IDENTITY_STORAGE_KEY);
+      if (identityRaw) {
         try {
-          const parsed = JSON.parse(moverRaw);
-          moverType = (parsed.primary ?? parsed.slug ?? parsed) as MoverType;
+          const parsed: HittingIdentityDiagnosticResult = JSON.parse(identityRaw);
+          identity = { movementType: parsed.movementType, batPathType: parsed.batPathType };
         } catch {}
+      } else {
+        // Legacy fallback: load old mover-type for drill affinity bias
+        const moverRaw = await AsyncStorage.getItem('otc:mover-type');
+        if (moverRaw) {
+          try {
+            const parsed = JSON.parse(moverRaw);
+            moverType = (parsed.primary ?? parsed.slug ?? parsed) as MoverType;
+          } catch {}
+        }
       }
 
       // Load mental scores for smart task selection
@@ -81,12 +96,17 @@ export default function DailyWorkScreen() {
         if (mentalRaw) mentalScores = JSON.parse(mentalRaw);
       } catch {}
 
+      // Resolve OTC-S strength task (uses real program when available)
+      const strengthTask = await getStrengthTaskForToday();
+
       const generated = generateUnifiedDailyWork(
         result.primary,
         result.secondary,
         athlete?.age ?? null,
         moverType,
         mentalScores,
+        identity,
+        strengthTask,
       );
       await saveDailyWork(generated);
       setPlan(generated);

@@ -15,6 +15,12 @@ import {
 } from '@/data/hitting-mechanical-diagnostic-data';
 import type { MoverType } from '@/data/hitting-mover-type-data';
 import {
+  HITTING_IDENTITY_STORAGE_KEY,
+  type HittingIdentityDiagnosticResult,
+  type HittingMovementType,
+  type HittingBatPathType,
+} from '@/data/hitting-identity-data';
+import {
   HITTING_VAULT_SECTIONS,
   type DrillCard,
 } from '@/data/hitting-vault-sections';
@@ -62,11 +68,15 @@ function getTroubleshootingDrills(
   issues: TroubleshootingIssueData[],
   diagnostic: MechanicalDiagnosticResult,
   moverType: MoverType | null,
+  movementType?: HittingMovementType | null,
+  batPathType?: HittingBatPathType | null,
 ): { name: string; issueLabel: string; issueColor: string }[] {
   const rec = getEngineRecommendation({
     primaryIssue: diagnostic.primary,
     secondaryIssue: diagnostic.secondary,
     moverType,
+    movementType: movementType ?? null,
+    batPathType: batPathType ?? null,
     age: null,
     recentDrills: [],
   });
@@ -100,6 +110,8 @@ export default function TroubleshootingScreen() {
   const upgradeTarget = getUpgradeTargetLabel(tier);
   const [diagnostic, setDiagnostic] = useState<MechanicalDiagnosticResult | null>(null);
   const [moverType, setMoverType] = useState<MoverType | null>(null);
+  const [movementType, setMovementType] = useState<HittingMovementType | null>(null);
+  const [batPathType, setBatPathType] = useState<HittingBatPathType | null>(null);
   const [expandedDrill, setExpandedDrill] = useState<string | null>(null);
 
   useEffect(() => {
@@ -108,12 +120,24 @@ export default function TroubleshootingScreen() {
       try { setDiagnostic(JSON.parse(val)); } catch {}
     });
 
-    AsyncStorage.getItem('otc:mover-type').then((val) => {
-      if (!val) return;
-      try {
-        const parsed = JSON.parse(val);
-        setMoverType((parsed.primary ?? parsed.slug ?? parsed) as MoverType);
-      } catch {}
+    // Check new identity first; fall back to legacy mover-type
+    AsyncStorage.getItem(HITTING_IDENTITY_STORAGE_KEY).then((val) => {
+      if (val) {
+        try {
+          const parsed: HittingIdentityDiagnosticResult = JSON.parse(val);
+          setMovementType(parsed.movementType);
+          setBatPathType(parsed.batPathType);
+        } catch {}
+        return;
+      }
+      // Legacy fallback
+      AsyncStorage.getItem('otc:mover-type').then((legacyVal) => {
+        if (!legacyVal) return;
+        try {
+          const parsed = JSON.parse(legacyVal);
+          setMoverType((parsed.primary ?? parsed.slug ?? parsed) as MoverType);
+        } catch {}
+      });
     });
   }, []);
 
@@ -154,7 +178,7 @@ export default function TroubleshootingScreen() {
   const { primary: primaryIssues, secondary: secondaryIssues } =
     getTroubleshootingIssuesForDiagnostic(diagnostic.primary, diagnostic.secondary);
   const allIssues = [...primaryIssues, ...secondaryIssues];
-  const allDrills = getTroubleshootingDrills(allIssues, diagnostic, moverType);
+  const allDrills = getTroubleshootingDrills(allIssues, diagnostic, moverType, movementType, batPathType);
   const drills = isPreviewOnly ? allDrills.slice(0, WALK_TROUBLESHOOTING_DRILL_LIMIT) : allDrills;
 
   return (

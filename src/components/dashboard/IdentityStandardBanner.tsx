@@ -48,12 +48,12 @@ export function IdentityStandardBanner({ tierLabel, developmentStatus, standardS
       ) : (
         <TouchableOpacity
           style={styles.statusRow}
-          onPress={() => router.push('/(app)/training/metrics-log' as any)}
+          onPress={() => router.push('/(app)/progress' as any)}
           activeOpacity={0.75}
         >
-          <Ionicons name="alert-circle-outline" size={14} color="#f59e0b" />
-          <Text style={styles.unverifiedLabel}>Development Unverified</Text>
-          <Text style={styles.unverifiedCta}>Log metrics →</Text>
+          <Ionicons name="speedometer-outline" size={14} color={colors.textMuted} />
+          <Text style={styles.unverifiedLabel}>Performance Trend</Text>
+          <Text style={styles.unverifiedCta}>Log test →</Text>
         </TouchableOpacity>
       )}
     </View>

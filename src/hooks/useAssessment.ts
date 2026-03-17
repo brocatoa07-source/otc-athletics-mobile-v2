@@ -1,4 +1,5 @@
 import { useState, useEffect, useCallback } from 'react';
+import { useFocusEffect } from 'expo-router';
 import AsyncStorage from '@react-native-async-storage/async-storage';
 import type { DeficiencyScores, QuizAnswer } from '@/data/deficiency-engine';
 import { supabase } from '@/lib/supabase';
@@ -19,16 +20,23 @@ export function useAssessment() {
   const [assessment, setAssessment] = useState<AssessmentData | null>(null);
   const [loaded, setLoaded] = useState(false);
 
-  useEffect(() => {
+  const load = useCallback(() => {
     AsyncStorage.getItem(STORAGE_KEY).then((raw) => {
       if (raw) {
         try {
           setAssessment(JSON.parse(raw));
         } catch {}
+      } else {
+        setAssessment(null);
       }
       setLoaded(true);
     });
   }, []);
+
+  useEffect(() => { load(); }, [load]);
+
+  // Re-read on screen focus so dashboard picks up assessment completion
+  useFocusEffect(useCallback(() => { load(); }, [load]));
 
   const saveAssessment = useCallback(async (data: AssessmentData) => {
     await AsyncStorage.setItem(STORAGE_KEY, JSON.stringify(data));

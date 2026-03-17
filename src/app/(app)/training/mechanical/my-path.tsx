@@ -15,10 +15,13 @@ import {
   type MechanicalDiagnosticResult,
 } from '@/data/hitting-mechanical-diagnostic-data';
 import {
-  MOVER_TYPES,
-  type MoverType,
-  type MoverTypeData,
-} from '@/data/hitting-mover-type-data';
+  MOVEMENT_PROFILES,
+  BAT_PATH_PROFILES,
+  COMBINED_PROFILE_LABELS,
+  COMBINED_PROFILE_SUMMARIES,
+  HITTING_IDENTITY_STORAGE_KEY,
+  type HittingIdentityDiagnosticResult,
+} from '@/data/hitting-identity-data';
 import {
   ISSUE_TO_QUICKFIX,
   QUICKFIX_TO_FOCUS,
@@ -71,13 +74,12 @@ function findDrillInVault(drillName: string): { drill: DrillCard; sectionKey: st
 function getRecommendedDrills(
   primary: MechanicalIssue,
   secondary: MechanicalIssue,
-  moverType: MoverType | null = null,
   age: number | null = null,
 ): FlatDrill[] {
   const rec = getEngineRecommendation({
     primaryIssue: primary,
     secondaryIssue: secondary,
-    moverType,
+    moverType: null,
     age,
     recentDrills: [],
   });
@@ -99,40 +101,28 @@ export default function MyPathScreen() {
   const { athlete } = useAuth();
   const { gate } = useGating();
 
-  const [moverData, setMoverData] = useState<MoverTypeData | null>(null);
+  const [identityResult, setIdentityResult] = useState<HittingIdentityDiagnosticResult | null>(null);
   const [diagnostic, setDiagnostic] = useState<MechanicalDiagnosticResult | null>(null);
 
   useEffect(() => {
-    // Load mover type (supports new {primary,secondary} and legacy slug formats)
-    AsyncStorage.getItem('otc:mover-type').then((val) => {
+    // Load hitting identity (new v2 key)
+    AsyncStorage.getItem(HITTING_IDENTITY_STORAGE_KEY).then((val) => {
       if (!val) return;
-      try {
-        const parsed = JSON.parse(val);
-        if (parsed.primary) {
-          const found = MOVER_TYPES[parsed.primary as MoverType];
-          if (found) setMoverData(found);
-        } else {
-          const slug: MoverType = parsed.slug ?? parsed;
-          const found = MOVER_TYPES[slug];
-          if (found) setMoverData(found);
-        }
-      } catch {}
+      try { setIdentityResult(JSON.parse(val)); } catch {}
     });
 
     // Load mechanical diagnostic
     AsyncStorage.getItem('otc:mechanical-diagnostic').then((val) => {
       if (!val) return;
-      try {
-        setDiagnostic(JSON.parse(val));
-      } catch {}
+      try { setDiagnostic(JSON.parse(val)); } catch {}
     });
   }, []);
 
-  const hasMover = gate.hitting.moverDone && moverData;
+  const hasIdentity = gate.hitting.moverDone && identityResult;
   const hasMechanical = gate.hitting.mechanicalDone && diagnostic;
 
   // ── No diagnostics — show CTA ──────────────────────
-  if (!hasMover && !hasMechanical) {
+  if (!hasIdentity && !hasMechanical) {
     return (
       <SafeAreaView style={styles.safe}>
         <View style={styles.header}>
@@ -164,9 +154,9 @@ export default function MyPathScreen() {
 
   // Derived data
   const focusAreas = hasMechanical ? getFocusAreas(diagnostic.primary, diagnostic.secondary) : [];
-  const moverSlug: MoverType | null = moverData?.slug ?? null;
+  // New identity system doesn't map to old MoverType slugs — pass null until drill metadata is migrated
   const recommended = hasMechanical
-    ? getRecommendedDrills(diagnostic.primary, diagnostic.secondary, moverSlug, athlete?.age ?? null)
+    ? getRecommendedDrills(diagnostic.primary, diagnostic.secondary, athlete?.age ?? null)
     : [];
 
   return (
@@ -185,41 +175,59 @@ export default function MyPathScreen() {
         contentContainerStyle={styles.content}
         showsVerticalScrollIndicator={false}
       >
-        {/* ── 1. Swing Identity ────────────────────── */}
-        {hasMover && (
+        {/* ── 1. Hitting Identity ───────────────────── */}
+        {hasIdentity && (
           <>
-            <Text style={styles.sectionLabel}>SWING IDENTITY</Text>
-            <View style={[styles.card, { borderColor: moverData.color + '30' }]}>
+            <Text style={styles.sectionLabel}>HITTING IDENTITY</Text>
+            <View style={[styles.card, { borderColor: MOVEMENT_PROFILES[identityResult.movementType].color + '30' }]}>
               <View style={styles.moverHeader}>
-                <View style={[styles.moverDot, { backgroundColor: moverData.color }]} />
-                <Text style={[styles.moverName, { color: moverData.color }]}>
-                  {moverData.name}
+                <View style={[styles.moverDot, { backgroundColor: MOVEMENT_PROFILES[identityResult.movementType].color }]} />
+                <Text style={[styles.moverName, { color: MOVEMENT_PROFILES[identityResult.movementType].color }]}>
+                  {COMBINED_PROFILE_LABELS[identityResult.combinedProfile]}
                 </Text>
               </View>
-              <Text style={styles.moverTagline}>{moverData.tagline}</Text>
+              <Text style={styles.moverTagline}>
+                {COMBINED_PROFILE_SUMMARIES[identityResult.combinedProfile]}
+              </Text>
 
+              {/* Movement Pattern */}
               <View style={styles.moverDetail}>
-                <Text style={styles.detailLabel}>MLB COMPARISONS</Text>
-                {moverData.mlbComps.map((comp) => (
+                <Text style={[styles.detailLabel, { color: MOVEMENT_PROFILES[identityResult.movementType].color }]}>
+                  MOVEMENT · {MOVEMENT_PROFILES[identityResult.movementType].label.toUpperCase()}
+                </Text>
+                {identityResult.movementExamples.map((comp: string) => (
                   <Text key={comp} style={styles.detailItem}>{comp}</Text>
                 ))}
               </View>
 
-              <View style={[styles.cueBadge, { borderColor: moverData.color + '40' }]}>
-                <Text style={[styles.cueLabel, { color: moverData.color }]}>PRIMARY CUES</Text>
-                {moverData.primaryCues.map((cue) => (
+              {/* Bat Path */}
+              <View style={styles.moverDetail}>
+                <Text style={[styles.detailLabel, { color: BAT_PATH_PROFILES[identityResult.batPathType].color }]}>
+                  BAT PATH · {BAT_PATH_PROFILES[identityResult.batPathType].label.toUpperCase()}
+                </Text>
+                {identityResult.batPathExamples.map((comp: string) => (
+                  <Text key={comp} style={styles.detailItem}>{comp}</Text>
+                ))}
+              </View>
+
+              <View style={[styles.cueBadge, { borderColor: MOVEMENT_PROFILES[identityResult.movementType].color + '40' }]}>
+                <Text style={[styles.cueLabel, { color: MOVEMENT_PROFILES[identityResult.movementType].color }]}>KEY CUES</Text>
+                {identityResult.movementCues.slice(0, 2).map((cue: string) => (
+                  <Text key={cue} style={styles.cueText}>"{cue}"</Text>
+                ))}
+                {identityResult.batPathCues.slice(0, 2).map((cue: string) => (
                   <Text key={cue} style={styles.cueText}>"{cue}"</Text>
                 ))}
               </View>
 
               <TouchableOpacity
-                style={[styles.linkBtn, { backgroundColor: moverData.color + '15' }]}
+                style={[styles.linkBtn, { backgroundColor: MOVEMENT_PROFILES[identityResult.movementType].color + '15' }]}
                 onPress={() => router.push('/(app)/training/mechanical/mover-type-quiz' as any)}
               >
-                <Text style={[styles.linkBtnText, { color: moverData.color }]}>
+                <Text style={[styles.linkBtnText, { color: MOVEMENT_PROFILES[identityResult.movementType].color }]}>
                   View Identity Details
                 </Text>
-                <Ionicons name="chevron-forward" size={14} color={moverData.color} />
+                <Ionicons name="chevron-forward" size={14} color={MOVEMENT_PROFILES[identityResult.movementType].color} />
               </TouchableOpacity>
             </View>
           </>

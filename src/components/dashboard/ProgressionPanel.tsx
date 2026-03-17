@@ -47,7 +47,7 @@ export function ProgressionPanel({ accountabilityScore, grade, daysSinceLastKeyM
       {!hasRetest ? (
         <TouchableOpacity
           style={styles.emptyState}
-          onPress={() => router.push('/(app)/training/metrics-log' as any)}
+          onPress={() => router.push('/(app)/progress' as any)}
           activeOpacity={0.8}
         >
           <Ionicons name="analytics-outline" size={24} color={colors.textMuted} />

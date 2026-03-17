@@ -1,4 +1,5 @@
 import { useState, useEffect, useCallback } from 'react';
+import { useFocusEffect } from 'expo-router';
 import AsyncStorage from '@react-native-async-storage/async-storage';
 import { supabase } from '@/lib/supabase';
 import { useAuthStore } from '@/store/auth.store';
@@ -32,16 +33,23 @@ export function useAthleteScProfile() {
   const [profile, setProfile] = useState<ScProfile | null>(null);
   const [loaded, setLoaded] = useState(false);
 
-  useEffect(() => {
+  const load = useCallback(() => {
     AsyncStorage.getItem(STORAGE_KEY).then((raw) => {
       if (raw) {
         try {
           setProfile(JSON.parse(raw));
         } catch {}
+      } else {
+        setProfile(null);
       }
       setLoaded(true);
     });
   }, []);
+
+  useEffect(() => { load(); }, [load]);
+
+  // Re-read on screen focus so dashboard picks up profile changes
+  useFocusEffect(useCallback(() => { load(); }, [load]));
 
   const saveProfile = useCallback(async (data: ScProfile) => {
     await AsyncStorage.setItem(STORAGE_KEY, JSON.stringify(data));

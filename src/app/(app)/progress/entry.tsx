@@ -1,77 +1,140 @@
+import { useState, useMemo } from 'react';
 import {
-  View,
-  Text,
-  TextInput,
-  TouchableOpacity,
-  StyleSheet,
-  ScrollView,
-  Alert,
-  KeyboardAvoidingView,
-  Platform,
+  View, Text, TextInput, TouchableOpacity, StyleSheet,
+  ScrollView, Alert, KeyboardAvoidingView, Platform,
 } from 'react-native';
 import { SafeAreaView } from 'react-native-safe-area-context';
-import { useLocalSearchParams, router } from 'expo-router';
-import { useState } from 'react';
-import { useMutation, useQueryClient } from '@tanstack/react-query';
+import { router } from 'expo-router';
 import { Ionicons } from '@expo/vector-icons';
+import { colors, radius } from '@/theme';
+import {
+  TREND_METRICS,
+  STRENGTH_INPUTS,
+  calculateStrengthIndex,
+  getStrengthBand,
+  saveSnapshot,
+  generateSnapshotId,
+  type TrendMetricConfig,
+  type PerformanceTrendSnapshot,
+} from '@/data/performance-trend';
 import { supabase } from '@/lib/supabase';
 import { useAuthStore } from '@/store/auth.store';
-import { Colors } from '@/constants/colors';
-import { METRIC_CONFIG, type MetricType } from '@/types/progress';
 
-const ALL_METRICS = Object.keys(METRIC_CONFIG) as MetricType[];
+const ACCENT = '#3b82f6';
 
-export default function ProgressEntry() {
-  const { metric: defaultMetric } = useLocalSearchParams<{ metric?: string }>();
+export default function LogTestSnapshot() {
   const athlete = useAuthStore((s) => s.athlete);
-  const qc = useQueryClient();
+  const [values, setValues] = useState<Record<string, string>>({});
+  const [note, setNote] = useState('');
+  const [saving, setSaving] = useState(false);
+  const [expandedDesc, setExpandedDesc] = useState<string | null>(null);
 
-  const [selectedMetric, setSelectedMetric] = useState<MetricType>(
-    (defaultMetric as MetricType) || ALL_METRICS[0]
+  function updateValue(key: string, text: string) {
+    setValues((prev) => ({ ...prev, [key]: text }));
+  }
+
+  function parseNum(key: string): number | null {
+    const raw = values[key]?.trim();
+    if (!raw) return null;
+    const n = parseFloat(raw);
+    return isNaN(n) ? null : n;
+  }
+
+  const bodyweight = parseNum('bodyweight');
+  const trapBar = parseNum('trapBarDeadlift');
+  const frontSquat = parseNum('frontSquat');
+  const splitSquat = parseNum('splitSquat');
+  const strengthIndex = useMemo(
+    () => calculateStrengthIndex(bodyweight, trapBar, frontSquat, splitSquat),
+    [bodyweight, trapBar, frontSquat, splitSquat],
   );
-  const [value, setValue] = useState('');
-  const [notes, setNotes] = useState('');
 
-  const config = METRIC_CONFIG[selectedMetric];
+  const filledCount = [...TREND_METRICS, ...STRENGTH_INPUTS].filter(
+    (m) => values[m.key]?.trim(),
+  ).length;
 
-  const mutation = useMutation({
-    mutationFn: async () => {
-      const numVal = parseFloat(value);
-      if (isNaN(numVal)) throw new Error('Enter a valid number');
-      if (!athlete) throw new Error('No profile found');
+  async function handleSave() {
+    if (filledCount === 0) {
+      Alert.alert('No Data', 'Enter at least one metric value.');
+      return;
+    }
+    setSaving(true);
+    try {
+      const snapshot: PerformanceTrendSnapshot = {
+        id: generateSnapshotId(),
+        createdAt: new Date().toISOString(),
+        testDate: new Date().toISOString().slice(0, 10),
+        note: note.trim(),
+        bodyweight,
+        exitVelo: parseNum('exitVelo'),
+        throwingVelo: parseNum('throwingVelo'),
+        sixtyYard: parseNum('sixtyYard'),
+        tenYard: parseNum('tenYard'),
+        batSpeed: parseNum('batSpeed'),
+        verticalJump: parseNum('verticalJump'),
+        broadJump: parseNum('broadJump'),
+        rotationalPower: parseNum('rotationalPower'),
+        trapBarDeadlift: trapBar,
+        frontSquat,
+        splitSquat,
+        strengthIndex,
+      };
 
-      const { error } = await supabase.from('athlete_progress').insert({
-        athlete_id: athlete.id,
-        metric_type: selectedMetric,
-        value: numVal,
-        notes: notes.trim() || null,
-        recorded_at: new Date().toISOString(),
-      });
+      await saveSnapshot(snapshot);
 
-      if (error) {
-        if (error.code === '42P01' || error.message?.includes('not exist') || error.message?.includes('Not Found')) {
-          throw new Error('Progress tracking table not set up. Ask your coach to run the latest database migration.');
+      // Supabase write-through for key metrics (non-blocking)
+      if (athlete?.id) {
+        const entries: { athlete_id: string; metric_type: string; value: number; recorded_at: string }[] = [];
+        const metricMap: Record<string, string> = {
+          exitVelo: 'exit_velocity_mph',
+          throwingVelo: 'throw_velocity_mph',
+          sixtyYard: 'sprint_60yd_seconds',
+          tenYard: 'sprint_10yd_seconds',
+          batSpeed: 'bat_speed_mph',
+          verticalJump: 'vertical_jump_inches',
+          broadJump: 'broad_jump_inches',
+          rotationalPower: 'rot_power_watts',
+        };
+        for (const [local, remote] of Object.entries(metricMap)) {
+          const val = (snapshot as any)[local];
+          if (val !== null) {
+            entries.push({ athlete_id: athlete.id, metric_type: remote, value: val, recorded_at: snapshot.createdAt });
+          }
         }
-        throw new Error(error.message || 'Failed to save. Please try again.');
+        if (strengthIndex !== null) {
+          entries.push({ athlete_id: athlete.id, metric_type: 'strength_index', value: strengthIndex, recorded_at: snapshot.createdAt });
+        }
+        if (entries.length > 0) {
+          supabase.from('athlete_progress').insert(entries).then(() => {});
+        }
       }
-    },
-    onSuccess: () => {
-      qc.invalidateQueries({ queryKey: ['progress', athlete?.id] });
-      Alert.alert('Logged', 'Progress entry saved.', [
-        { text: 'Log Another', onPress: () => { setValue(''); setNotes(''); } },
-        { text: 'Done', onPress: () => router.back() },
-      ]);
-    },
-    onError: (err: Error) => Alert.alert('Error', err.message),
-  });
+
+      Alert.alert(
+        'Saved',
+        `Test snapshot logged with ${filledCount} metric${filledCount === 1 ? '' : 's'}.`,
+        [
+          { text: 'View Results', onPress: () => router.replace('/(app)/progress' as any) },
+          { text: 'Done', onPress: () => router.back() },
+        ],
+      );
+    } catch (err: any) {
+      Alert.alert('Error', err.message ?? 'Failed to save.');
+    } finally {
+      setSaving(false);
+    }
+  }
 
   return (
     <SafeAreaView style={styles.safe}>
       <View style={styles.header}>
         <TouchableOpacity onPress={() => router.back()}>
-          <Ionicons name="chevron-back" size={24} color={Colors.textPrimary} />
+          <Ionicons name="chevron-back" size={24} color={colors.textPrimary} />
         </TouchableOpacity>
-        <Text style={styles.headerTitle}>Log Progress</Text>
+        <Text style={styles.headerTitle}>Log Test Snapshot</Text>
+        <View style={{ flex: 1 }} />
+        {filledCount > 0 && (
+          <Text style={styles.filledBadge}>{filledCount} filled</Text>
+        )}
       </View>
 
       <KeyboardAvoidingView
@@ -79,57 +142,78 @@ export default function ProgressEntry() {
         behavior={Platform.OS === 'ios' ? 'padding' : undefined}
       >
         <ScrollView contentContainerStyle={styles.content} keyboardShouldPersistTaps="handled">
-          <Text style={styles.sectionLabel}>Select Metric</Text>
-          <ScrollView horizontal showsHorizontalScrollIndicator={false} style={styles.metricScroll}>
-            {ALL_METRICS.map((m) => (
-              <TouchableOpacity
-                key={m}
-                style={[styles.metricPill, selectedMetric === m && styles.metricPillActive]}
-                onPress={() => setSelectedMetric(m)}
-              >
-                <Ionicons
-                  name={METRIC_CONFIG[m].icon as keyof typeof Ionicons.glyphMap}
-                  size={14}
-                  color={selectedMetric === m ? '#fff' : Colors.textMuted}
-                />
-                <Text style={[styles.metricPillText, selectedMetric === m && styles.metricPillTextActive]}>
-                  {METRIC_CONFIG[m].label}
-                </Text>
-              </TouchableOpacity>
-            ))}
-          </ScrollView>
+          <Text style={styles.intro}>
+            Enter your testing results below. Each metric saves independently. Fill in only what you tested.
+          </Text>
 
-          <Text style={styles.sectionLabel}>{config.label} ({config.unit})</Text>
-          <View style={styles.valueRow}>
-            <TextInput
-              style={styles.valueInput}
-              value={value}
-              onChangeText={setValue}
-              keyboardType="decimal-pad"
-              placeholder="0.0"
-              placeholderTextColor={Colors.textMuted}
-              autoFocus
+          {/* Performance Metrics */}
+          <Text style={styles.groupLabel}>PERFORMANCE METRICS</Text>
+          {TREND_METRICS.map((m) => (
+            <MetricInput
+              key={m.key}
+              config={m}
+              value={values[m.key] ?? ''}
+              onChange={(t) => updateValue(m.key, t)}
+              expanded={expandedDesc === m.key}
+              onToggleDesc={() => setExpandedDesc(expandedDesc === m.key ? null : m.key)}
             />
-            <Text style={styles.unit}>{config.unit}</Text>
-          </View>
+          ))}
 
-          <Text style={styles.sectionLabel}>Notes (optional)</Text>
+          {/* Strength Index Inputs */}
+          <Text style={styles.groupLabel}>STRENGTH INDEX</Text>
+          <Text style={styles.groupSub}>
+            Enter your max or working max for each lift. Strength Index auto-calculates from bodyweight.
+          </Text>
+          {STRENGTH_INPUTS.map((m) => (
+            <MetricInput
+              key={m.key}
+              config={m}
+              value={values[m.key] ?? ''}
+              onChange={(t) => updateValue(m.key, t)}
+              expanded={expandedDesc === m.key}
+              onToggleDesc={() => setExpandedDesc(expandedDesc === m.key ? null : m.key)}
+            />
+          ))}
+
+          {/* Strength Index Preview */}
+          {strengthIndex !== null && (
+            <View style={styles.siPreview}>
+              <Text style={styles.siLabel}>Calculated Strength Index</Text>
+              <Text style={styles.siValue}>{strengthIndex.toFixed(2)}</Text>
+              <View style={[styles.siBand, { backgroundColor: getStrengthBand(strengthIndex).color + '18' }]}>
+                <Text style={[styles.siBandText, { color: getStrengthBand(strengthIndex).color }]}>
+                  {getStrengthBand(strengthIndex).label}
+                </Text>
+              </View>
+              {bodyweight && (
+                <Text style={styles.siBreakdown}>
+                  {trapBar ? `TB: ${(trapBar / bodyweight).toFixed(2)}` : ''}
+                  {frontSquat ? `  FS: ${(frontSquat / bodyweight).toFixed(2)}` : ''}
+                  {splitSquat ? `  SS: ${(splitSquat / bodyweight).toFixed(2)}` : ''}
+                </Text>
+              )}
+            </View>
+          )}
+
+          {/* Notes */}
+          <Text style={styles.groupLabel}>NOTES (OPTIONAL)</Text>
           <TextInput
             style={styles.notesInput}
-            value={notes}
-            onChangeText={setNotes}
-            placeholder="Context, conditions, how you felt..."
-            placeholderTextColor={Colors.textMuted}
+            value={note}
+            onChangeText={setNote}
+            placeholder="Testing conditions, how you felt..."
+            placeholderTextColor={colors.textMuted}
             multiline
           />
 
+          {/* Save */}
           <TouchableOpacity
-            style={[styles.button, (!value || mutation.isPending) && styles.buttonDisabled]}
-            onPress={() => mutation.mutate()}
-            disabled={!value || mutation.isPending}
+            style={[styles.saveBtn, (filledCount === 0 || saving) && styles.saveBtnDisabled]}
+            onPress={handleSave}
+            disabled={filledCount === 0 || saving}
           >
-            <Text style={styles.buttonText}>
-              {mutation.isPending ? 'Saving...' : 'Save Entry'}
+            <Text style={styles.saveBtnText}>
+              {saving ? 'Saving...' : `Save Snapshot (${filledCount} metric${filledCount === 1 ? '' : 's'})`}
             </Text>
           </TouchableOpacity>
         </ScrollView>
@@ -138,80 +222,120 @@ export default function ProgressEntry() {
   );
 }
 
+/* ─── Metric Input Row ───────────────────────────── */
+
+function MetricInput({
+  config, value, onChange, expanded, onToggleDesc,
+}: {
+  config: TrendMetricConfig;
+  value: string;
+  onChange: (t: string) => void;
+  expanded: boolean;
+  onToggleDesc: () => void;
+}) {
+  const filled = !!value.trim();
+  return (
+    <View style={styles.metricRow}>
+      <View style={styles.metricTop}>
+        <TouchableOpacity onPress={onToggleDesc} style={styles.metricLabelWrap}>
+          <Ionicons
+            name={config.icon}
+            size={14}
+            color={filled ? ACCENT : colors.textMuted}
+          />
+          <Text style={[styles.metricLabel, filled && styles.metricLabelFilled]}>
+            {config.label}
+          </Text>
+          {config.unit ? <Text style={styles.metricUnit}>{config.unit}</Text> : null}
+          <Ionicons
+            name={expanded ? 'chevron-up' : 'information-circle-outline'}
+            size={14}
+            color={colors.textMuted}
+          />
+        </TouchableOpacity>
+        <TextInput
+          style={[styles.metricInput, filled && styles.metricInputFilled]}
+          value={value}
+          onChangeText={onChange}
+          keyboardType="decimal-pad"
+          placeholder="—"
+          placeholderTextColor={colors.textMuted}
+        />
+      </View>
+      {expanded && (
+        <Text style={styles.metricDesc}>{config.description}</Text>
+      )}
+    </View>
+  );
+}
+
+/* ─── Styles ─────────────────────────────────────── */
+
 const styles = StyleSheet.create({
-  safe: { flex: 1, backgroundColor: Colors.bg },
+  safe: { flex: 1, backgroundColor: colors.bg },
   flex: { flex: 1 },
   header: {
-    flexDirection: 'row',
-    alignItems: 'center',
-    paddingHorizontal: 16,
-    paddingVertical: 14,
-    borderBottomWidth: 1,
-    borderBottomColor: Colors.border,
-    gap: 12,
+    flexDirection: 'row', alignItems: 'center', gap: 12,
+    paddingHorizontal: 16, paddingVertical: 14,
+    borderBottomWidth: 1, borderBottomColor: colors.border,
   },
-  headerTitle: { fontSize: 17, fontWeight: '700', color: Colors.textPrimary },
-  content: { padding: 20, gap: 12 },
-  sectionLabel: {
-    fontSize: 13,
-    fontWeight: '800',
-    color: Colors.textSecondary,
-    textTransform: 'uppercase',
-    letterSpacing: 1,
-    marginBottom: 2,
+  headerTitle: { fontSize: 17, fontWeight: '700', color: colors.textPrimary },
+  filledBadge: { fontSize: 12, fontWeight: '700', color: ACCENT },
+  content: { padding: 20, gap: 10, paddingBottom: 60 },
+  intro: { fontSize: 13, color: colors.textSecondary, lineHeight: 19, marginBottom: 4 },
+
+  groupLabel: {
+    fontSize: 11, fontWeight: '900', letterSpacing: 1.2,
+    color: colors.textMuted, textTransform: 'uppercase', marginTop: 12, marginBottom: 2,
   },
-  metricScroll: { marginHorizontal: -20, paddingHorizontal: 20 },
-  metricPill: {
-    flexDirection: 'row',
-    alignItems: 'center',
-    gap: 6,
-    paddingHorizontal: 12,
-    paddingVertical: 7,
-    borderRadius: 20,
-    backgroundColor: Colors.bgCard,
-    borderWidth: 1,
-    borderColor: Colors.border,
-    marginRight: 8,
+  groupSub: {
+    fontSize: 12, color: colors.textSecondary, lineHeight: 17, marginBottom: 4,
   },
-  metricPillActive: { backgroundColor: Colors.primary, borderColor: Colors.primary },
-  metricPillText: { fontSize: 12, fontWeight: '600', color: Colors.textMuted },
-  metricPillTextActive: { color: '#fff' },
-  valueRow: {
-    flexDirection: 'row',
-    alignItems: 'center',
-    gap: 10,
+
+  metricRow: {
+    borderBottomWidth: 1, borderBottomColor: colors.border, paddingBottom: 8,
   },
-  valueInput: {
-    flex: 1,
-    backgroundColor: Colors.bgInput,
-    borderWidth: 1,
-    borderColor: Colors.border,
-    borderRadius: 10,
-    paddingHorizontal: 16,
-    paddingVertical: 14,
-    color: Colors.textPrimary,
-    fontSize: 24,
-    fontWeight: '800',
+  metricTop: {
+    flexDirection: 'row', alignItems: 'center', gap: 12, paddingVertical: 6,
   },
-  unit: { fontSize: 16, color: Colors.textMuted, fontWeight: '600', minWidth: 30 },
+  metricLabelWrap: {
+    flex: 1, flexDirection: 'row', alignItems: 'center', gap: 6,
+  },
+  metricLabel: { fontSize: 14, fontWeight: '600', color: colors.textSecondary, flex: 1 },
+  metricLabelFilled: { color: colors.textPrimary, fontWeight: '700' },
+  metricUnit: { fontSize: 11, fontWeight: '600', color: colors.textMuted },
+  metricInput: {
+    width: 90, backgroundColor: colors.surfaceElevated,
+    borderWidth: 1, borderColor: colors.border, borderRadius: 8,
+    paddingHorizontal: 12, paddingVertical: 10,
+    color: colors.textPrimary, fontSize: 18, fontWeight: '800', textAlign: 'center',
+  },
+  metricInputFilled: { borderColor: ACCENT, backgroundColor: ACCENT + '08' },
+  metricDesc: {
+    fontSize: 11, color: colors.textMuted, lineHeight: 16,
+    paddingLeft: 20, paddingTop: 2, paddingBottom: 4,
+  },
+
+  siPreview: {
+    backgroundColor: colors.surface, borderWidth: 1, borderColor: colors.border,
+    borderRadius: radius.lg, padding: 16, alignItems: 'center', gap: 6,
+  },
+  siLabel: { fontSize: 11, fontWeight: '800', color: colors.textMuted, letterSpacing: 0.5 },
+  siValue: { fontSize: 28, fontWeight: '900', color: colors.textPrimary },
+  siBand: { borderRadius: 6, paddingHorizontal: 10, paddingVertical: 4 },
+  siBandText: { fontSize: 12, fontWeight: '800' },
+  siBreakdown: { fontSize: 11, color: colors.textMuted, fontWeight: '600' },
+
   notesInput: {
-    backgroundColor: Colors.bgInput,
-    borderWidth: 1,
-    borderColor: Colors.border,
-    borderRadius: 10,
-    padding: 14,
-    color: Colors.textPrimary,
-    fontSize: 15,
-    minHeight: 80,
-    textAlignVertical: 'top',
+    backgroundColor: colors.surfaceElevated, borderWidth: 1, borderColor: colors.border,
+    borderRadius: 10, padding: 14, color: colors.textPrimary,
+    fontSize: 15, minHeight: 80, textAlignVertical: 'top',
   },
-  button: {
-    backgroundColor: Colors.primary,
-    borderRadius: 10,
-    paddingVertical: 16,
-    alignItems: 'center',
-    marginTop: 8,
+
+  saveBtn: {
+    backgroundColor: ACCENT, borderRadius: 10, paddingVertical: 16,
+    alignItems: 'center', marginTop: 8,
   },
-  buttonDisabled: { opacity: 0.5 },
-  buttonText: { color: '#fff', fontWeight: '800', fontSize: 16 },
+  saveBtnDisabled: { opacity: 0.5 },
+  saveBtnText: { color: '#fff', fontWeight: '800', fontSize: 16 },
 });

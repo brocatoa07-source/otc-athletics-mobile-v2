@@ -119,7 +119,7 @@ export function buildDashboardSnapshot(
       desc: 'Complete the movement quiz for personalized scoring',
       icon: 'clipboard-outline',
       color: '#22c55e',
-      route: '/(app)/training/sc/movement-quiz',
+      route: '/(app)/training/sc/diagnostics',
       priority: 1,
     });
   }
@@ -130,7 +130,7 @@ export function buildDashboardSnapshot(
       desc: 'Complete your readiness check before training',
       icon: 'pulse-outline',
       color: '#8b5cf6',
-      route: '/(app)/training/sc/readiness',
+      route: '/(app)/training/own-the-cost-checkin',
       priority: 2,
     });
   }
@@ -143,7 +143,7 @@ export function buildDashboardSnapshot(
         desc: weakest.lowDesc,
         icon: weakest.icon,
         color: weakest.color,
-        route: '/(app)/training/sc/session',
+        route: '/(app)/training/sc',
         priority: 3,
       });
     }
@@ -155,7 +155,7 @@ export function buildDashboardSnapshot(
       desc: `${injuries.length} area${injuries.length > 1 ? 's' : ''} flagged — review and update`,
       icon: 'shield-checkmark-outline',
       color: '#ef4444',
-      route: '/(app)/training/sc/injuries',
+      route: '/(app)/training/sc',
       priority: 4,
     });
   }

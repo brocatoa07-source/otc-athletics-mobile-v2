@@ -9,8 +9,15 @@ import AsyncStorage from '@react-native-async-storage/async-storage';
 import { colors, radius } from '@/theme';
 import { useTier } from '@/hooks/useTier';
 import { useGating } from '@/hooks/useGating';
-import { MOVER_TYPES, type MoverTypeData } from '@/data/hitting-mover-type-data';
 import { MECHANICAL_ISSUES, type MechanicalDiagnosticResult } from '@/data/hitting-mechanical-diagnostic-data';
+import {
+  MOVEMENT_PROFILES,
+  BAT_PATH_PROFILES,
+  COMBINED_PROFILE_LABELS,
+  COMBINED_PROFILE_SUMMARIES,
+  HITTING_IDENTITY_STORAGE_KEY,
+  type HittingIdentityDiagnosticResult,
+} from '@/data/hitting-identity-data';
 
 const ACCENT = '#E10600';
 
@@ -34,38 +41,24 @@ const EXPLORE_ITEMS: ExploreItem[] = [
   { key: 'extension', label: 'Extension', sub: 'Contact zone and follow-through', icon: 'expand-outline', color: '#ec4899', route: '/(app)/training/mechanical/extension' },
   { key: 'troubleshoot', label: 'Troubleshooting', sub: 'Fix common mechanical issues', icon: 'hammer-outline', color: '#ef4444', route: '/(app)/training/mechanical/troubleshooting' },
   { key: 'approach', label: 'Approach', sub: 'OTC Hitting Philosophy', icon: 'bulb-outline', color: '#f59e0b', route: '/(app)/training/mechanical/approach' },
+  { key: 'at-bat', label: 'At-Bat Accountability', sub: 'Post-game review & scoring', icon: 'analytics-outline', color: '#22c55e', route: '/(app)/training/mechanical/at-bat-home' },
   { key: 'video', label: 'Video Breakdown', sub: 'Swing analysis tools (coming soon)', icon: 'videocam-outline', color: '#64748b', route: '' },
 ];
 
 export default function HittingVaultIndex() {
   const { hasLimitedHitting } = useTier();
   const { gate } = useGating();
-  const [moverResult, setMoverResult] = useState<{ primary: MoverTypeData; secondary: MoverTypeData } | null>(null);
+  const [identityResult, setIdentityResult] = useState<HittingIdentityDiagnosticResult | null>(null);
   const [mechResult, setMechResult] = useState<MechanicalDiagnosticResult | null>(null);
   const [exploreExpanded, setExploreExpanded] = useState(false);
 
   useEffect(() => {
     Promise.all([
-      AsyncStorage.getItem('otc:mover-type'),
+      AsyncStorage.getItem(HITTING_IDENTITY_STORAGE_KEY),
       AsyncStorage.getItem('otc:mechanical-diagnostic'),
-    ]).then(([moverVal, mechVal]) => {
-      if (moverVal) {
-        try {
-          const parsed = JSON.parse(moverVal);
-          // Support both new format {primary, secondary} and legacy slug string
-          if (parsed.primary && parsed.secondary) {
-            const primaryData = MOVER_TYPES[parsed.primary as keyof typeof MOVER_TYPES];
-            const secondaryData = MOVER_TYPES[parsed.secondary as keyof typeof MOVER_TYPES];
-            if (primaryData && secondaryData) {
-              setMoverResult({ primary: primaryData, secondary: secondaryData });
-            }
-          } else {
-            // Legacy: plain slug string
-            const slug = parsed.slug ?? parsed;
-            const found = MOVER_TYPES[slug as keyof typeof MOVER_TYPES];
-            if (found) setMoverResult({ primary: found, secondary: found });
-          }
-        } catch {}
+    ]).then(([identityVal, mechVal]) => {
+      if (identityVal) {
+        try { setIdentityResult(JSON.parse(identityVal)); } catch {}
       }
       if (mechVal) {
         try { setMechResult(JSON.parse(mechVal)); } catch {}
@@ -117,56 +110,78 @@ export default function HittingVaultIndex() {
         <View style={styles.profileCard}>
           <Text style={styles.profileCardTitle}>SWING PROFILE</Text>
 
-          {/* Mover Type — Primary + Secondary */}
+          {/* Hitting Identity — Movement Pattern + Bat Path */}
           <TouchableOpacity
             style={styles.profileRow}
             onPress={() => router.push('/(app)/training/mechanical/mover-type-quiz' as any)}
             activeOpacity={0.8}
           >
-            <View style={[styles.profileIcon, { backgroundColor: (moverResult?.primary.color ?? '#f59e0b') + '18' }]}>
+            <View style={[styles.profileIcon, { backgroundColor: (identityResult ? MOVEMENT_PROFILES[identityResult.movementType].color : '#f59e0b') + '18' }]}>
               <Ionicons
-                name={moverResult ? 'body-outline' : 'help-circle-outline'}
+                name={identityResult ? 'body-outline' : 'help-circle-outline'}
                 size={18}
-                color={moverResult?.primary.color ?? '#f59e0b'}
+                color={identityResult ? MOVEMENT_PROFILES[identityResult.movementType].color : '#f59e0b'}
               />
             </View>
             <View style={{ flex: 1 }}>
-              {moverResult ? (
+              {identityResult ? (
                 <View style={styles.moverResults}>
-                  <Text style={styles.profileRowLabel}>Primary Mover</Text>
-                  <Text style={[styles.profileRowValue, { color: moverResult.primary.color }]}>
-                    {moverResult.primary.name}
+                  <Text style={styles.profileRowLabel}>Hitting Identity</Text>
+                  <Text style={[styles.profileRowValue, { color: MOVEMENT_PROFILES[identityResult.movementType].color }]}>
+                    {COMBINED_PROFILE_LABELS[identityResult.combinedProfile]}
                   </Text>
                   <Text style={styles.moverSecondary}>
-                    Secondary: {moverResult.secondary.name}
+                    {MOVEMENT_PROFILES[identityResult.movementType].label} · {BAT_PATH_PROFILES[identityResult.batPathType].label}
                   </Text>
                 </View>
               ) : (
                 <>
-                  <Text style={styles.profileRowLabel}>Mover Type</Text>
-                  <Text style={styles.profileRowValue}>Take Hitter Mover Diagnostic</Text>
+                  <Text style={styles.profileRowLabel}>Hitting Identity</Text>
+                  <Text style={styles.profileRowValue}>Take Hitting Identity Diagnostic</Text>
                 </>
               )}
             </View>
             <Ionicons name="chevron-forward" size={16} color={colors.textMuted} />
           </TouchableOpacity>
 
-          {/* Mover details — description, cues, MLB comps */}
-          {moverResult && (
+          {/* Identity details — movement + bat path axes */}
+          {identityResult && (
             <View style={styles.moverDetail}>
-              <Text style={styles.moverDesc}>{moverResult.primary.description}</Text>
+              <Text style={styles.moverDesc}>
+                {COMBINED_PROFILE_SUMMARIES[identityResult.combinedProfile]}
+              </Text>
 
-              <Text style={styles.detailLabel}>MLB COMPARISONS</Text>
+              {/* Movement Pattern */}
+              <Text style={[styles.detailLabel, { color: MOVEMENT_PROFILES[identityResult.movementType].color }]}>
+                MOVEMENT PATTERN · {MOVEMENT_PROFILES[identityResult.movementType].label.toUpperCase()}
+              </Text>
               <View style={styles.mlbRow}>
-                {moverResult.primary.mlbComps.map((comp) => (
-                  <Text key={comp} style={[styles.mlbName, { color: moverResult.primary.color }]}>{comp}</Text>
+                {identityResult.movementExamples.map((comp: string) => (
+                  <Text key={comp} style={[styles.mlbName, { color: MOVEMENT_PROFILES[identityResult.movementType].color }]}>{comp}</Text>
                 ))}
               </View>
 
-              <Text style={styles.detailLabel}>PRIMARY CUES</Text>
-              {moverResult.primary.primaryCues.map((cue) => (
+              {/* Bat Path */}
+              <Text style={[styles.detailLabel, { color: BAT_PATH_PROFILES[identityResult.batPathType].color }]}>
+                BAT PATH · {BAT_PATH_PROFILES[identityResult.batPathType].label.toUpperCase()}
+              </Text>
+              <View style={styles.mlbRow}>
+                {identityResult.batPathExamples.map((comp: string) => (
+                  <Text key={comp} style={[styles.mlbName, { color: BAT_PATH_PROFILES[identityResult.batPathType].color }]}>{comp}</Text>
+                ))}
+              </View>
+
+              {/* Cues */}
+              <Text style={styles.detailLabel}>KEY CUES</Text>
+              {identityResult.movementCues.slice(0, 2).map((cue: string) => (
                 <View key={cue} style={styles.cueRow}>
-                  <Ionicons name="mic-outline" size={12} color={moverResult.primary.color} />
+                  <Ionicons name="mic-outline" size={12} color={MOVEMENT_PROFILES[identityResult.movementType].color} />
+                  <Text style={styles.cueText}>{cue}</Text>
+                </View>
+              ))}
+              {identityResult.batPathCues.slice(0, 2).map((cue: string) => (
+                <View key={cue} style={styles.cueRow}>
+                  <Ionicons name="mic-outline" size={12} color={BAT_PATH_PROFILES[identityResult.batPathType].color} />
                   <Text style={styles.cueText}>{cue}</Text>
                 </View>
               ))}
@@ -208,7 +223,7 @@ export default function HittingVaultIndex() {
         {/* ═══════ APPROACH CONNECTOR ═══════ */}
         <View style={styles.approachConnector}>
           <Text style={styles.approachConnectorText}>
-            Your mover type explains HOW your body naturally creates power.{'\n\n'}Your approach determines HOW you compete in the box.
+            Your hitting identity explains HOW your body naturally moves and attacks the ball.{'\n\n'}Your approach determines HOW you compete in the box.
           </Text>
           <TouchableOpacity
             style={styles.approachBtn}
@@ -268,7 +283,7 @@ export default function HittingVaultIndex() {
             <Text style={styles.approachCardTitle}>OTC Hitting Philosophy</Text>
           </View>
           <Text style={styles.approachCardText}>
-            Consistent hard contact with backspin that can be driven to all fields. Mechanics are tools — the goal is becoming a hitter who competes and produces results.
+            Hunt your pitch. Find the barrel. Backspin the ball. Mechanics are tools — the goal is becoming a hitter who competes and produces results.
           </Text>
         </View>
 

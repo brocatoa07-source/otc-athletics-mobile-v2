@@ -14,6 +14,7 @@
 import AsyncStorage from '@react-native-async-storage/async-storage';
 import type { MechanicalIssue } from './hitting-mechanical-diagnostic-data';
 import type { MoverType } from './hitting-mover-type-data';
+import type { HittingMovementType, HittingBatPathType } from './hitting-identity-data';
 import {
   getRecommendedDrills,
   flattenRecommendation,
@@ -25,6 +26,11 @@ import {
   ISSUE_SECONDARY_QUICKFIX,
   QUICKFIX_TO_FOCUS,
 } from './quick-fix-data';
+import {
+  loadGeneratedProgram,
+  loadStrengthProgress,
+  getNextWorkout,
+} from './strength-program-engine';
 
 // Re-export so existing consumers don't need to change imports
 export type { QuickFix } from './quick-fix-data';
@@ -182,6 +188,10 @@ export function generateUnifiedDailyWork(
   moverType?: MoverType | null,
   /** Optional mental scores for smarter task selection */
   mentalScores?: { iss?: number | null; hss?: number | null } | null,
+  /** New 2-axis identity (takes precedence over moverType when provided) */
+  identity?: { movementType: HittingMovementType; batPathType: HittingBatPathType } | null,
+  /** Pre-resolved OTC-S strength task (from getStrengthTaskForToday). When provided, replaces the static STRENGTH_POOL fallback. */
+  resolvedStrengthTask?: string | null,
 ): UnifiedDailyWork {
   const dayIndex = Math.floor(Date.now() / 86_400_000);
   const weekIndex = Math.floor(dayIndex / 7);
@@ -192,6 +202,8 @@ export function generateUnifiedDailyWork(
     primaryIssue,
     secondaryIssue,
     moverType: moverType ?? null,
+    movementType: identity?.movementType ?? null,
+    batPathType: identity?.batPathType ?? null,
     age,
     recentDrills: [],
   });
@@ -210,8 +222,8 @@ export function generateUnifiedDailyWork(
   const primaryFix = QUICK_FIXES[primaryKey]!;
   const secondaryFix = QUICK_FIXES[secondaryKey]!;
 
-  // ── Strength ──────────────────────────────────────
-  const strengthTask = STRENGTH_POOL[dayIndex % STRENGTH_POOL.length];
+  // ── Strength (OTC-S program when available, static fallback otherwise) ──
+  const strengthTask = resolvedStrengthTask ?? STRENGTH_POOL[dayIndex % STRENGTH_POOL.length];
 
   // ── Mental (smart selection based on ISS/HSS) ───
   const mentalTask = getSmartMentalTask(dayIndex, mentalScores?.iss, mentalScores?.hss);
@@ -321,4 +333,29 @@ export async function toggleDailyWorkItem(
   plan.completion[itemId] = !plan.completion[itemId];
   await saveDailyWork(plan);
   return plan;
+}
+
+/* ─── OTC-S Integration ─────────────────────────────── */
+
+/**
+ * Get a strength task label from the OTC-S program (next workout).
+ * Returns the day label + focus (e.g. "Lower + Accel — Lower Body + Acceleration Mechanics")
+ * or falls back to the static STRENGTH_POOL rotation.
+ */
+export async function getStrengthTaskForToday(): Promise<string> {
+  try {
+    const [program, progress] = await Promise.all([
+      loadGeneratedProgram(),
+      loadStrengthProgress(),
+    ]);
+    if (program && progress) {
+      const next = getNextWorkout(program, progress);
+      if (next) {
+        return `${next.workout.label} — ${next.workout.focus}`;
+      }
+    }
+  } catch {}
+  // Fallback to static pool
+  const dayIndex = Math.floor(Date.now() / 86_400_000);
+  return STRENGTH_POOL[dayIndex % STRENGTH_POOL.length];
 }

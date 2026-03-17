@@ -28,6 +28,8 @@ import { StandardEngineCard } from '@/components/dashboard/StandardEngineCard';
 import { RequiredTodayPanel } from '@/components/dashboard/RequiredTodayPanel';
 import { loadDailyWork, type UnifiedDailyWork } from '@/data/daily-work';
 import { filterDailyWorkItems } from '@/lib/tier-content';
+import { loadTodayCheckIn } from '@/data/own-the-cost-checkin';
+import { loadGames } from '@/data/at-bat-accountability';
 
 /* ────────────────────────────────────────────────
  * HOME — COMMAND CENTER (awareness view)
@@ -47,8 +49,20 @@ export default function DashboardScreen() {
 
   // Daily Work state
   const [dailyWork, setDailyWork] = useState<UnifiedDailyWork | null>(null);
+  const [otcCheckedIn, setOtcCheckedIn] = useState<boolean | null>(null);
+  const [showAbCard, setShowAbCard] = useState(false);
   useEffect(() => {
     loadDailyWork().then((plan) => { if (plan) setDailyWork(plan); });
+    loadTodayCheckIn().then((log) => setOtcCheckedIn(!!log));
+    // Show AB card if a game was logged today or yesterday
+    loadGames().then((games) => {
+      if (games.length === 0) return;
+      const now = new Date();
+      const todayStr = `${now.getFullYear()}-${String(now.getMonth() + 1).padStart(2, '0')}-${String(now.getDate()).padStart(2, '0')}`;
+      const yest = new Date(now.getTime() - 86_400_000);
+      const yestStr = `${yest.getFullYear()}-${String(yest.getMonth() + 1).padStart(2, '0')}-${String(yest.getDate()).padStart(2, '0')}`;
+      setShowAbCard(games.some((g) => g.date === todayStr || g.date === yestStr));
+    });
   }, []);
 
   const { todayPlan, hasProfile, completedToday } = useMyProgram();
@@ -129,6 +143,44 @@ export default function DashboardScreen() {
           </View>
         </View>
 
+        {/* ── Own The Cost Check-In ─────────────── */}
+        {otcCheckedIn !== null && (
+          <TouchableOpacity
+            style={styles.otcCard}
+            onPress={() => router.push(
+              otcCheckedIn
+                ? '/(app)/training/own-the-cost-summary' as any
+                : '/(app)/training/own-the-cost-checkin' as any,
+            )}
+            activeOpacity={0.85}
+          >
+            <View style={styles.otcAccent} />
+            <View style={styles.otcBody}>
+              <Text style={styles.otcLabel}>OWN THE COST</Text>
+              <View style={styles.otcRow}>
+                <View style={styles.otcIconWrap}>
+                  {otcCheckedIn ? (
+                    <Ionicons name="checkmark-circle" size={22} color={colors.success} />
+                  ) : (
+                    <Ionicons name="shield-checkmark" size={22} color="#f59e0b" />
+                  )}
+                </View>
+                <View style={{ flex: 1 }}>
+                  <Text style={styles.otcTitle}>Daily Check-In</Text>
+                  <Text style={styles.otcSub}>
+                    {otcCheckedIn ? 'Completed — tap to review' : 'Hold yourself accountable'}
+                  </Text>
+                </View>
+                <Ionicons
+                  name="arrow-forward-circle"
+                  size={28}
+                  color={otcCheckedIn ? colors.success : '#f59e0b'}
+                />
+              </View>
+            </View>
+          </TouchableOpacity>
+        )}
+
         {/* ── 0. Daily Work Card ──────────────────── */}
         {dailyWork && (() => {
           const filtered = filterDailyWorkItems(dailyWork.items, tier, isCoach);
@@ -168,6 +220,30 @@ export default function DashboardScreen() {
             </TouchableOpacity>
           );
         })()}
+
+        {/* ── At-Bat Accountability (conditional) ── */}
+        {showAbCard && (
+          <TouchableOpacity
+            style={styles.otcCard}
+            onPress={() => router.push('/(app)/training/mechanical/at-bat-home' as any)}
+            activeOpacity={0.85}
+          >
+            <View style={[styles.otcAccent, { backgroundColor: '#E10600' }]} />
+            <View style={styles.otcBody}>
+              <Text style={[styles.otcLabel, { color: '#E10600' }]}>POST-GAME</Text>
+              <View style={styles.otcRow}>
+                <View style={[styles.otcIconWrap, { backgroundColor: '#E1060018' }]}>
+                  <Ionicons name="baseball-outline" size={22} color="#E10600" />
+                </View>
+                <View style={{ flex: 1 }}>
+                  <Text style={styles.otcTitle}>At-Bat Accountability</Text>
+                  <Text style={styles.otcSub}>Review your recent game</Text>
+                </View>
+                <Ionicons name="arrow-forward-circle" size={28} color="#E10600" />
+              </View>
+            </View>
+          </TouchableOpacity>
+        )}
 
         {/* ── 1. Identity + Standard Banner ───────── */}
         <IdentityStandardBanner
@@ -277,6 +353,23 @@ const styles = StyleSheet.create({
     marginBottom: 8,
     marginTop: 4,
   },
+
+  otcCard: {
+    backgroundColor: colors.surface,
+    borderWidth: 1,
+    borderColor: '#f59e0b30',
+    borderRadius: 14,
+    flexDirection: 'row' as const,
+    overflow: 'hidden' as const,
+    marginBottom: 12,
+  },
+  otcAccent: { width: 4, backgroundColor: '#f59e0b' },
+  otcBody: { flex: 1, padding: 14, gap: 8 },
+  otcLabel: { fontSize: 10, fontWeight: '900' as const, letterSpacing: 1.5, color: '#f59e0b' },
+  otcRow: { flexDirection: 'row' as const, alignItems: 'center' as const, gap: 12 },
+  otcIconWrap: { width: 42, height: 42, borderRadius: 12, backgroundColor: '#f59e0b18', alignItems: 'center' as const, justifyContent: 'center' as const },
+  otcTitle: { fontSize: 15, fontWeight: '900' as const, color: colors.textPrimary },
+  otcSub: { fontSize: 12, color: colors.textSecondary, marginTop: 2 },
 
   dailyWorkCard: {
     backgroundColor: colors.surface,

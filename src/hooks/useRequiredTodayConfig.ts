@@ -32,13 +32,13 @@ export const REQUIRED_TODAY_META: Record<
   readiness: {
     label: 'Readiness Check',
     icon: 'pulse-outline',
-    route: '/(app)/training/sc/readiness',
+    route: '/(app)/training/own-the-cost-checkin',
     description: 'Daily 4-question check-in before training',
   },
   training: {
     label: "Today's Session",
     icon: 'barbell-outline',
-    route: '/(app)/training/my-program',
+    route: '/(app)/training/sc/workout',
     description: 'Your personalized lifting or training session',
   },
   skillWork: {
@@ -56,20 +56,20 @@ export const REQUIRED_TODAY_META: Record<
   journal: {
     label: 'Journal Entry',
     icon: 'journal-outline',
-    route: '/(app)/training/mental/journal',
+    route: '/(app)/training/mental/journals',
     description: 'Reflect on training and mindset',
   },
   habits: {
     label: 'Habit Tracker',
     icon: 'checkmark-done-outline',
-    route: '/(app)/training/habits',
-    description: 'Daily non-negotiables — sleep, nutrition, recovery',
+    route: '/(app)/training',
+    description: 'Daily non-negotiables — coming soon',
   },
   addons: {
     label: 'Add-On Session',
     icon: 'add-circle-outline',
-    route: '/(app)/training/addons',
-    description: 'Purchased add-on content — video, calls, programs',
+    route: '/(app)/training',
+    description: 'Add-on content — coming soon',
   },
 };
 
