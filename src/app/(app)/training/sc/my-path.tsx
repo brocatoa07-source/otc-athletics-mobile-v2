@@ -6,6 +6,7 @@ import { SafeAreaView } from 'react-native-safe-area-context';
 import { router } from 'expo-router';
 import { Ionicons } from '@expo/vector-icons';
 import { colors, radius } from '@/theme';
+import { useTier } from '@/hooks/useTier';
 import { loadStrengthProfile, ARCHETYPE_META, POSITION_META, DEFICIENCY_META, type StrengthProfile } from '@/data/strength-profile';
 import {
   loadGeneratedProgram,
@@ -20,9 +21,17 @@ import { OTCS_PHASE_META } from '@/data/otcs-types';
 const ACCENT = '#1DB954';
 
 export default function SCMyPathScreen() {
+  const { hasFullLifting, isCoach } = useTier();
   const [profile, setProfile] = useState<StrengthProfile | null>(null);
   const [program, setProgram] = useState<OtcsGeneratedProgram | null>(null);
   const [progress, setProgress] = useState<StrengthProgress | null>(null);
+
+  // Single/Walk tier guard — redirect to SC home (diagnostic-only gate)
+  useEffect(() => {
+    if (!hasFullLifting && !isCoach) {
+      router.replace('/(app)/training/sc' as any);
+    }
+  }, [hasFullLifting, isCoach]);
 
   useEffect(() => {
     loadStrengthProfile().then(setProfile);

@@ -1,3 +1,4 @@
+import { useEffect } from 'react';
 import {
   View, Text, ScrollView, TouchableOpacity, StyleSheet,
 } from 'react-native';
@@ -5,6 +6,7 @@ import { SafeAreaView } from 'react-native-safe-area-context';
 import { router } from 'expo-router';
 import { Ionicons } from '@expo/vector-icons';
 import { colors, radius } from '@/theme';
+import { useTier } from '@/hooks/useTier';
 import { FUEL_FOUNDATIONS, FUEL_REAL_WORLD, type FuelSection } from '@/data/fuel-the-engine';
 
 const ACCENT = '#10b981';
@@ -30,6 +32,15 @@ function SectionRow({ section }: { section: FuelSection }) {
 }
 
 export default function FuelTheEngineHub() {
+  const { hasFullLifting, isCoach } = useTier();
+
+  // Single/Walk tier guard
+  useEffect(() => {
+    if (!hasFullLifting && !isCoach) {
+      router.replace('/(app)/training/sc' as any);
+    }
+  }, [hasFullLifting, isCoach]);
+
   return (
     <SafeAreaView style={styles.safe}>
       {/* Header */}

@@ -1,4 +1,4 @@
-import { useState, useMemo } from 'react';
+import { useState, useMemo, useEffect } from 'react';
 import {
   View, Text, ScrollView, TouchableOpacity, TextInput,
   StyleSheet,
@@ -7,6 +7,7 @@ import { SafeAreaView } from 'react-native-safe-area-context';
 import { router, useLocalSearchParams } from 'expo-router';
 import { Ionicons } from '@expo/vector-icons';
 import { colors, radius } from '@/theme';
+import { useTier } from '@/hooks/useTier';
 import { getAllTemplates } from '@/data/otcs-program';
 import {
   OTCS_ALL_BLOCKS,
@@ -190,6 +191,15 @@ function extractExercises(filterBlocks: OtcsBlockKey[], category: string): Uniqu
 /* ─── Component ──────────────────────────────────── */
 
 export default function ExercisesScreen() {
+  const { hasFullLifting, isCoach } = useTier();
+
+  // Single/Walk tier guard
+  useEffect(() => {
+    if (!hasFullLifting && !isCoach) {
+      router.replace('/(app)/training/sc' as any);
+    }
+  }, [hasFullLifting, isCoach]);
+
   const { category = 'exercises' } = useLocalSearchParams<{ category?: string }>();
   const meta = CATEGORY_META[category] ?? CATEGORY_META.exercises;
   const filterBlocks = CATEGORY_BLOCKS[category] ?? CATEGORY_BLOCKS.exercises;

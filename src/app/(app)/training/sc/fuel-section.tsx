@@ -1,3 +1,4 @@
+import { useEffect } from 'react';
 import {
   View, Text, ScrollView, TouchableOpacity, StyleSheet,
 } from 'react-native';
@@ -5,11 +6,20 @@ import { SafeAreaView } from 'react-native-safe-area-context';
 import { router, useLocalSearchParams } from 'expo-router';
 import { Ionicons } from '@expo/vector-icons';
 import { colors, radius } from '@/theme';
+import { useTier } from '@/hooks/useTier';
 import { getFuelSection, type FuelSectionKey } from '@/data/fuel-the-engine';
 import { FuelCard } from '@/components/training/FuelCard';
 
 export default function FuelSectionScreen() {
+  const { hasFullLifting, isCoach } = useTier();
   const { section: sectionKey } = useLocalSearchParams<{ section: string }>();
+
+  // Single/Walk tier guard
+  useEffect(() => {
+    if (!hasFullLifting && !isCoach) {
+      router.replace('/(app)/training/sc' as any);
+    }
+  }, [hasFullLifting, isCoach]);
   const section = getFuelSection((sectionKey ?? 'daily') as FuelSectionKey);
 
   if (!section) {

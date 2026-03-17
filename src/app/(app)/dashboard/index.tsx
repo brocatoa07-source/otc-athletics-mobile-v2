@@ -1,4 +1,4 @@
-import { useEffect, useState } from 'react';
+import { useEffect, useState, useMemo } from 'react';
 import {
   View,
   Text,
@@ -9,17 +9,14 @@ import {
 import { SafeAreaView } from 'react-native-safe-area-context';
 import { router } from 'expo-router';
 import { Ionicons } from '@expo/vector-icons';
-import { colors, accentGlow } from '@/theme';
+import { colors, radius } from '@/theme';
 import { useAuthStore } from '@/store/auth.store';
 import { supabase } from '@/lib/supabase';
 import { useTier } from '@/hooks/useTier';
 import { useMyProgram } from '@/hooks/useMyProgram';
 import { useAccountability } from '@/hooks/useAccountability';
 import { useMetricsStatus } from '@/hooks/useMetricsStatus';
-import { useAthleteScProfile } from '@/hooks/useAthleteScProfile';
-import { useAssessment } from '@/hooks/useAssessment';
-import { useRequiredTodayConfig } from '@/hooks/useRequiredTodayConfig';
-import { getNextPriority } from '@/data/next-priority-engine';
+import { loadTodayCheckIn, scoreDayCheckIn, type OwnTheCostCheckInLog } from '@/data/own-the-cost-checkin';
 import { TierBadge } from '@/components/common/TierBadge';
 import { PerformanceTrendCard } from '@/components/dashboard/PerformanceTrendCard';
 import { StandardEngineCard } from '@/components/dashboard/StandardEngineCard';
@@ -32,12 +29,41 @@ import { loadGames } from '@/data/at-bat-accountability';
  * HOME — COMMAND CENTER (awareness view)
  *
  * Section order:
- *   1. Identity + Standard Banner
- *   2. Performance Trend
- *   3. Standard Engine (Accountability + Status)
- *   4. Required Today  ← athlete-customizable
- *   5. Next Priority   ← driven by Required Today config
+ *   1. Header (identity + tier)
+ *   2. Athlete Status (from OTC Check-In)
+ *   3. Standard Engine (always visible)
+ *   4. Required Today (incomplete daily CTAs)
+ *   5. Performance Trend
  * ──────────────────────────────────────────────── */
+
+/* ─── Athlete Status helpers ────────────────────── */
+
+const MAX_OTC_SCORE = 18;
+
+function getReadinessLabel(pct: number): { label: string; color: string } {
+  if (pct >= 0.85) return { label: 'Elite', color: '#22c55e' };
+  if (pct >= 0.70) return { label: 'Strong', color: '#84cc16' };
+  if (pct >= 0.45) return { label: 'Mixed', color: '#f59e0b' };
+  return { label: 'Needs Work', color: '#ef4444' };
+}
+
+const ENERGY_DISPLAY: Record<string, { label: string; color: string }> = {
+  high: { label: 'High', color: '#22c55e' },
+  okay: { label: 'Okay', color: '#f59e0b' },
+  low:  { label: 'Low', color: '#ef4444' },
+};
+
+const FOCUS_DISPLAY: Record<string, { label: string; color: string }> = {
+  locked_in:  { label: 'Locked In', color: '#22c55e' },
+  in_and_out: { label: 'In & Out', color: '#f59e0b' },
+  distracted: { label: 'Distracted', color: '#ef4444' },
+};
+
+const OWNERSHIP_DISPLAY: Record<string, { label: string; color: string }> = {
+  owned_everything:          { label: 'Owned It', color: '#22c55e' },
+  avoided_once_or_twice:     { label: 'Slipped', color: '#f59e0b' },
+  avoided_more_than_should:  { label: 'Avoided', color: '#ef4444' },
+};
 
 export default function DashboardScreen() {
   const user = useAuthStore((s) => s.user);
@@ -47,8 +73,11 @@ export default function DashboardScreen() {
   // Daily Work state
   const [dailyWork, setDailyWork] = useState<UnifiedDailyWork | null>(null);
   const [showAbCard, setShowAbCard] = useState(false);
+  const [todayCheckIn, setTodayCheckIn] = useState<OwnTheCostCheckInLog | null>(null);
+
   useEffect(() => {
     loadDailyWork().then((plan) => { if (plan) setDailyWork(plan); });
+    loadTodayCheckIn().then((log) => { setTodayCheckIn(log); });
     // Show AB card if a game was logged today or yesterday
     loadGames().then((games) => {
       if (games.length === 0) return;
@@ -60,11 +89,8 @@ export default function DashboardScreen() {
     });
   }, []);
 
-  const { todayPlan, hasProfile, completedToday } = useMyProgram();
-  const { result: accountability, loaded: accountabilityLoaded, otcCheckedInToday, skillWorkDoneToday, mentalDoneToday, journalDoneToday, habitsDoneToday, addonsDoneToday } = useAccountability();
-  const { profile: _scProfile } = useAthleteScProfile();
-  const { assessment } = useAssessment();
-  const { enabled } = useRequiredTodayConfig();
+  useMyProgram();
+  const { result: accountability, loaded: accountabilityLoaded, otcCheckedInToday } = useAccountability();
   const {
     developmentStatus,
     standardStatus,
@@ -76,28 +102,29 @@ export default function DashboardScreen() {
   const firstName = displayName.split(' ')[0];
   const tierValue = isCoach ? 'COACH' : (tier ?? 'WALK');
 
-  // Build completions map for Next Up — uses same daily flags as RequiredTodayPanel
-  const hasTrainingToday = todayPlan?.type === 'training';
-  const completions = {
-    readiness: otcCheckedInToday,
-    training:  completedToday,
-    skillWork: skillWorkDoneToday,
-    mental:    mentalDoneToday,
-    journal:   journalDoneToday,
-    habits:    habitsDoneToday,
-    addons:    addonsDoneToday,
-  };
+  // Compute daily work completion for CTA hiding
+  const dailyWorkAllDone = useMemo(() => {
+    if (!dailyWork) return false;
+    const filtered = filterDailyWorkItems(dailyWork.items, tier, isCoach);
+    if (filtered.length === 0) return false;
+    return filtered.every((i) => dailyWork.completion[i.id]);
+  }, [dailyWork, tier, isCoach]);
 
-  const metricsRetestDue = daysSinceLastKeyMetric !== null && daysSinceLastKeyMetric >= 28;
-
-  const nextPriority = getNextPriority({
-    hasScProfile: hasProfile,
-    hasAssessment: !!assessment,
-    enabled,
-    hasTrainingToday,
-    completions,
-    metricsRetestDue,
-  });
+  // Athlete Status derived data
+  const athleteStatus = useMemo(() => {
+    if (!todayCheckIn) return null;
+    const score = scoreDayCheckIn(todayCheckIn);
+    const pct = score / MAX_OTC_SCORE;
+    const readiness = getReadinessLabel(pct);
+    return {
+      score,
+      pct,
+      readiness,
+      energy: ENERGY_DISPLAY[todayCheckIn.energy] ?? ENERGY_DISPLAY.okay,
+      focus: FOCUS_DISPLAY[todayCheckIn.focus] ?? FOCUS_DISPLAY.in_and_out,
+      ownership: OWNERSHIP_DISPLAY[todayCheckIn.responsibilityAvoidance] ?? OWNERSHIP_DISPLAY.owned_everything,
+    };
+  }, [todayCheckIn]);
 
   async function handleLogout() {
     await supabase.auth.signOut();
@@ -130,15 +157,94 @@ export default function DashboardScreen() {
           </View>
         </View>
 
-        {/* ── Own The Cost Check-In ─────────────── */}
-        {accountabilityLoaded && (
+        {/* ── 1. Athlete Status ──────────────────── */}
+        {athleteStatus ? (
+          <TouchableOpacity
+            style={styles.statusCard}
+            onPress={() => router.push('/(app)/training/own-the-cost-summary' as any)}
+            activeOpacity={0.85}
+          >
+            <View style={styles.statusHeader}>
+              <View style={[styles.statusIconWrap, { backgroundColor: athleteStatus.readiness.color + '18' }]}>
+                <Ionicons name="pulse-outline" size={18} color={athleteStatus.readiness.color} />
+              </View>
+              <View style={{ flex: 1 }}>
+                <Text style={styles.statusTitle}>Athlete Status</Text>
+                <Text style={styles.statusSub}>Today's check-in</Text>
+              </View>
+              <View style={[styles.statusBadge, { backgroundColor: athleteStatus.readiness.color + '20' }]}>
+                <Text style={[styles.statusBadgeText, { color: athleteStatus.readiness.color }]}>
+                  {athleteStatus.readiness.label}
+                </Text>
+              </View>
+            </View>
+
+            {/* Readiness bar */}
+            <View style={styles.readinessRow}>
+              <Text style={styles.readinessLabel}>Readiness</Text>
+              <View style={styles.readinessTrack}>
+                <View style={[styles.readinessFill, { width: `${Math.round(athleteStatus.pct * 100)}%`, backgroundColor: athleteStatus.readiness.color }]} />
+              </View>
+              <Text style={[styles.readinessScore, { color: athleteStatus.readiness.color }]}>
+                {athleteStatus.score}/{MAX_OTC_SCORE}
+              </Text>
+            </View>
+
+            {/* Quick indicators */}
+            <View style={styles.indicatorRow}>
+              <View style={styles.indicator}>
+                <Ionicons name="flash-outline" size={12} color={athleteStatus.energy.color} />
+                <Text style={[styles.indicatorText, { color: athleteStatus.energy.color }]}>
+                  {athleteStatus.energy.label}
+                </Text>
+              </View>
+              <View style={styles.indicatorDot} />
+              <View style={styles.indicator}>
+                <Ionicons name="eye-outline" size={12} color={athleteStatus.focus.color} />
+                <Text style={[styles.indicatorText, { color: athleteStatus.focus.color }]}>
+                  {athleteStatus.focus.label}
+                </Text>
+              </View>
+              <View style={styles.indicatorDot} />
+              <View style={styles.indicator}>
+                <Ionicons name="shield-checkmark-outline" size={12} color={athleteStatus.ownership.color} />
+                <Text style={[styles.indicatorText, { color: athleteStatus.ownership.color }]}>
+                  {athleteStatus.ownership.label}
+                </Text>
+              </View>
+            </View>
+          </TouchableOpacity>
+        ) : accountabilityLoaded && !otcCheckedInToday ? (
+          <TouchableOpacity
+            style={styles.statusCardEmpty}
+            onPress={() => router.push('/(app)/training/own-the-cost-checkin' as any)}
+            activeOpacity={0.85}
+          >
+            <View style={[styles.statusIconWrap, { backgroundColor: '#f59e0b18' }]}>
+              <Ionicons name="pulse-outline" size={18} color="#f59e0b" />
+            </View>
+            <View style={{ flex: 1 }}>
+              <Text style={styles.statusTitle}>Athlete Status</Text>
+              <Text style={styles.statusSub}>Complete your daily check-in to see your readiness</Text>
+            </View>
+            <Ionicons name="arrow-forward-circle" size={24} color="#f59e0b" />
+          </TouchableOpacity>
+        ) : null}
+
+        {/* ── 2. Standard Engine (always visible) ── */}
+        <StandardEngineCard
+          accountability={accountability}
+          developmentStatus={developmentStatus}
+          standardStatus={standardStatus}
+        />
+
+        {/* ── 3. Required Today (incomplete daily CTAs) ── */}
+
+        {/* OTC Check-In — hidden after completion */}
+        {accountabilityLoaded && !otcCheckedInToday && (
           <TouchableOpacity
             style={styles.otcCard}
-            onPress={() => router.push(
-              otcCheckedInToday
-                ? '/(app)/training/own-the-cost-summary' as any
-                : '/(app)/training/own-the-cost-checkin' as any,
-            )}
+            onPress={() => router.push('/(app)/training/own-the-cost-checkin' as any)}
             activeOpacity={0.85}
           >
             <View style={styles.otcAccent} />
@@ -146,30 +252,20 @@ export default function DashboardScreen() {
               <Text style={styles.otcLabel}>OWN THE COST</Text>
               <View style={styles.otcRow}>
                 <View style={styles.otcIconWrap}>
-                  {otcCheckedInToday ? (
-                    <Ionicons name="checkmark-circle" size={22} color={colors.success} />
-                  ) : (
-                    <Ionicons name="shield-checkmark" size={22} color="#f59e0b" />
-                  )}
+                  <Ionicons name="shield-checkmark" size={22} color="#f59e0b" />
                 </View>
                 <View style={{ flex: 1 }}>
                   <Text style={styles.otcTitle}>Daily Check-In</Text>
-                  <Text style={styles.otcSub}>
-                    {otcCheckedInToday ? 'Completed — tap to review' : 'Hold yourself accountable'}
-                  </Text>
+                  <Text style={styles.otcSub}>Hold yourself accountable</Text>
                 </View>
-                <Ionicons
-                  name="arrow-forward-circle"
-                  size={28}
-                  color={otcCheckedInToday ? colors.success : '#f59e0b'}
-                />
+                <Ionicons name="arrow-forward-circle" size={28} color="#f59e0b" />
               </View>
             </View>
           </TouchableOpacity>
         )}
 
-        {/* ── 0. Daily Work Card ──────────────────── */}
-        {dailyWork && (() => {
+        {/* Daily Work — hidden when all items complete */}
+        {dailyWork && !dailyWorkAllDone && (() => {
           const filtered = filterDailyWorkItems(dailyWork.items, tier, isCoach);
           const done = filtered.filter((i) => dailyWork.completion[i.id]).length;
           const total = filtered.length;
@@ -208,7 +304,7 @@ export default function DashboardScreen() {
           );
         })()}
 
-        {/* ── At-Bat Accountability (conditional) ── */}
+        {/* At-Bat Accountability (conditional on recent game) */}
         {showAbCard && (
           <TouchableOpacity
             style={styles.otcCard}
@@ -232,44 +328,17 @@ export default function DashboardScreen() {
           </TouchableOpacity>
         )}
 
-        {/* ── 1. Performance Trend Card ───────────── */}
-        <PerformanceTrendCard
-          keyMetrics={keyMetrics}
-          daysSinceLastKeyMetric={daysSinceLastKeyMetric}
-        />
-
-        {/* ── 3. Standard Engine Card ─────────────── */}
-        <StandardEngineCard
-          accountability={accountability}
-          developmentStatus={developmentStatus}
-          standardStatus={standardStatus}
-        />
-
-        {/* ── 4. Required Today (self-contained) ──── */}
+        {/* Required Today checklist */}
         <Text style={styles.sectionLabel}>REQUIRED TODAY</Text>
         <RequiredTodayPanel />
 
-        {/* ── 5. Next Priority ────────────────────── */}
-        <TouchableOpacity
-          style={[styles.priorityCard, accentGlow(nextPriority.color, 'subtle')]}
-          onPress={() => router.push(nextPriority.route as any)}
-          activeOpacity={0.85}
-        >
-          <View style={styles.priorityAccent} />
-          <View style={styles.priorityBody}>
-            <Text style={styles.priorityLabel}>NEXT UP</Text>
-            <View style={styles.priorityRow}>
-              <View style={[styles.priorityIconWrap, { backgroundColor: nextPriority.color + '20' }]}>
-                <Ionicons name={nextPriority.icon as any} size={22} color={nextPriority.color} />
-              </View>
-              <View style={{ flex: 1 }}>
-                <Text style={styles.priorityTitle}>{nextPriority.title}</Text>
-                <Text style={styles.prioritySub}>{nextPriority.subtitle}</Text>
-              </View>
-              <Ionicons name="arrow-forward-circle" size={28} color={nextPriority.color} />
-            </View>
-          </View>
-        </TouchableOpacity>
+        {/* ── 4. Performance Trend Card ──────────── */}
+        <View style={{ marginTop: 12 }}>
+          <PerformanceTrendCard
+            keyMetrics={keyMetrics}
+            daysSinceLastKeyMetric={daysSinceLastKeyMetric}
+          />
+        </View>
 
         {/* ── Coach CTA ─────────────────────────── */}
         {isCoach && (
@@ -330,9 +399,90 @@ const styles = StyleSheet.create({
     letterSpacing: 1.5,
     color: colors.textMuted,
     marginBottom: 8,
-    marginTop: 4,
+    marginTop: 12,
   },
 
+  /* ── Athlete Status Card ───────────────────── */
+  statusCard: {
+    backgroundColor: colors.surface,
+    borderWidth: 1,
+    borderColor: colors.border,
+    borderRadius: radius.lg,
+    padding: 14,
+    marginBottom: 12,
+    gap: 12,
+  },
+  statusCardEmpty: {
+    backgroundColor: colors.surface,
+    borderWidth: 1,
+    borderColor: '#f59e0b30',
+    borderRadius: radius.lg,
+    padding: 14,
+    marginBottom: 12,
+    flexDirection: 'row',
+    alignItems: 'center',
+    gap: 12,
+  },
+  statusHeader: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    gap: 10,
+  },
+  statusIconWrap: {
+    width: 36,
+    height: 36,
+    borderRadius: 10,
+    alignItems: 'center',
+    justifyContent: 'center',
+  },
+  statusTitle: { fontSize: 14, fontWeight: '800', color: colors.textPrimary },
+  statusSub: { fontSize: 11, color: colors.textSecondary, marginTop: 1 },
+  statusBadge: {
+    paddingHorizontal: 10,
+    paddingVertical: 4,
+    borderRadius: 8,
+  },
+  statusBadgeText: { fontSize: 11, fontWeight: '900' },
+
+  readinessRow: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    gap: 8,
+    paddingTop: 4,
+    borderTopWidth: 1,
+    borderTopColor: colors.border,
+  },
+  readinessLabel: { fontSize: 12, fontWeight: '600', color: colors.textSecondary, width: 72 },
+  readinessTrack: {
+    flex: 1,
+    height: 6,
+    borderRadius: 3,
+    backgroundColor: colors.border,
+    overflow: 'hidden',
+  },
+  readinessFill: { height: 6, borderRadius: 3 },
+  readinessScore: { fontSize: 12, fontWeight: '800', width: 36, textAlign: 'right' },
+
+  indicatorRow: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    justifyContent: 'center',
+    gap: 8,
+  },
+  indicator: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    gap: 4,
+  },
+  indicatorText: { fontSize: 11, fontWeight: '700' },
+  indicatorDot: {
+    width: 3,
+    height: 3,
+    borderRadius: 1.5,
+    backgroundColor: colors.textMuted,
+  },
+
+  /* ── OTC Check-In CTA ─────────────────────── */
   otcCard: {
     backgroundColor: colors.surface,
     borderWidth: 1,
@@ -350,6 +500,7 @@ const styles = StyleSheet.create({
   otcTitle: { fontSize: 15, fontWeight: '900' as const, color: colors.textPrimary },
   otcSub: { fontSize: 12, color: colors.textSecondary, marginTop: 2 },
 
+  /* ── Daily Work CTA ────────────────────────── */
   dailyWorkCard: {
     backgroundColor: colors.surface,
     borderWidth: 1,
@@ -369,24 +520,7 @@ const styles = StyleSheet.create({
   dailyWorkProgress: { height: 3, backgroundColor: colors.border, borderRadius: 2, overflow: 'hidden' as const },
   dailyWorkProgressFill: { height: 3, backgroundColor: '#E10600', borderRadius: 2 },
 
-  priorityCard: {
-    backgroundColor: colors.surface,
-    borderWidth: 1,
-    borderColor: colors.border,
-    borderRadius: 14,
-    flexDirection: 'row',
-    overflow: 'hidden',
-    marginTop: 12,
-    marginBottom: 12,
-  },
-  priorityAccent: { width: 4, backgroundColor: colors.textMuted + '40' },
-  priorityBody: { flex: 1, padding: 14, gap: 8 },
-  priorityLabel: { fontSize: 10, fontWeight: '900', letterSpacing: 1.5, color: colors.textSecondary },
-  priorityRow: { flexDirection: 'row', alignItems: 'center', gap: 12 },
-  priorityIconWrap: { width: 42, height: 42, borderRadius: 12, alignItems: 'center', justifyContent: 'center' },
-  priorityTitle: { fontSize: 15, fontWeight: '900', color: colors.textPrimary },
-  prioritySub: { fontSize: 12, color: colors.textSecondary, marginTop: 2 },
-
+  /* ── Other ──────────────────────────────────── */
   coachCta: {
     flexDirection: 'row',
     alignItems: 'center',

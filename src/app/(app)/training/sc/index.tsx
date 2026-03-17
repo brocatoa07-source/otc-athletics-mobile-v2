@@ -28,10 +28,10 @@ interface ExploreItem {
 }
 
 const EXPLORE_ITEMS: ExploreItem[] = [
-  { key: 'exercises', label: 'Exercise Library', sub: '80+ exercises · 5 categories', icon: 'barbell-outline', color: '#3b82f6', route: '/(app)/training/sc/exercises?category=exercises' },
-  { key: 'mobility', label: 'Mobility Bank', sub: '18 mobility drills', icon: 'body-outline', color: '#22c55e', route: '/(app)/training/sc/exercises?category=mobility' },
-  { key: 'power', label: 'Power Drills', sub: '14 explosive movements', icon: 'flash-outline', color: '#f59e0b', route: '/(app)/training/sc/exercises?category=power' },
-  { key: 'conditioning', label: 'Conditioning', sub: '17 conditioning circuits', icon: 'heart-outline', color: '#ef4444', route: '/(app)/training/sc/exercises?category=conditioning' },
+  { key: 'exercises', label: 'Exercise Library', sub: 'Strength, accessory & core exercises', icon: 'barbell-outline', color: '#3b82f6', route: '/(app)/training/sc/exercises?category=exercises' },
+  { key: 'mobility', label: 'Mobility Bank', sub: 'Warm-up, recovery & mobility drills', icon: 'body-outline', color: '#22c55e', route: '/(app)/training/sc/exercises?category=mobility' },
+  { key: 'power', label: 'Power Drills', sub: 'Plyometrics & explosive movements', icon: 'flash-outline', color: '#f59e0b', route: '/(app)/training/sc/exercises?category=power' },
+  { key: 'conditioning', label: 'Conditioning', sub: 'Sprint work & conditioning drills', icon: 'heart-outline', color: '#ef4444', route: '/(app)/training/sc/exercises?category=conditioning' },
   { key: 'fuel', label: 'Fuel The Engine', sub: 'Performance nutrition', icon: 'flame-outline', color: '#10b981', route: '/(app)/training/sc/fuel' },
 ];
 
@@ -84,6 +84,52 @@ export default function SCVaultIndex() {
           >
             <Text style={styles.ctaBtnText}>Upgrade to Single</Text>
             <Ionicons name="arrow-forward" size={16} color="#fff" />
+          </TouchableOpacity>
+        </View>
+      </SafeAreaView>
+    );
+  }
+
+  // Single tier — diagnostic-only access
+  if (hasLimitedLifting && !hasFullLifting) {
+    return (
+      <SafeAreaView style={styles.safe}>
+        <View style={styles.header}>
+          <TouchableOpacity onPress={() => router.back()} style={styles.backBtn}>
+            <Ionicons name="chevron-back" size={24} color={colors.textPrimary} />
+          </TouchableOpacity>
+          <View style={{ flex: 1 }}>
+            <Text style={styles.headerSup}>STRENGTH VAULT</Text>
+            <Text style={styles.headerTitle}>OTC Strength System</Text>
+          </View>
+        </View>
+        <View style={styles.lockedState}>
+          <Ionicons name="clipboard-outline" size={48} color={ACCENT} />
+          <Text style={styles.lockedTitle}>
+            {moverDone ? 'Assessment Complete' : 'Strength Assessment'}
+          </Text>
+          <Text style={styles.lockedDesc}>
+            {moverDone
+              ? 'Your Strength diagnostic is complete. Upgrade to Double to unlock the full Strength Vault with personalized programs, exercise library, and daily training.'
+              : 'Take the Athletic Profile Assessment to discover your mover type. Upgrade to Double to unlock the full Strength Vault.'}
+          </Text>
+          {!moverDone && (
+            <TouchableOpacity
+              style={[styles.ctaBtn, { backgroundColor: ACCENT }]}
+              onPress={() => router.push('/(app)/training/sc/diagnostics' as any)}
+              activeOpacity={0.8}
+            >
+              <Text style={styles.ctaBtnText}>Start Assessment</Text>
+              <Ionicons name="arrow-forward" size={16} color="#fff" />
+            </TouchableOpacity>
+          )}
+          <TouchableOpacity
+            style={[styles.ctaBtn, { backgroundColor: colors.surface, borderWidth: 1, borderColor: ACCENT + '40' }]}
+            onPress={() => router.push('/(app)/upgrade' as any)}
+            activeOpacity={0.8}
+          >
+            <Text style={[styles.ctaBtnText, { color: ACCENT }]}>Upgrade to Double</Text>
+            <Ionicons name="arrow-forward" size={16} color={ACCENT} />
           </TouchableOpacity>
         </View>
       </SafeAreaView>

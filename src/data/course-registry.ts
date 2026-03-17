@@ -46,6 +46,8 @@ export interface CourseEntry {
   mastery: CourseWeek;
   /** Total outline segments across both weeks (for progress tracking) */
   totalSections: number;
+  /** True for courses 7–11 whose content is not yet built */
+  placeholder?: boolean;
 }
 
 export const COURSE_REGISTRY: Record<string, CourseEntry> = {
@@ -105,4 +107,78 @@ export const COURSE_REGISTRY: Record<string, CourseEntry> = {
   },
 };
 
+/* ─── Placeholder stub for courses 7–11 ─────────── */
+
+const PLACEHOLDER_WEEK: CourseWeek = {
+  title: 'Coming Soon',
+  quote: 'This module is being built.',
+  outline: [],
+  coachScience: {
+    videoTitle: 'Content in Development',
+    points: ['Full course content is being developed.'],
+    playerAnalogy: '',
+    baseballAnalogy: '',
+  },
+};
+
+/** Advanced courses 7–11: visible as placeholders, gated behind 1–6 completion */
+
+COURSE_REGISTRY['communication'] = {
+  id: 'communication',
+  label: 'Communication',
+  color: '#06b6d4',
+  skillNum: 7,
+  shadow: PLACEHOLDER_WEEK,
+  mastery: PLACEHOLDER_WEEK,
+  totalSections: 0,
+  placeholder: true,
+};
+
+COURSE_REGISTRY['presence'] = {
+  id: 'presence',
+  label: 'Presence',
+  color: '#a855f7',
+  skillNum: 8,
+  shadow: PLACEHOLDER_WEEK,
+  mastery: PLACEHOLDER_WEEK,
+  totalSections: 0,
+  placeholder: true,
+};
+
+COURSE_REGISTRY['composure'] = {
+  id: 'composure',
+  label: 'Composure',
+  color: '#64748b',
+  skillNum: 9,
+  shadow: PLACEHOLDER_WEEK,
+  mastery: PLACEHOLDER_WEEK,
+  totalSections: 0,
+  placeholder: true,
+};
+
+COURSE_REGISTRY['leadership'] = {
+  id: 'leadership',
+  label: 'Leadership',
+  color: '#ec4899',
+  skillNum: 10,
+  shadow: PLACEHOLDER_WEEK,
+  mastery: PLACEHOLDER_WEEK,
+  totalSections: 0,
+  placeholder: true,
+};
+
+COURSE_REGISTRY['flow-state'] = {
+  id: 'flow-state',
+  label: 'Flow State',
+  color: '#14b8a6',
+  skillNum: 11,
+  shadow: PLACEHOLDER_WEEK,
+  mastery: PLACEHOLDER_WEEK,
+  totalSections: 0,
+  placeholder: true,
+};
+
 export const COURSE_LIST = Object.values(COURSE_REGISTRY);
+
+/** IDs of the 6 core courses that must be completed to unlock advanced courses */
+export const CORE_COURSE_IDS = ['awareness', 'confidence', 'focus', 'emotional-control', 'resilience', 'accountability'] as const;

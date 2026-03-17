@@ -1,6 +1,6 @@
-import { useEffect, useState } from 'react';
+import { useEffect, useState, useMemo } from 'react';
 import {
-  View, Text, ScrollView, TouchableOpacity, StyleSheet,
+  View, Text, ScrollView, TouchableOpacity, TextInput, StyleSheet,
 } from 'react-native';
 import { SafeAreaView } from 'react-native-safe-area-context';
 import { router } from 'expo-router';
@@ -18,6 +18,28 @@ import {
   HITTING_IDENTITY_STORAGE_KEY,
   type HittingIdentityDiagnosticResult,
 } from '@/data/hitting-identity-data';
+import { HITTING_VAULT_SECTIONS } from '@/data/hitting-vault-sections';
+
+/* ─── Flatten drills for search ──────────────────── */
+interface SearchableDrill {
+  name: string;
+  fixes: string;
+  focus: string;
+  sectionKey: string;
+  sectionLabel: string;
+  sectionColor: string;
+}
+
+const ALL_DRILLS: SearchableDrill[] = HITTING_VAULT_SECTIONS.flatMap((s) =>
+  s.drills.map((d) => ({
+    name: d.name,
+    fixes: d.fixes,
+    focus: d.focus,
+    sectionKey: s.key,
+    sectionLabel: s.label,
+    sectionColor: s.color,
+  })),
+);
 
 const ACCENT = '#E10600';
 
@@ -51,6 +73,18 @@ export default function HittingVaultIndex() {
   const [identityResult, setIdentityResult] = useState<HittingIdentityDiagnosticResult | null>(null);
   const [mechResult, setMechResult] = useState<MechanicalDiagnosticResult | null>(null);
   const [exploreExpanded, setExploreExpanded] = useState(false);
+  const [search, setSearch] = useState('');
+
+  const searchResults = useMemo(() => {
+    if (!search.trim()) return [];
+    const q = search.trim().toLowerCase();
+    return ALL_DRILLS.filter(
+      (d) =>
+        d.name.toLowerCase().includes(q) ||
+        d.fixes.toLowerCase().includes(q) ||
+        d.focus.toLowerCase().includes(q),
+    );
+  }, [search]);
 
   useEffect(() => {
     Promise.all([
@@ -86,6 +120,60 @@ export default function HittingVaultIndex() {
           <Ionicons name="clipboard-outline" size={18} color={ACCENT} />
         </TouchableOpacity>
       </View>
+
+      {/* Search Bar */}
+      <View style={styles.searchRow}>
+        <Ionicons name="search-outline" size={18} color={colors.textMuted} />
+        <TextInput
+          style={styles.searchInput}
+          placeholder="Search hitting drills..."
+          placeholderTextColor={colors.textMuted}
+          value={search}
+          onChangeText={setSearch}
+          returnKeyType="search"
+          autoCorrect={false}
+          autoCapitalize="none"
+        />
+        {search.length > 0 && (
+          <TouchableOpacity onPress={() => setSearch('')} hitSlop={{ top: 8, bottom: 8, left: 8, right: 8 }}>
+            <Ionicons name="close-circle" size={18} color={colors.textMuted} />
+          </TouchableOpacity>
+        )}
+      </View>
+
+      {/* Search Results */}
+      {search.trim().length > 0 ? (
+        <ScrollView style={{ flex: 1 }} contentContainerStyle={styles.content} showsVerticalScrollIndicator={false}>
+          {searchResults.length === 0 ? (
+            <View style={styles.searchEmpty}>
+              <Ionicons name="search-outline" size={40} color={colors.textMuted} />
+              <Text style={styles.searchEmptyTitle}>No results found</Text>
+              <Text style={styles.searchEmptySub}>No drills match "{search}"</Text>
+            </View>
+          ) : (
+            <>
+              <Text style={styles.searchCount}>{searchResults.length} result{searchResults.length !== 1 ? 's' : ''}</Text>
+              {searchResults.map((d) => (
+                <TouchableOpacity
+                  key={`${d.sectionKey}-${d.name}`}
+                  style={styles.searchResultCard}
+                  onPress={() => router.push(`/(app)/training/mechanical/${d.sectionKey}` as any)}
+                  activeOpacity={0.8}
+                >
+                  <View style={[styles.searchResultDot, { backgroundColor: d.sectionColor }]} />
+                  <View style={{ flex: 1 }}>
+                    <Text style={styles.searchResultName}>{d.name}</Text>
+                    <Text style={styles.searchResultFixes} numberOfLines={1}>{d.fixes}</Text>
+                  </View>
+                  <View style={[styles.searchResultTag, { backgroundColor: d.sectionColor + '15' }]}>
+                    <Text style={[styles.searchResultTagText, { color: d.sectionColor }]}>{d.sectionLabel}</Text>
+                  </View>
+                </TouchableOpacity>
+              ))}
+            </>
+          )}
+        </ScrollView>
+      ) : (
 
       <ScrollView contentContainerStyle={styles.content} showsVerticalScrollIndicator={false}>
         {/* Walk Tier Banner */}
@@ -328,6 +416,7 @@ export default function HittingVaultIndex() {
           </View>
         )}
       </ScrollView>
+      )}
     </SafeAreaView>
   );
 }
@@ -449,4 +538,28 @@ const styles = StyleSheet.create({
   },
   exploreLabel: { fontSize: 14, fontWeight: '800', color: colors.textPrimary },
   exploreSub: { fontSize: 11, color: colors.textSecondary, lineHeight: 15 },
+
+  /* ── Search ──────────────────────────────────── */
+  searchRow: {
+    flexDirection: 'row', alignItems: 'center', gap: 8,
+    marginHorizontal: 16, marginTop: 12, marginBottom: 4,
+    paddingHorizontal: 12, paddingVertical: 10,
+    backgroundColor: colors.surface, borderWidth: 1, borderColor: colors.border,
+    borderRadius: radius.lg,
+  },
+  searchInput: { flex: 1, fontSize: 14, color: colors.textPrimary, padding: 0 },
+  searchEmpty: { alignItems: 'center', paddingTop: 60, gap: 8 },
+  searchEmptyTitle: { fontSize: 16, fontWeight: '800', color: colors.textPrimary },
+  searchEmptySub: { fontSize: 13, color: colors.textSecondary, textAlign: 'center' },
+  searchCount: { fontSize: 12, fontWeight: '700', color: colors.textMuted },
+  searchResultCard: {
+    flexDirection: 'row', alignItems: 'center', gap: 12,
+    backgroundColor: colors.surface, borderWidth: 1, borderColor: colors.border,
+    borderRadius: radius.lg, padding: 14,
+  },
+  searchResultDot: { width: 8, height: 8, borderRadius: 4 },
+  searchResultName: { fontSize: 14, fontWeight: '800', color: colors.textPrimary },
+  searchResultFixes: { fontSize: 12, color: colors.textSecondary, marginTop: 2 },
+  searchResultTag: { paddingHorizontal: 8, paddingVertical: 3, borderRadius: 6 },
+  searchResultTagText: { fontSize: 10, fontWeight: '800' },
 });

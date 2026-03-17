@@ -1,4 +1,4 @@
-import { useState, useCallback } from 'react';
+import { useState, useCallback, useEffect } from 'react';
 import {
   View, Text, ScrollView, TouchableOpacity, StyleSheet,
 } from 'react-native';
@@ -7,6 +7,7 @@ import { router, useLocalSearchParams } from 'expo-router';
 import { useFocusEffect } from '@react-navigation/native';
 import { Ionicons } from '@expo/vector-icons';
 import { colors, radius } from '@/theme';
+import { useTier } from '@/hooks/useTier';
 import {
   loadGeneratedProgram,
   loadStrengthProgress,
@@ -27,8 +28,16 @@ function getBlockMeta(key: OtcsBlockKey) {
 }
 
 export default function WorkoutScreen() {
+  const { hasFullLifting, isCoach } = useTier();
   const params = useLocalSearchParams<{ month?: string; week?: string; day?: string }>();
   const [program, setProgram] = useState<OtcsGeneratedProgram | null>(null);
+
+  // Single/Walk tier guard
+  useEffect(() => {
+    if (!hasFullLifting && !isCoach) {
+      router.replace('/(app)/training/sc' as any);
+    }
+  }, [hasFullLifting, isCoach]);
   const [progress, setProgress] = useState<StrengthProgress | null>(null);
   const [workout, setWorkout] = useState<OtcsGeneratedDay | null>(null);
   const [monthNum, setMonthNum] = useState(1);

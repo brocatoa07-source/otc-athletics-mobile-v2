@@ -1,3 +1,4 @@
+import { useEffect, useState } from 'react';
 import {
   View, Text, ScrollView, TouchableOpacity, StyleSheet,
 } from 'react-native';
@@ -6,13 +7,32 @@ import { router } from 'expo-router';
 import { Ionicons } from '@expo/vector-icons';
 import { colors, radius } from '@/theme';
 import { useTier } from '@/hooks/useTier';
-import { COURSE_LIST } from '@/data/course-registry';
+import { COURSE_LIST, CORE_COURSE_IDS, COURSE_REGISTRY } from '@/data/course-registry';
+import { readCourseProgress } from '@/hooks/useCourseProgress';
 
 const ACCENT = '#8b5cf6';
 
 export default function CoursesListScreen() {
   const { hasFullMental, isCoach } = useTier();
   const canAccess = hasFullMental || isCoach;
+  const [coreComplete, setCoreComplete] = useState(false);
+
+  // Check if all 6 core courses are complete (all sections checked off)
+  useEffect(() => {
+    (async () => {
+      let allDone = true;
+      for (const cId of CORE_COURSE_IDS) {
+        const entry = COURSE_REGISTRY[cId];
+        if (!entry || entry.totalSections === 0) { allDone = false; break; }
+        const completed = await readCourseProgress(cId);
+        if (completed < entry.totalSections) { allDone = false; break; }
+      }
+      setCoreComplete(allDone);
+    })();
+  }, []);
+
+  const coreCourses = COURSE_LIST.filter((c) => !c.placeholder);
+  const advancedCourses = COURSE_LIST.filter((c) => c.placeholder);
 
   return (
     <SafeAreaView style={styles.safe}>
@@ -31,10 +51,12 @@ export default function CoursesListScreen() {
 
       <ScrollView contentContainerStyle={styles.content} showsVerticalScrollIndicator={false}>
         <Text style={styles.intro}>
-          6 core mental skill courses. Each has a Shadow week and a Mastery week.
+          6 core mental skill courses plus 5 advanced modules. Complete the core sequence to unlock advanced courses.
         </Text>
 
-        {COURSE_LIST.map((course, idx) => {
+        {/* ── Core Courses (1–6) ─────────────────────── */}
+        <Text style={styles.groupLabel}>CORE SEQUENCE</Text>
+        {coreCourses.map((course, idx) => {
           const locked = !canAccess && idx >= 2;
           return (
             <TouchableOpacity
@@ -64,6 +86,47 @@ export default function CoursesListScreen() {
               {!locked && (
                 <Ionicons name="chevron-forward" size={18} color={colors.textMuted} />
               )}
+            </TouchableOpacity>
+          );
+        })}
+
+        {/* ── Advanced Courses (7–11) ────────────────── */}
+        <Text style={[styles.groupLabel, { marginTop: 16 }]}>ADVANCED</Text>
+        {!coreComplete && (
+          <View style={styles.prereqNote}>
+            <Ionicons name="lock-closed-outline" size={14} color={colors.textMuted} />
+            <Text style={styles.prereqText}>
+              Complete all 6 core courses to unlock advanced modules
+            </Text>
+          </View>
+        )}
+        {advancedCourses.map((course) => {
+          const advLocked = !coreComplete;
+          return (
+            <TouchableOpacity
+              key={course.id}
+              style={[styles.card, advLocked && styles.cardLocked]}
+              onPress={() => {
+                if (advLocked) return;
+                router.push(`/(app)/training/mental/course?id=${course.id}` as any);
+              }}
+              activeOpacity={advLocked ? 1 : 0.8}
+            >
+              <View style={[styles.icon, { backgroundColor: course.color + '18' }]}>
+                <Ionicons
+                  name={advLocked ? 'lock-closed-outline' : 'school-outline'}
+                  size={22}
+                  color={advLocked ? colors.textMuted : course.color}
+                />
+              </View>
+              <View style={{ flex: 1 }}>
+                <Text style={[styles.cardTitle, advLocked && { color: colors.textMuted }]}>
+                  {course.label}
+                </Text>
+                <Text style={styles.cardSub}>
+                  Skill #{course.skillNum} · {advLocked ? 'Locked' : 'Coming Soon'}
+                </Text>
+              </View>
             </TouchableOpacity>
           );
         })}
@@ -104,6 +167,19 @@ const styles = StyleSheet.create({
 
   content: { padding: 16, paddingBottom: 60, gap: 10 },
   intro: { fontSize: 13, color: colors.textSecondary, lineHeight: 19, marginBottom: 4 },
+
+  groupLabel: {
+    fontSize: 10, fontWeight: '900', letterSpacing: 1.5,
+    color: colors.textMuted, marginTop: 4, marginBottom: 2,
+  },
+
+  prereqNote: {
+    flexDirection: 'row', alignItems: 'center', gap: 8,
+    paddingVertical: 8, paddingHorizontal: 12,
+    backgroundColor: colors.surface, borderWidth: 1, borderColor: colors.border,
+    borderRadius: radius.sm,
+  },
+  prereqText: { flex: 1, fontSize: 12, color: colors.textMuted, fontWeight: '600' },
 
   card: {
     flexDirection: 'row', alignItems: 'center', gap: 14,
