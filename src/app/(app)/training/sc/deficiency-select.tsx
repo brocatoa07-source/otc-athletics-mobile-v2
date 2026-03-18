@@ -5,20 +5,11 @@ import {
 import { SafeAreaView } from 'react-native-safe-area-context';
 import { router, useLocalSearchParams } from 'expo-router';
 import { Ionicons } from '@expo/vector-icons';
-import AsyncStorage from '@react-native-async-storage/async-storage';
 import { colors, radius } from '@/theme';
 import {
   DEFICIENCY_META,
-  saveStrengthProfile,
-  type BaseballPosition,
   type MovementDeficiency,
-  type StrengthArchetype,
 } from '@/data/strength-profile';
-import {
-  generateProgram,
-  saveGeneratedProgram,
-  initStrengthProgress,
-} from '@/data/strength-program-engine';
 
 const ACCENT = '#1DB954';
 
@@ -31,44 +22,13 @@ const DEFICIENCIES: { key: MovementDeficiency; meta: typeof DEFICIENCY_META[Move
 export default function DeficiencySelectScreen() {
   const { position } = useLocalSearchParams<{ position: string }>();
   const [selected, setSelected] = useState<MovementDeficiency | null>(null);
-  const [saving, setSaving] = useState(false);
 
-  async function handleFinish() {
-    if (!selected || !position || saving) return;
-    setSaving(true);
-
-    try {
-      // Load mover type from AsyncStorage
-      const moverType = (await AsyncStorage.getItem('otc:lifting-mover-type')) as StrengthArchetype | null;
-      if (!moverType) {
-        // Fallback — shouldn't happen since quiz must be done first
-        router.back();
-        return;
-      }
-
-      const profile = {
-        archetype: moverType,
-        position: position as BaseballPosition,
-        deficiency: selected,
-        updatedAt: new Date().toISOString(),
-      };
-
-      // Save profile
-      await saveStrengthProfile(profile);
-
-      // Generate and save program
-      const program = generateProgram(profile);
-      await saveGeneratedProgram(program);
-
-      // Init progress tracking
-      await initStrengthProgress();
-
-      // Navigate to vault
-      router.replace('/(app)/training/sc' as any);
-    } catch (err) {
-      if (__DEV__) console.warn('[deficiency-select] error:', err);
-      setSaving(false);
-    }
+  function handleNext() {
+    if (!selected || !position) return;
+    router.push({
+      pathname: '/(app)/training/sc/training-config' as any,
+      params: { position, deficiency: selected },
+    });
   }
 
   return (
@@ -81,7 +41,7 @@ export default function DeficiencySelectScreen() {
           <Text style={styles.headerSup}>STRENGTH SETUP</Text>
           <Text style={styles.headerTitle}>Movement Focus</Text>
         </View>
-        <Text style={styles.stepBadge}>Step 2 of 2</Text>
+        <Text style={styles.stepBadge}>Step 2 of 3</Text>
       </View>
 
       <ScrollView contentContainerStyle={styles.content} showsVerticalScrollIndicator={false}>
@@ -135,15 +95,13 @@ export default function DeficiencySelectScreen() {
       {/* Bottom CTA */}
       <View style={styles.bottomBar}>
         <TouchableOpacity
-          style={[styles.finishBtn, (!selected || saving) && { opacity: 0.4 }]}
-          onPress={handleFinish}
+          style={[styles.nextBtn, !selected && { opacity: 0.4 }]}
+          onPress={handleNext}
           activeOpacity={0.85}
-          disabled={!selected || saving}
+          disabled={!selected}
         >
-          <Ionicons name="checkmark-circle" size={20} color="#fff" />
-          <Text style={styles.finishBtnText}>
-            {saving ? 'Generating Program...' : 'Generate My Program'}
-          </Text>
+          <Text style={styles.nextBtnText}>Next</Text>
+          <Ionicons name="arrow-forward" size={18} color="#fff" />
         </TouchableOpacity>
       </View>
     </SafeAreaView>
@@ -194,9 +152,9 @@ const styles = StyleSheet.create({
     backgroundColor: colors.bg,
     borderTopWidth: 1, borderTopColor: colors.border,
   },
-  finishBtn: {
+  nextBtn: {
     flexDirection: 'row', alignItems: 'center', justifyContent: 'center', gap: 8,
     backgroundColor: ACCENT, paddingVertical: 16, borderRadius: radius.md,
   },
-  finishBtnText: { fontSize: 16, fontWeight: '900', color: '#fff' },
+  nextBtnText: { fontSize: 16, fontWeight: '900', color: '#fff' },
 });

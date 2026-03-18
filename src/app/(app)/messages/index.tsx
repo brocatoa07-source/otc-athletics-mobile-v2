@@ -1,10 +1,11 @@
+import { useCallback } from 'react';
 import {
   View, Text, FlatList, TouchableOpacity, StyleSheet, ActivityIndicator,
 } from 'react-native';
 import { SafeAreaView } from 'react-native-safe-area-context';
-import { router } from 'expo-router';
+import { router, useFocusEffect } from 'expo-router';
 import { Ionicons } from '@expo/vector-icons';
-import { useQuery } from '@tanstack/react-query';
+import { useQuery, useQueryClient } from '@tanstack/react-query';
 import { Colors } from '@/constants/colors';
 import { useConversations, type EnrichedConversation } from '@/hooks/useConversations';
 import { useAuth } from '@/hooks/useAuth';
@@ -76,9 +77,17 @@ function ConversationRow({
 export default function MessagesIndexScreen() {
   const { conversations, isLoading } = useConversations();
   const { isCoach, user } = useAuth();
+  const qc = useQueryClient();
 
   const conversationIds = conversations.map((c) => c.id);
   const { data: unreadCounts = {} } = useUnreadCounts(conversationIds, user?.id);
+
+  // Immediately refresh unread counts when returning from a thread
+  useFocusEffect(
+    useCallback(() => {
+      qc.invalidateQueries({ queryKey: ['unread-counts'] });
+    }, [qc]),
+  );
 
   return (
     <SafeAreaView style={styles.safe}>

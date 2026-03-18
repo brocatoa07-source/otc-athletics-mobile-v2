@@ -54,12 +54,13 @@ function getBand(score: number, bands: ScoreBand[]): ScoreBand {
 }
 
 export default function MentalMyPathScreen() {
-  const { gate } = useGating();
+  const { gate, isLoading: gateLoading } = useGating();
   const { profile: dbProfile } = useMentalProfile();
   const [localProfile, setLocalProfile] = useState<MentalProfileData | null>(null);
   const [diagnostic, setDiagnostic] = useState<MentalDiagnosticResult | null>(null);
   const [recommended, setRecommended] = useState<FlatMentalTool[]>([]);
   const [scoringOpen, setScoringOpen] = useState(false);
+  const [localLoaded, setLocalLoaded] = useState(false);
 
   const mentalDiagDone = gate.mental.archetypeDone && gate.mental.identityDone && gate.mental.habitsDone;
 
@@ -83,6 +84,7 @@ export default function MentalMyPathScreen() {
           setDiagnostic(parsed);
         } catch {}
       }
+      setLocalLoaded(true);
     });
   }, []);
 
@@ -104,6 +106,9 @@ export default function MentalMyPathScreen() {
   const archetypeInfo = dbProfile?.primary_archetype
     ? ARCHETYPE_INFO[dbProfile.primary_archetype as ArchetypeKey]
     : null;
+
+  // ── Wait for gate + local data before deciding state ──
+  if (gateLoading || !localLoaded) return null;
 
   // ── Empty state ───────────────────────────────────
   if (!mentalDiagDone && !localProfile) {

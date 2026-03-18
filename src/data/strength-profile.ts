@@ -5,8 +5,10 @@
  *   - Mover type (from existing 20-question quiz)
  *   - Position (baseball position group)
  *   - Deficiency (primary movement limitation)
+ *   - Days per week (training frequency)
+ *   - Season phase (periodization context)
  *
- * These three inputs drive program generation.
+ * These five inputs drive program generation.
  */
 
 import AsyncStorage from '@react-native-async-storage/async-storage';
@@ -16,13 +18,23 @@ import AsyncStorage from '@react-native-async-storage/async-storage';
 export type StrengthArchetype = 'static' | 'spring' | 'hybrid';
 export type BaseballPosition = 'outfielder' | 'infielder' | 'catcher';
 export type MovementDeficiency = 'hip_mobility' | 'shoulder_stability' | 'acceleration_weakness';
+export type DaysPerWeek = 1 | 2 | 3 | 4 | 5;
+export type SeasonPhase = 'IN_SEASON' | 'PRESEASON' | 'OFFSEASON';
 
 export interface StrengthProfile {
   archetype: StrengthArchetype;
   position: BaseballPosition;
   deficiency: MovementDeficiency;
+  daysPerWeek?: DaysPerWeek;    // optional for backward compat
+  seasonPhase?: SeasonPhase;    // optional for backward compat
   updatedAt: string; // ISO date
 }
+
+/** Safe defaults for older profiles missing new fields. */
+export const STRENGTH_PROFILE_DEFAULTS = {
+  daysPerWeek: 3 as DaysPerWeek,
+  seasonPhase: 'OFFSEASON' as SeasonPhase,
+};
 
 /* ─── Display Data ───────────────────────────────── */
 
@@ -77,6 +89,39 @@ export const DEFICIENCY_META: Record<MovementDeficiency, { label: string; descri
     label: 'Acceleration Weakness',
     description: 'Slow first step and limited explosive power off the start.',
     icon: 'rocket-outline',
+  },
+};
+
+/* ─── Days Per Week Metadata ─────────────────────── */
+
+export const DAYS_PER_WEEK_OPTIONS: { value: DaysPerWeek; label: string; description: string }[] = [
+  { value: 1, label: '1 Day', description: 'Minimum effective dose — one full-body session' },
+  { value: 2, label: '2 Days', description: 'Low-frequency development and maintenance' },
+  { value: 3, label: '3 Days', description: 'Balanced development model' },
+  { value: 4, label: '4 Days', description: 'Expanded split with dedicated speed work' },
+  { value: 5, label: '5 Days', description: 'Highest commitment — full development bandwidth' },
+];
+
+/* ─── Season Phase Metadata ──────────────────────── */
+
+export const SEASON_PHASE_META: Record<SeasonPhase, { label: string; description: string; icon: string; color: string }> = {
+  IN_SEASON: {
+    label: 'In-Season',
+    description: 'Maintain strength and power. Prioritize freshness and minimize soreness.',
+    icon: 'baseball-outline',
+    color: '#22c55e',
+  },
+  PRESEASON: {
+    label: 'Preseason',
+    description: 'Sharpen explosiveness. Transfer strength to speed and prepare for competition.',
+    icon: 'trending-up-outline',
+    color: '#f59e0b',
+  },
+  OFFSEASON: {
+    label: 'Offseason',
+    description: 'Biggest development window. Build strength, durability, and physical capacity.',
+    icon: 'construct-outline',
+    color: '#3b82f6',
   },
 };
 

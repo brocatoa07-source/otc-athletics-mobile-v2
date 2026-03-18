@@ -1,4 +1,4 @@
-import { useEffect } from 'react';
+import { useEffect, useCallback } from 'react';
 import { useQuery, useMutation, useQueryClient } from '@tanstack/react-query';
 import { supabase } from '@/lib/supabase';
 import { useAuth } from '@/hooks/useAuth';
@@ -134,20 +134,25 @@ export function useMessages(conversationId: string | undefined) {
     onSuccess: () => qc.invalidateQueries({ queryKey }),
   });
 
-  const markRead = async () => {
+  const markRead = useCallback(async () => {
     if (!conversationId || !user?.id) return;
-    const unread = messages.filter((m) => !m.read_by.includes(user.id));
-    for (const msg of unread) {
-      await supabase
-        .from('messages')
-        .update({ read_by: [...msg.read_by, user.id] })
-        .eq('id', msg.id);
+    const unreadIds = messages
+      .filter((m) => m.sender_id !== user.id && !m.read_by.includes(user.id))
+      .map((m) => m.id);
+    if (unreadIds.length === 0) return;
+
+    const { error } = await supabase.rpc('mark_messages_read', {
+      p_message_ids: unreadIds,
+    });
+
+    if (error) {
+      if (__DEV__) console.error('[markRead] RPC failed:', error.message, error.code);
+      return;
     }
-    if (unread.length > 0) {
-      qc.invalidateQueries({ queryKey });
-      qc.invalidateQueries({ queryKey: ['unread-counts'] });
-    }
-  };
+
+    qc.invalidateQueries({ queryKey });
+    qc.invalidateQueries({ queryKey: ['unread-counts'] });
+  }, [conversationId, user?.id, messages, qc, queryKey]);
 
   const unreadCount = messages.filter(
     (m) => m.sender_id !== user?.id && !m.read_by.includes(user?.id ?? ''),

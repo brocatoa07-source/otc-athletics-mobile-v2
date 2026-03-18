@@ -110,9 +110,9 @@ export const HABITS_QUESTIONS: DiagnosticQuestion[] = [
 ];
 
 export const QUESTIONS_BY_TYPE: Record<DiagnosticType, DiagnosticQuestion[]> = {
-  archetype: ARCHETYPE_QUESTIONS,
-  identity:  IDENTITY_QUESTIONS,
-  habits:    HABITS_QUESTIONS,
+  'archetype': ARCHETYPE_QUESTIONS,
+  'identity':  IDENTITY_QUESTIONS,
+  'habits':    HABITS_QUESTIONS,
 };
 
 // ── Diagnostic metadata ───────────────────────────────────────────────────────
@@ -121,19 +121,19 @@ export const DIAGNOSTIC_META: Record<
   DiagnosticType,
   { label: string; description: string; icon: string; order: number }
 > = {
-  archetype: {
+  'archetype': {
     label: 'Archetype Diagnostic',
     description: 'Identify your mental pattern under pressure. Find your archetype.',
     icon: 'finger-print-outline',
     order: 1,
   },
-  identity: {
+  'identity': {
     label: 'Identity Diagnostic',
     description: 'Discover how you define yourself as a competitor and where your confidence lives.',
     icon: 'person-circle-outline',
     order: 2,
   },
-  habits: {
+  'habits': {
     label: 'Habits Diagnostic',
     description: 'Map your mental routine system from daily prep to postgame recovery.',
     icon: 'repeat-outline',

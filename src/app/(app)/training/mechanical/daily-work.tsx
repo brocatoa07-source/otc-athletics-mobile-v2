@@ -1,6 +1,6 @@
 import { useEffect, useState, useCallback } from 'react';
 import {
-  View, Text, ScrollView, TouchableOpacity, StyleSheet, Alert,
+  View, Text, ScrollView, TouchableOpacity, StyleSheet,
 } from 'react-native';
 import { SafeAreaView } from 'react-native-safe-area-context';
 import { router } from 'expo-router';
@@ -15,7 +15,6 @@ import {
   saveDailyWork,
   getStrengthTaskForToday,
   type UnifiedDailyWork,
-  type DailyWorkItem,
 } from '@/data/daily-work';
 import {
   HITTING_VAULT_SECTIONS,
@@ -28,6 +27,7 @@ import {
   type HittingIdentityDiagnosticResult,
 } from '@/data/hitting-identity-data';
 import { useTier } from '@/hooks/useTier';
+import { useAccountability } from '@/hooks/useAccountability';
 import { filterDailyWorkItems, getLockedTypes, getUpgradeTargetLabel } from '@/lib/tier-content';
 
 const ACCENT = '#E10600';
@@ -37,7 +37,6 @@ const TYPE_META: Record<string, { icon: keyof typeof Ionicons.glyphMap; color: s
   hitting:    { icon: 'baseball-outline', color: '#E10600', label: 'HITTING' },
   strength:   { icon: 'barbell-outline', color: '#1DB954', label: 'STRENGTH' },
   mental:     { icon: 'sparkles-outline', color: '#A78BFA', label: 'MENTAL' },
-  challenge:  { icon: 'trophy-outline', color: '#FBBF24', label: 'CHALLENGE' },
 };
 
 function findDrillCard(drillName: string): DrillCard | null {
@@ -52,6 +51,7 @@ export default function DailyWorkScreen() {
   const { athlete } = useAuth();
   const { gate } = useGating();
   const { tier, isCoach } = useTier();
+  const { markSkillWorkDoneToday } = useAccountability();
   const [plan, setPlan] = useState<UnifiedDailyWork | null>(null);
   const [expandedItem, setExpandedItem] = useState<string | null>(null);
 
@@ -119,21 +119,18 @@ export default function DailyWorkScreen() {
 
   const hasDiagnostic = gate.hitting.mechanicalDone;
 
-  const handleToggle = async (itemId: string, item: DailyWorkItem) => {
+  const handleToggle = async (itemId: string) => {
     if (!plan) return;
 
-    // Challenges require video — don't allow honor-system toggle
-    if (item.type === 'challenge' && !plan.completion[itemId]) {
-      Alert.alert(
-        'Video Required',
-        'Challenge completion requires a video submission. This feature is coming soon.',
-      );
-      return;
-    }
-
-    const updated = { ...plan, completion: { ...plan.completion, [itemId]: !plan.completion[itemId] } };
+    const nowDone = !plan.completion[itemId];
+    const updated = { ...plan, completion: { ...plan.completion, [itemId]: nowDone } };
     setPlan(updated);
     await saveDailyWork(updated);
+
+    // Mark skill work done for Daily Standards tracking
+    if (nowDone) {
+      await markSkillWorkDoneToday();
+    }
   };
 
   // ── No diagnostic — show CTA ──────────────────────
@@ -167,8 +164,9 @@ export default function DailyWorkScreen() {
     );
   }
 
-  // Filter items by tier
-  const visibleItems = filterDailyWorkItems(plan.items, tier, isCoach);
+  // Filter to hitting-only items, then apply tier filter
+  const hittingItems = plan.items.filter((i) => i.type === 'hitting' || i.type === 'foundation');
+  const visibleItems = filterDailyWorkItems(hittingItems, tier, isCoach);
   const lockedTypes = getLockedTypes(tier, isCoach);
   const upgradeTarget = getUpgradeTargetLabel(tier);
 
@@ -261,7 +259,7 @@ export default function DailyWorkScreen() {
                 {/* Completion toggle */}
                 <TouchableOpacity
                   style={[styles.checkbox, isDone && { backgroundColor: meta.color, borderColor: meta.color }]}
-                  onPress={() => handleToggle(item.id, item)}
+                  onPress={() => handleToggle(item.id)}
                 >
                   {isDone && <Ionicons name="checkmark" size={14} color={colors.bg} />}
                 </TouchableOpacity>
@@ -287,7 +285,7 @@ export default function DailyWorkScreen() {
                 </TouchableOpacity>
 
                 {/* Expand chevron */}
-                {(drillCard || item.challenge) && (
+                {drillCard && (
                   <TouchableOpacity onPress={() => setExpandedItem(isExpanded ? null : item.id)}>
                     <Ionicons
                       name={isExpanded ? 'chevron-up' : 'chevron-down'}
@@ -320,36 +318,6 @@ export default function DailyWorkScreen() {
                 </View>
               )}
 
-              {/* Expanded challenge detail */}
-              {isExpanded && item.challenge && (
-                <View style={styles.expandedBody}>
-                  <View style={styles.fieldRow}>
-                    <Text style={[styles.fieldLabel, { color: meta.color }]}>GOAL</Text>
-                    <Text style={styles.fieldText}>{item.challenge.goal}</Text>
-                  </View>
-                  <View style={styles.fieldRow}>
-                    <Text style={[styles.fieldLabel, { color: meta.color }]}>RULES</Text>
-                    <Text style={styles.fieldText}>{item.challenge.rules}</Text>
-                  </View>
-                  <View style={styles.fieldRow}>
-                    <Text style={[styles.fieldLabel, { color: meta.color }]}>SCORING</Text>
-                    <Text style={styles.fieldText}>{item.challenge.scoring}</Text>
-                  </View>
-                  <View style={styles.fieldRow}>
-                    <Text style={[styles.fieldLabel, { color: meta.color }]}>MEDALS</Text>
-                    <Text style={styles.fieldText}>{item.challenge.medalLogic}</Text>
-                  </View>
-                  <View style={styles.videoRequired}>
-                    <Ionicons name="videocam-outline" size={16} color={meta.color} />
-                    <Text style={[styles.videoRequiredText, { color: meta.color }]}>
-                      Video submission required
-                    </Text>
-                  </View>
-                  <Text style={styles.deadlineText}>
-                    Due: {item.challenge.submissionDeadline}
-                  </Text>
-                </View>
-              )}
             </View>
           );
         })}
@@ -484,15 +452,6 @@ const styles = StyleSheet.create({
   focusText: { fontSize: 13, fontWeight: '700', color: colors.textPrimary },
   demoRow: { flexDirection: 'row', alignItems: 'center', gap: 8, paddingTop: 4 },
   demoText: { fontSize: 12, fontWeight: '600', color: colors.textMuted },
-
-  videoRequired: {
-    flexDirection: 'row',
-    alignItems: 'center',
-    gap: 8,
-    paddingVertical: 6,
-  },
-  videoRequiredText: { fontSize: 12, fontWeight: '700' },
-  deadlineText: { fontSize: 11, fontWeight: '600', color: colors.textMuted },
 
   lockedBanner: {
     flexDirection: 'row',

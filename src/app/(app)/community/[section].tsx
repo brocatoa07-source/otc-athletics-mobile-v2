@@ -564,7 +564,7 @@ function GenericFeed({ sectionKey, config, canPost, color }: {
   const [composeVisible, setComposeVisible] = useState(false);
   const [composeText, setComposeText] = useState('');
 
-  const { data, isLoading, fetchNextPage, hasNextPage } = useInfiniteQuery({
+  const { data, isLoading, isError, fetchNextPage, hasNextPage } = useInfiniteQuery({
     queryKey: ['community-posts', sectionKey],
     enabled: !!sectionKey,
     initialPageParam: undefined as string | undefined,
@@ -616,11 +616,22 @@ function GenericFeed({ sectionKey, config, canPost, color }: {
   return (
     <>
       {isLoading && <ActivityIndicator color={color} style={{ marginTop: 40 }} />}
-      {!isLoading && posts.length === 0 && (
+      {!isLoading && isError && (
         <EmptyState
-          icon="chatbubbles"
-          title="No posts yet"
-          subtitle={canPost ? 'Be the first to post here.' : undefined}
+          icon={sectionKey === 'announcements' ? 'megaphone' : 'videocam'}
+          title="Coming Soon"
+          subtitle={sectionKey === 'announcements'
+            ? 'Coach updates and important program announcements will appear here.'
+            : 'Recorded live sessions, clinics, and Q&As will appear here.'}
+        />
+      )}
+      {!isLoading && !isError && posts.length === 0 && (
+        <EmptyState
+          icon={sectionKey === 'announcements' ? 'megaphone' : 'videocam'}
+          title="Coming Soon"
+          subtitle={sectionKey === 'announcements'
+            ? 'Coach updates and important program announcements will appear here.'
+            : 'Recorded live sessions, clinics, and Q&As will appear here.'}
           actionLabel={canPost ? 'Write Post' : undefined}
           onAction={canPost ? () => setComposeVisible(true) : undefined}
         />

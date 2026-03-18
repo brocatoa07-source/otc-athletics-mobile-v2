@@ -7,6 +7,7 @@ import { StripeProvider } from '@stripe/stripe-react-native';
 import { queryClient } from '@/lib/query-client';
 import { supabase } from '@/lib/supabase';
 import { useAuthStore } from '@/store/auth.store';
+import { handleUserSwitch, clearUserLocalState } from '@/lib/user-storage';
 
 export default function RootLayout() {
   const hydrate = useAuthStore((s) => s.hydrate);
@@ -19,7 +20,15 @@ export default function RootLayout() {
     // hydrate() restores session from AsyncStorage and sets isHydrated = true
     // when done. We gate the auth listener behind this flag so we never
     // double-fetch the profile during startup.
-    hydrate().then(() => {
+    hydrate().then(async () => {
+      // Check for account switch on startup (session already restored)
+      const currentSession = (await supabase.auth.getSession()).data.session;
+      if (currentSession) {
+        const switched = await handleUserSwitch(currentSession.user.id);
+        if (switched) {
+          queryClient.clear();
+        }
+      }
       hydrated.current = true;
     });
 
@@ -33,10 +42,19 @@ export default function RootLayout() {
       // after initial hydration, update state.
       if (!hydrated.current) return;
 
-      setSession(session);
       if (session) {
+        // Detect account switch and clear stale local state
+        const switched = await handleUserSwitch(session.user.id);
+        if (switched) {
+          queryClient.clear();
+        }
+        setSession(session);
         await fetchProfile(session.user.id);
       } else {
+        // Logout: clear all user-specific local state
+        await clearUserLocalState();
+        queryClient.clear();
+        setSession(null);
         clearAuth();
       }
     });

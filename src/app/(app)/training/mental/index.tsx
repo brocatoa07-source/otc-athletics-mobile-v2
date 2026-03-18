@@ -47,8 +47,7 @@ interface ExploreItem {
 }
 
 const EXPLORE_ITEMS: ExploreItem[] = [
-  { key: 'courses', label: 'Courses', sub: '6 core skills · Shadow → Mastery', icon: 'school-outline', color: '#8b5cf6', route: '/(app)/training/mental/courses-list' },
-  { key: 'skills', label: 'Skill Tracks', sub: '11 mental skills · Core + Advanced', icon: 'fitness-outline', color: '#3b82f6', route: '/(app)/training/mental/skills-list' },
+  { key: 'courses', label: 'Courses', sub: '11 mental skills · Shadow → Mastery', icon: 'school-outline', color: '#8b5cf6', route: '/(app)/training/mental/courses-list' },
   { key: 'toolbox', label: 'Toolbox', sub: '5 categories · 70+ tools', icon: 'build-outline', color: '#f59e0b', route: '/(app)/training/mental/toolbox' },
   { key: 'journals', label: 'Journals', sub: '5 standard + 11 skill journals', icon: 'book-outline', color: '#3b82f6', route: '/(app)/training/mental/journals' },
   { key: 'meditations', label: 'Meditations', sub: '7 guided sessions · 3–8 min', icon: 'leaf-outline', color: '#a855f7', route: '/(app)/training/mental/meditations' },

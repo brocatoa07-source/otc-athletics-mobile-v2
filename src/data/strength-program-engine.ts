@@ -1,11 +1,13 @@
 /**
- * OTC STRENGTH PROGRAM ENGINE v2
+ * OTC STRENGTH PROGRAM ENGINE v3
  *
  * Template-first generation:
  *   1. Look up archetype×month template (18 pre-authored templates)
- *   2. Apply week progression (Intro → Volume → Peak → Deload)
- *   3. Apply position modifiers
- *   4. Apply deficiency overrides
+ *   2. Select days based on daysPerWeek
+ *   3. Apply season phase volume/block modifiers
+ *   4. Apply week progression (Intro → Volume → Peak → Deload)
+ *   5. Apply position modifiers
+ *   6. Apply deficiency overrides
  *
  * Produces meaningfully different programs for different athletes.
  */
@@ -15,12 +17,15 @@ import {
   type OtcsArchetype,
   type OtcsPosition,
   type OtcsDeficiency,
+  type OtcsDaysPerWeek,
+  type OtcsSeasonPhase,
   type OtcsMonthTemplate,
   type OtcsDay,
   type OtcsBlock,
   type OtcsExercise,
   type OtcsWeekType,
   type OtcsBlockKey,
+  type OtcsDayKey,
   type OtcsGeneratedExercise,
   type OtcsGeneratedBlock,
   type OtcsGeneratedDay,
@@ -50,14 +55,156 @@ export type GeneratedWeek = OtcsGeneratedWeek;
 export type GeneratedMonth = OtcsGeneratedMonth;
 export type GeneratedProgram = OtcsGeneratedProgram;
 
-/* ─── Week Progression Sets ──────────────────────── */
+/* ═══════════════════════════════════════════════════
+ * SEASON PHASE → WEEK PROGRESSION SETS
+ *
+ * Each season phase has its own set/rep scheme per
+ * week type. This is the primary volume lever.
+ * ═══════════════════════════════════════════════════ */
 
-const WEEK_SETS: Record<OtcsWeekType, { sets: number; reps: number }> = {
-  intro:  { sets: 3, reps: 6 },
-  volume: { sets: 4, reps: 6 },
-  peak:   { sets: 5, reps: 5 },
-  deload: { sets: 3, reps: 5 },
+const SEASON_WEEK_SETS: Record<OtcsSeasonPhase, Record<OtcsWeekType, { sets: number; reps: number }>> = {
+  OFFSEASON: {
+    intro:  { sets: 3, reps: 6 },
+    volume: { sets: 4, reps: 6 },
+    peak:   { sets: 5, reps: 5 },
+    deload: { sets: 3, reps: 5 },
+  },
+  PRESEASON: {
+    intro:  { sets: 3, reps: 5 },
+    volume: { sets: 3, reps: 6 },
+    peak:   { sets: 4, reps: 5 },
+    deload: { sets: 2, reps: 5 },
+  },
+  IN_SEASON: {
+    intro:  { sets: 2, reps: 6 },
+    volume: { sets: 3, reps: 5 },
+    peak:   { sets: 3, reps: 4 },
+    deload: { sets: 2, reps: 5 },
+  },
 };
+
+/* ═══════════════════════════════════════════════════
+ * SEASON PHASE → BLOCK TRIMMING
+ *
+ * Controls which blocks are dropped or trimmed per
+ * season phase to reduce session density.
+ * ═══════════════════════════════════════════════════ */
+
+interface SeasonBlockConfig {
+  /** Blocks removed entirely from lift days */
+  dropBlocks: OtcsBlockKey[];
+  /** Max exercises kept per block (Infinity = no trim) */
+  maxExercisesPerBlock: number;
+}
+
+const SEASON_BLOCK_CONFIG: Record<OtcsSeasonPhase, SeasonBlockConfig> = {
+  OFFSEASON: {
+    dropBlocks: [],
+    maxExercisesPerBlock: Infinity,
+  },
+  PRESEASON: {
+    dropBlocks: [],
+    maxExercisesPerBlock: 3,
+  },
+  IN_SEASON: {
+    dropBlocks: ['accessory-circuit'],
+    maxExercisesPerBlock: 2,
+  },
+};
+
+/* ═══════════════════════════════════════════════════
+ * DAYS PER WEEK → DAY SELECTION
+ *
+ * Each template has 5 days (3 lift + 2 sprint).
+ * We select a subset based on the athlete's schedule.
+ * ═══════════════════════════════════════════════════ */
+
+/** Day keys selected for each daysPerWeek value. */
+const DAY_SELECTION: Record<OtcsDaysPerWeek, OtcsDayKey[]> = {
+  1: ['full-power'],
+  2: ['lower-accel', 'upper-shoulder'],
+  3: ['lower-accel', 'upper-shoulder', 'full-power'],
+  4: ['lower-accel', 'upper-shoulder', 'full-power', 'sprint-1'],
+  5: ['lower-accel', 'upper-shoulder', 'full-power', 'sprint-1', 'sprint-2'],
+};
+
+/**
+ * For 1-day programs, we merge essential blocks from all lift days
+ * into a single comprehensive session. This ensures the athlete
+ * gets power + strength + rotational + shoulder durability in one workout.
+ */
+function buildSingleDaySession(template: OtcsMonthTemplate): OtcsDay {
+  const fullPower = template.days.find(d => d.key === 'full-power');
+  const lower = template.days.find(d => d.key === 'lower-accel');
+  const upper = template.days.find(d => d.key === 'upper-shoulder');
+  const sprint = template.days.find(d => d.key === 'sprint-1');
+
+  // Start with full-power day as the base
+  const base = fullPower ?? template.days[0];
+
+  // Build a merged block list — take essential blocks
+  const getBlock = (day: OtcsDay | undefined, key: OtcsBlockKey): OtcsBlock | undefined =>
+    day?.blocks.find(b => b.key === key);
+
+  const blocks: OtcsBlock[] = [];
+
+  // Plyometrics from full-power (best overall explosive primer)
+  const plyo = getBlock(base, 'plyometrics');
+  if (plyo) blocks.push({ ...plyo, exercises: plyo.exercises.slice(0, 2) });
+
+  // Loaded power from full-power
+  const loadedPower = getBlock(base, 'loaded-power');
+  if (loadedPower) blocks.push(loadedPower);
+
+  // Main strength: take first exercise from lower + first from upper for balanced stimulus
+  const lowerStrength = getBlock(lower, 'main-strength');
+  const upperStrength = getBlock(upper, 'main-strength');
+  const mergedStrength: OtcsExercise[] = [];
+  if (lowerStrength?.exercises[0]) mergedStrength.push(lowerStrength.exercises[0]);
+  if (upperStrength?.exercises[0]) mergedStrength.push(upperStrength.exercises[0]);
+  if (mergedStrength.length > 0) {
+    blocks.push({ key: 'main-strength', exercises: mergedStrength });
+  }
+
+  // Rotational core from full-power
+  const rotCore = getBlock(base, 'rotational-core');
+  if (rotCore) blocks.push({ ...rotCore, exercises: rotCore.exercises.slice(0, 2) });
+
+  // Shoulder durability from upper
+  const shoulderDur = getBlock(upper, 'shoulder-durability') ?? getBlock(base, 'shoulder-durability');
+  if (shoulderDur) blocks.push({ ...shoulderDur, exercises: shoulderDur.exercises.slice(0, 2) });
+
+  // Sprint warmup drills (minimal speed exposure)
+  const sprintDrills = getBlock(sprint, 'sprint-drills');
+  if (sprintDrills) blocks.push({ ...sprintDrills, exercises: sprintDrills.exercises.slice(0, 2) });
+
+  return {
+    ...base,
+    key: 'full-power',
+    dayNumber: 1,
+    label: 'Full Body + Speed',
+    focus: 'Power + Strength + Rotational + Speed (full body)',
+    blocks,
+  };
+}
+
+function selectDays(template: OtcsMonthTemplate, daysPerWeek: OtcsDaysPerWeek): OtcsDay[] {
+  if (daysPerWeek === 1) {
+    return [buildSingleDaySession(template)];
+  }
+
+  const selectedKeys = DAY_SELECTION[daysPerWeek];
+  const days: OtcsDay[] = [];
+
+  for (const key of selectedKeys) {
+    const day = template.days.find(d => d.key === key);
+    if (day) {
+      days.push({ ...day, dayNumber: days.length + 1 });
+    }
+  }
+
+  return days;
+}
 
 const WEEK_LABELS: Record<OtcsWeekType, string> = {
   intro:  'Intro Week',
@@ -66,31 +213,32 @@ const WEEK_LABELS: Record<OtcsWeekType, string> = {
   deload: 'Deload Week',
 };
 
+/* ─── Set Adjustment ────────────────────────────── */
+
 /**
- * Adjust sets string based on week type for exercises that scale.
+ * Adjust sets string based on week type + season phase.
  *
  * Block-aware progression:
- *   - loaded-power: only scale set count, preserve base reps (e.g. 3×3 → 4×3 → 5×3 → 3×3)
- *   - all other blocks: scale both sets and reps (e.g. 3×6 → 4×6 → 5×5 → 3×5)
+ *   - loaded-power: only scale set count, preserve base reps
+ *   - all other blocks: scale both sets and reps
  */
 function adjustSetsForWeek(
   baseSets: string,
   weekType: OtcsWeekType,
   scales: boolean,
+  seasonPhase: OtcsSeasonPhase,
   blockKey?: OtcsBlockKey,
 ): string {
   if (!scales) return baseSets;
 
-  const { sets, reps } = WEEK_SETS[weekType];
+  const { sets, reps } = SEASON_WEEK_SETS[seasonPhase][weekType];
 
-  // Parse base sets to determine format (e.g. "3×6", "3×4/side", "3×3")
   const match = baseSets.match(/^(\d+)×(\d+)(\/side)?$/);
-  if (!match) return baseSets; // Can't parse — return as-is
+  if (!match) return baseSets;
 
   const baseReps = parseInt(match[2], 10);
   const suffix = match[3] ?? '';
 
-  // Loaded power: preserve base reps, only scale set count
   if (blockKey === 'loaded-power') {
     return `${sets}×${baseReps}${suffix}`;
   }
@@ -110,10 +258,11 @@ function generateExercise(
   exercise: OtcsExercise,
   blockKey: OtcsBlockKey,
   weekType: OtcsWeekType,
+  seasonPhase: OtcsSeasonPhase,
 ): OtcsGeneratedExercise {
   return {
     name: exercise.name,
-    sets: adjustSetsForWeek(exercise.sets, weekType, exercise.scalesWithWeek ?? false, blockKey),
+    sets: adjustSetsForWeek(exercise.sets, weekType, exercise.scalesWithWeek ?? false, seasonPhase, blockKey),
     cue: exercise.cue,
     rest: exercise.rest,
     blockKey,
@@ -126,11 +275,14 @@ function generateExercise(
 function generateBlock(
   block: OtcsBlock,
   weekType: OtcsWeekType,
+  seasonPhase: OtcsSeasonPhase,
+  maxExercises: number,
 ): OtcsGeneratedBlock {
+  const exercises = block.exercises.slice(0, maxExercises);
   return {
     key: block.key,
     label: getBlockLabel(block.key),
-    exercises: block.exercises.map((ex) => generateExercise(ex, block.key, weekType)),
+    exercises: exercises.map((ex) => generateExercise(ex, block.key, weekType, seasonPhase)),
   };
 }
 
@@ -142,42 +294,45 @@ function generateDay(
   monthNumber: number,
   position: OtcsPosition,
   deficiency: OtcsDeficiency,
+  seasonPhase: OtcsSeasonPhase,
 ): OtcsGeneratedDay {
-  const blocks = day.blocks.map((block) => {
-    const genBlock = generateBlock(block, weekType);
+  const blockConfig = SEASON_BLOCK_CONFIG[seasonPhase];
 
-    // Apply modifiers to each exercise
-    for (let i = 0; i < genBlock.exercises.length; i++) {
-      // Deficiency overrides take priority
-      const defOverride = getDeficiencyOverride(monthNumber, day.key, block.key, i, deficiency);
-      if (defOverride) {
-        genBlock.exercises[i] = {
-          ...genBlock.exercises[i],
-          name: defOverride.altName,
-          sets: defOverride.altSets ?? genBlock.exercises[i].sets,
-          isModified: true,
-          modifiedBy: 'deficiency',
-          modNote: defOverride.note,
-        };
-        continue; // Don't also apply position tweak
+  const blocks = day.blocks
+    .filter((block) => !blockConfig.dropBlocks.includes(block.key))
+    .map((block) => {
+      const genBlock = generateBlock(block, weekType, seasonPhase, blockConfig.maxExercisesPerBlock);
+
+      // Apply modifiers to each exercise
+      for (let i = 0; i < genBlock.exercises.length; i++) {
+        const defOverride = getDeficiencyOverride(monthNumber, day.key, block.key, i, deficiency);
+        if (defOverride) {
+          genBlock.exercises[i] = {
+            ...genBlock.exercises[i],
+            name: defOverride.altName,
+            sets: defOverride.altSets ?? genBlock.exercises[i].sets,
+            isModified: true,
+            modifiedBy: 'deficiency',
+            modNote: defOverride.note,
+          };
+          continue;
+        }
+
+        const posTweak = getPositionTweak(monthNumber, day.key, block.key, i, position);
+        if (posTweak) {
+          genBlock.exercises[i] = {
+            ...genBlock.exercises[i],
+            name: posTweak.altName,
+            sets: posTweak.altSets ?? genBlock.exercises[i].sets,
+            isModified: true,
+            modifiedBy: 'position',
+            modNote: posTweak.note,
+          };
+        }
       }
 
-      // Position tweaks
-      const posTweak = getPositionTweak(monthNumber, day.key, block.key, i, position);
-      if (posTweak) {
-        genBlock.exercises[i] = {
-          ...genBlock.exercises[i],
-          name: posTweak.altName,
-          sets: posTweak.altSets ?? genBlock.exercises[i].sets,
-          isModified: true,
-          modifiedBy: 'position',
-          modNote: posTweak.note,
-        };
-      }
-    }
-
-    return genBlock;
-  });
+      return genBlock;
+    });
 
   return {
     key: day.key,
@@ -193,11 +348,13 @@ function generateDay(
 /* ─── Week Generation ────────────────────────────── */
 
 function generateWeek(
-  template: OtcsMonthTemplate,
-  weekIndex: number, // 0-3
+  days: OtcsDay[],
+  weekIndex: number,
   globalWeekNumber: number,
+  monthNumber: number,
   position: OtcsPosition,
   deficiency: OtcsDeficiency,
+  seasonPhase: OtcsSeasonPhase,
 ): OtcsGeneratedWeek {
   const weekType = MONTH_WEEK_ORDER[weekIndex];
 
@@ -206,26 +363,32 @@ function generateWeek(
     globalWeekNumber,
     weekType,
     weekLabel: WEEK_LABELS[weekType],
-    days: template.days.map((day) =>
-      generateDay(day, weekType, template.monthNumber, position, deficiency),
+    days: days.map((day) =>
+      generateDay(day, weekType, monthNumber, position, deficiency, seasonPhase),
     ),
   };
 }
 
-/* ─── Full Program Generation ────────────────────── */
-
-/**
- * Generate the full 6-month OTC-S program from athlete profile.
+/* ═══════════════════════════════════════════════════
+ * FULL PROGRAM GENERATION
  *
- * Each archetype gets distinct pre-authored templates.
- * Position and deficiency modifiers further customize the output.
- * Week progression varies sets/reps across the 4-week cycle.
- */
+ * Combines archetype templates with:
+ *   - daysPerWeek → day selection
+ *   - seasonPhase → volume/block modifiers
+ *   - position → exercise substitutions
+ *   - deficiency → exercise overrides
+ * ═══════════════════════════════════════════════════ */
+
 export function generateProgram(profile: {
   archetype: OtcsArchetype;
   position: OtcsPosition;
   deficiency: OtcsDeficiency;
+  daysPerWeek?: OtcsDaysPerWeek;
+  seasonPhase?: OtcsSeasonPhase;
 }): OtcsGeneratedProgram {
+  const daysPerWeek: OtcsDaysPerWeek = profile.daysPerWeek ?? 3;
+  const seasonPhase: OtcsSeasonPhase = profile.seasonPhase ?? 'OFFSEASON';
+
   const months: OtcsGeneratedMonth[] = [];
   let globalWeek = 0;
 
@@ -233,11 +396,14 @@ export function generateProgram(profile: {
     const template = getTemplate(profile.archetype, m);
     const phaseMeta = OTCS_PHASE_META[template.phase];
 
+    // Select days based on frequency
+    const selectedDays = selectDays(template, daysPerWeek);
+
     const weeks: OtcsGeneratedWeek[] = [];
     for (let w = 0; w < 4; w++) {
       globalWeek++;
       weeks.push(
-        generateWeek(template, w, globalWeek, profile.position, profile.deficiency),
+        generateWeek(selectedDays, w, globalWeek, m, profile.position, profile.deficiency, seasonPhase),
       );
     }
 
@@ -257,10 +423,12 @@ export function generateProgram(profile: {
     archetype: profile.archetype,
     position: profile.position,
     deficiency: profile.deficiency,
+    daysPerWeek,
+    seasonPhase,
     months,
     totalWeeks: 24,
     generatedAt: new Date().toISOString(),
-    version: 2,
+    version: 3,
   };
 }
 
@@ -277,20 +445,72 @@ export interface StrengthProgress {
 }
 
 export async function saveGeneratedProgram(program: OtcsGeneratedProgram): Promise<void> {
+  if (__DEV__) {
+    console.log('[strength-engine] saveGeneratedProgram — daysPerWeek:', program.daysPerWeek,
+      'seasonPhase:', program.seasonPhase, 'months:', program.months.length,
+      'days/month1:', program.months[0]?.weeks[0]?.days.length);
+  }
   await AsyncStorage.setItem(PROGRAM_STORAGE_KEY, JSON.stringify(program));
 }
 
 export async function loadGeneratedProgram(): Promise<OtcsGeneratedProgram | null> {
   try {
     const raw = await AsyncStorage.getItem(PROGRAM_STORAGE_KEY);
-    if (!raw) return null;
+    if (!raw) {
+      if (__DEV__) console.log('[strength-engine] loadGeneratedProgram — no stored program');
+      return null;
+    }
     const parsed = JSON.parse(raw);
-    // v1 programs lack version field — return null to force re-generation
-    if (!parsed.version || parsed.version < 2) return null;
+    // v1/v2 programs lack new fields — return null to force re-generation
+    if (!parsed.version || parsed.version < 3) {
+      if (__DEV__) console.log('[strength-engine] loadGeneratedProgram — stale version:', parsed.version);
+      return null;
+    }
+    // v3 programs generated before daysPerWeek/seasonPhase support lack those fields —
+    // return null to force re-generation with current profile settings
+    if (parsed.daysPerWeek == null || parsed.seasonPhase == null) {
+      if (__DEV__) console.log('[strength-engine] loadGeneratedProgram — missing daysPerWeek/seasonPhase, forcing regen');
+      return null;
+    }
+    if (__DEV__) {
+      console.log('[strength-engine] loadGeneratedProgram — loaded OK, daysPerWeek:',
+        parsed.daysPerWeek, 'seasonPhase:', parsed.seasonPhase);
+    }
     return parsed;
   } catch {
     return null;
   }
+}
+
+/**
+ * Load program and validate it matches the current stored profile.
+ * Returns null if program settings (daysPerWeek, seasonPhase) diverge from
+ * the saved profile, forcing the UI to show "regenerate" state.
+ */
+export async function loadValidatedProgram(): Promise<OtcsGeneratedProgram | null> {
+  const [program, profileRaw] = await Promise.all([
+    loadGeneratedProgram(),
+    AsyncStorage.getItem('otc:strength-profile'),
+  ]);
+  if (!program) return null;
+  if (!profileRaw) return program; // no profile to compare — use program as-is
+
+  try {
+    const p = JSON.parse(profileRaw);
+    const profileDays = p.daysPerWeek ?? 3;
+    const profileSeason = p.seasonPhase ?? 'OFFSEASON';
+
+    if (program.daysPerWeek !== profileDays || program.seasonPhase !== profileSeason) {
+      if (__DEV__) {
+        console.log('[strength-engine] loadValidatedProgram — profile/program MISMATCH, forcing regen.',
+          { programDays: program.daysPerWeek, profileDays, programSeason: program.seasonPhase, profileSeason });
+      }
+      return null;
+    }
+  } catch {
+    // profile parse failed — use program as-is
+  }
+  return program;
 }
 
 export async function loadStrengthProgress(): Promise<StrengthProgress | null> {
@@ -315,6 +535,37 @@ export async function initStrengthProgress(): Promise<StrengthProgress> {
   };
   await saveStrengthProgress(progress);
   return progress;
+}
+
+/**
+ * Regenerate a program from the saved profile.
+ * Loads the stored profile, generates a fresh program, saves it, and resets progress.
+ * Returns the new program, or null if no valid profile exists.
+ */
+export async function regenerateFromProfile(): Promise<OtcsGeneratedProgram | null> {
+  const { loadStrengthProfile } = await import('./strength-profile');
+  const profile = await loadStrengthProfile();
+  if (!profile) {
+    if (__DEV__) console.log('[strength-engine] regenerateFromProfile — no profile found');
+    return null;
+  }
+
+  if (__DEV__) {
+    console.log('[strength-engine] regenerateFromProfile — generating from profile:',
+      { archetype: profile.archetype, position: profile.position, deficiency: profile.deficiency,
+        daysPerWeek: profile.daysPerWeek, seasonPhase: profile.seasonPhase });
+  }
+
+  const program = generateProgram(profile);
+  await saveGeneratedProgram(program);
+  await initStrengthProgress();
+
+  if (__DEV__) {
+    console.log('[strength-engine] regenerateFromProfile — OK, months:', program.months.length,
+      'daysPerWeek:', program.daysPerWeek, 'seasonPhase:', program.seasonPhase);
+  }
+
+  return program;
 }
 
 export function getWorkoutKey(month: number, week: number, day: number): string {

@@ -14,7 +14,7 @@ import {
   type LiftingMoverType,
 } from '@/data/lifting-mover-type-data';
 import { loadStrengthProfile, ARCHETYPE_META, type StrengthProfile } from '@/data/strength-profile';
-import { loadGeneratedProgram, loadStrengthProgress, type GeneratedProgram, type StrengthProgress, getCompletionCount } from '@/data/strength-program-engine';
+import { loadValidatedProgram, loadStrengthProgress, regenerateFromProfile, type GeneratedProgram, type StrengthProgress, getCompletionCount } from '@/data/strength-program-engine';
 
 const ACCENT = '#1DB954';
 
@@ -43,6 +43,7 @@ export default function SCVaultIndex() {
   const [program, setProgram] = useState<GeneratedProgram | null>(null);
   const [progress, setProgress] = useState<StrengthProgress | null>(null);
   const [exploreExpanded, setExploreExpanded] = useState(false);
+  const [regenerating, setRegenerating] = useState(false);
 
   const moverDone = gate.sc.moverDone;
 
@@ -51,12 +52,24 @@ export default function SCVaultIndex() {
       if (val) setMoverType(val as LiftingMoverType);
     });
     loadStrengthProfile().then(setProfile);
-    loadGeneratedProgram().then(setProgram);
+    loadValidatedProgram().then(setProgram);
     loadStrengthProgress().then(setProgress);
   }, []);
 
   const profileComplete = moverDone && !!profile;
   const programReady = profileComplete && !!program;
+  const needsRegeneration = profileComplete && !program;
+
+  async function handleRegenerate() {
+    setRegenerating(true);
+    const newProgram = await regenerateFromProfile();
+    if (newProgram) {
+      setProgram(newProgram);
+      const prog = await loadStrengthProgress();
+      setProgress(prog);
+    }
+    setRegenerating(false);
+  }
 
   // Walk tier — fully locked
   if (isWalk) {
@@ -200,6 +213,29 @@ export default function SCVaultIndex() {
           </TouchableOpacity>
         )}
 
+        {/* Regenerate CTA if profile exists but program is stale/missing */}
+        {needsRegeneration && (
+          <TouchableOpacity
+            style={styles.setupCard}
+            onPress={handleRegenerate}
+            activeOpacity={0.8}
+            disabled={regenerating}
+          >
+            <View style={[styles.setupIcon, { backgroundColor: ACCENT + '18' }]}>
+              <Ionicons name="refresh-outline" size={24} color={ACCENT} />
+            </View>
+            <View style={{ flex: 1 }}>
+              <Text style={styles.setupTitle}>
+                {regenerating ? 'Generating...' : 'Generate Your Program'}
+              </Text>
+              <Text style={styles.setupSub}>
+                Your profile is ready. Tap to generate your personalized 6-month program.
+              </Text>
+            </View>
+            {!regenerating && <Ionicons name="chevron-forward" size={20} color={colors.textMuted} />}
+          </TouchableOpacity>
+        )}
+
         {/* Not assessed yet */}
         {!moverDone && (
           <TouchableOpacity
@@ -242,6 +278,8 @@ export default function SCVaultIndex() {
           onPress={() => {
             if (programReady) {
               router.push('/(app)/training/sc/my-path' as any);
+            } else if (needsRegeneration) {
+              handleRegenerate();
             } else if (moverDone && !profile) {
               router.push('/(app)/training/sc/position-select' as any);
             } else {

@@ -2,6 +2,7 @@ import { useQuery } from '@tanstack/react-query';
 import { useAuthStore } from '@/store/auth.store';
 import { getDevelopmentStatus, aggregateStandardStatus } from '@/services/statusService';
 import { getKeyMetricsSnapshot } from '@/services/metricsService';
+import { getLatestSnapshot } from '@/data/performance-trend';
 import type { DevelopmentStatus, StandardStatus, KeyMetric, MetricReading } from '@/types/progress';
 
 export interface MetricsStatusResult {
@@ -24,6 +25,30 @@ export function useMetricsStatus() {
         getDevelopmentStatus(userId!),
         getKeyMetricsSnapshot(userId!),
       ]);
+
+      // If Supabase returned nothing, fall back to local AsyncStorage snapshots
+      if (Object.keys(keyMetrics).length === 0) {
+        const local = await getLatestSnapshot();
+        if (local) {
+          const localMap: Record<string, KeyMetric> = {
+            exitVelo: 'exit_velocity_mph',
+            tenYard: 'sprint_10yd_seconds',
+            throwingVelo: 'throw_velocity_mph',
+            rotationalPower: 'rot_power_watts',
+            strengthIndex: 'strength_index',
+          };
+          for (const [localKey, metricKey] of Object.entries(localMap)) {
+            const val = (local as any)[localKey];
+            if (val !== null && val !== undefined) {
+              keyMetrics[metricKey] = {
+                value: val,
+                recordedAt: local.createdAt,
+                delta: null,
+              };
+            }
+          }
+        }
+      }
 
       const standardStatus =
         devStatus === 'verified' ? aggregateStandardStatus(keyMetrics) : null;

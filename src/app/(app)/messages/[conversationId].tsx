@@ -1,10 +1,10 @@
-import { useState, useRef, useEffect } from 'react';
+import { useState, useRef, useEffect, useCallback } from 'react';
 import {
   View, Text, FlatList, TextInput, TouchableOpacity, StyleSheet,
   KeyboardAvoidingView, Platform, ActivityIndicator, Image, Linking, Alert,
 } from 'react-native';
 import { SafeAreaView } from 'react-native-safe-area-context';
-import { router, useLocalSearchParams } from 'expo-router';
+import { router, useLocalSearchParams, useFocusEffect } from 'expo-router';
 import { Ionicons } from '@expo/vector-icons';
 import * as ImagePicker from 'expo-image-picker';
 import { Colors } from '@/constants/colors';
@@ -69,11 +69,14 @@ export default function ConversationScreen() {
     setDraft('');
   }, [conversationId]);
 
-  useEffect(() => {
-    if (messages.length > 0) {
-      markRead();
-    }
-  }, [messages.length, conversationId]);
+  // Mark incoming messages as read on mount, focus, and when new messages arrive
+  useFocusEffect(
+    useCallback(() => {
+      if (messages.length > 0) {
+        markRead();
+      }
+    }, [messages, markRead]),
+  );
 
   useEffect(() => {
     if (messages.length > 0) {

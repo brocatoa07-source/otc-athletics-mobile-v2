@@ -97,6 +97,7 @@ export default function VideoReviewScreen() {
           conversation_id: conversationId,
           sender_id: user.id,
           body: reviewText,
+          read_by: [user.id],
         });
       }
 

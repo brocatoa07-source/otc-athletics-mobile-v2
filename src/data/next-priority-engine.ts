@@ -1,5 +1,5 @@
 import type { RequiredTodayEnabled, RequiredTodayItemKey } from '@/hooks/useRequiredTodayConfig';
-import { REQUIRED_TODAY_ORDER, REQUIRED_TODAY_META } from '@/hooks/useRequiredTodayConfig';
+import { REQUIRED_TODAY_ORDER } from '@/hooks/useRequiredTodayConfig';
 
 /* ────────────────────────────────────────────────────
  * NEXT PRIORITY ENGINE
@@ -21,8 +21,6 @@ export type PriorityAction =
   | 'skill_work'
   | 'continue_course'
   | 'journal_entry'
-  | 'habit_tracker'
-  | 'addon_session'
   | 'log_metrics'
   | 'explore_lab';
 
@@ -72,20 +70,6 @@ const ITEM_PRIORITY: Record<RequiredTodayItemKey, Omit<NextPriority, 'action'>> 
     icon: 'journal-outline',
     color: '#A78BFA',
   },
-  habits: {
-    title: 'Habit Tracker',
-    subtitle: 'Log your daily non-negotiables — coming soon',
-    route: '/(app)/training',
-    icon: 'checkmark-done-outline',
-    color: '#06b6d4',
-  },
-  addons: {
-    title: 'Add-On Session',
-    subtitle: 'Add-on content — coming soon',
-    route: '/(app)/training',
-    icon: 'add-circle-outline',
-    color: '#f97316',
-  },
 };
 
 const ITEM_ACTION: Record<RequiredTodayItemKey, PriorityAction> = {
@@ -94,8 +78,6 @@ const ITEM_ACTION: Record<RequiredTodayItemKey, PriorityAction> = {
   skillWork: 'skill_work',
   mental:    'continue_course',
   journal:   'journal_entry',
-  habits:    'habit_tracker',
-  addons:    'addon_session',
 };
 
 const STATIC: Record<string, Omit<NextPriority, 'action'>> = {

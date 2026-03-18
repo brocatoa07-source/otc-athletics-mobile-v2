@@ -16,7 +16,16 @@ import {
   type FlatMentalTool,
 } from '@/lib/recommendation/mentalRecommendationEngine';
 import { SKILL_JOURNAL_CONFIG, type SkillJournalType } from '@/data/skill-journal-prompts';
+import { MENTAL_VAULT_SECTIONS } from '@/data/mental-vault-sections';
 import { useAccountability } from '@/hooks/useAccountability';
+
+/** Map tool name → vault section key for deep-linking */
+const TOOL_TO_SECTION: Record<string, string> = {};
+for (const section of MENTAL_VAULT_SECTIONS) {
+  for (const tool of section.tools) {
+    TOOL_TO_SECTION[tool.name] = section.key;
+  }
+}
 
 const ACCENT = '#8b5cf6';
 const STORAGE_KEY = 'otc:mental-daily-work';
@@ -59,6 +68,7 @@ function generateMentalDailyPlan(
   // 1 primary tool
   const primaryTool = flat.find((f) => f.role === 'primary');
   if (primaryTool) {
+    const sectionKey = TOOL_TO_SECTION[primaryTool.name];
     items.push({
       id: 'mental-primary',
       type: 'tool',
@@ -66,7 +76,9 @@ function generateMentalDailyPlan(
       subtitle: 'Primary mental tool',
       tag: 'Primary',
       tagColor: '#ef4444',
-      route: '/(app)/training/mental/toolbox',
+      route: sectionKey
+        ? `/(app)/training/mental/${sectionKey}`
+        : '/(app)/training/mental/toolbox',
     });
   }
 
@@ -85,13 +97,16 @@ function generateMentalDailyPlan(
       subtitle: prompt ?? 'Reflect on your mental game today.',
       tag: 'Reflection',
       tagColor: '#22c55e',
-      route: '/(app)/training/mental/journals',
+      route: config
+        ? `/(app)/training/mental/journals?type=${journalType}`
+        : '/(app)/training/mental/journals',
     });
   }
 
   // Optional: secondary support tool
   const secondaryTool = flat.find((f) => f.role === 'secondary');
   if (secondaryTool) {
+    const sectionKey = TOOL_TO_SECTION[secondaryTool.name];
     items.push({
       id: 'mental-secondary',
       type: 'tool',
@@ -99,7 +114,9 @@ function generateMentalDailyPlan(
       subtitle: 'Support tool',
       tag: 'Support',
       tagColor: '#3b82f6',
-      route: '/(app)/training/mental/toolbox',
+      route: sectionKey
+        ? `/(app)/training/mental/${sectionKey}`
+        : '/(app)/training/mental/toolbox',
     });
   }
 
@@ -112,13 +129,18 @@ function generateMentalDailyPlan(
 }
 
 export default function MentalDailyWorkScreen() {
-  const { gate } = useGating();
+  const { gate, isLoading: gateLoading } = useGating();
   const { markMentalDoneToday } = useAccountability();
   const [profile, setProfile] = useState<MentalProfileData | null>(null);
   const [diagnostic, setDiagnostic] = useState<MentalDiagnosticResult | null>(null);
   const [plan, setPlan] = useState<MentalDailyPlan | null>(null);
+  const [localLoaded, setLocalLoaded] = useState(false);
 
   const mentalDiagDone = gate.mental.archetypeDone && gate.mental.identityDone && gate.mental.habitsDone;
+
+  if (__DEV__) {
+    console.log('[mental/daily-work] gateLoading:', gateLoading, 'mentalDiagDone:', mentalDiagDone, 'localLoaded:', localLoaded, 'diagnostic:', !!diagnostic);
+  }
 
   // Load profile + diagnostic from storage
   useEffect(() => {
@@ -137,6 +159,7 @@ export default function MentalDailyWorkScreen() {
       if (dVal) {
         try { setDiagnostic(JSON.parse(dVal)); } catch {}
       }
+      setLocalLoaded(true);
     });
   }, []);
 
@@ -173,8 +196,11 @@ export default function MentalDailyWorkScreen() {
     }
   }, [plan, markMentalDoneToday]);
 
-  // ── Empty state ───────────────────────────────────
-  if (!diagnostic) {
+  // ── Wait for both gate and local data before deciding state ──
+  if (gateLoading || !localLoaded) return null;
+
+  // ── Empty state — use gate (Supabase) as source of truth ──
+  if (!mentalDiagDone) {
     return (
       <SafeAreaView style={styles.safe}>
         <View style={styles.header}>
@@ -190,14 +216,46 @@ export default function MentalDailyWorkScreen() {
           <Ionicons name="flash-outline" size={48} color={colors.textMuted} />
           <Text style={styles.emptyTitle}>Complete Your Assessment</Text>
           <Text style={styles.emptyDesc}>
-            Take the Mental Struggles Assessment to unlock your daily mental training plan.
+            Complete the Mental Diagnostics to unlock your daily mental training plan.
           </Text>
           <TouchableOpacity
             style={[styles.ctaBtn, { backgroundColor: ACCENT }]}
-            onPress={() => router.push('/(app)/training/mental/mental-struggles-quiz' as any)}
+            onPress={() => router.push('/(app)/training/mental/diagnostics/entry' as any)}
             activeOpacity={0.8}
           >
-            <Text style={styles.ctaBtnText}>Take Assessment</Text>
+            <Text style={styles.ctaBtnText}>Start Diagnostics</Text>
+            <Ionicons name="arrow-forward" size={16} color="#fff" />
+          </TouchableOpacity>
+        </View>
+      </SafeAreaView>
+    );
+  }
+
+  // Gate passed but legacy struggles data missing — redirect to generate profile
+  if (!diagnostic) {
+    return (
+      <SafeAreaView style={styles.safe}>
+        <View style={styles.header}>
+          <TouchableOpacity onPress={() => router.back()} style={styles.backBtn}>
+            <Ionicons name="chevron-back" size={24} color={colors.textPrimary} />
+          </TouchableOpacity>
+          <View style={{ flex: 1 }}>
+            <Text style={styles.headerSup}>MENTAL</Text>
+            <Text style={styles.headerTitle}>Daily Work</Text>
+          </View>
+        </View>
+        <View style={styles.emptyState}>
+          <Ionicons name="sparkles-outline" size={48} color={ACCENT} />
+          <Text style={styles.emptyTitle}>Generate Your Profile</Text>
+          <Text style={styles.emptyDesc}>
+            Your diagnostics are complete. Generate your mental profile to unlock daily work.
+          </Text>
+          <TouchableOpacity
+            style={[styles.ctaBtn, { backgroundColor: ACCENT }]}
+            onPress={() => router.push('/(app)/training/mental/diagnostics/entry' as any)}
+            activeOpacity={0.8}
+          >
+            <Text style={styles.ctaBtnText}>Generate Profile</Text>
             <Ionicons name="arrow-forward" size={16} color="#fff" />
           </TouchableOpacity>
         </View>

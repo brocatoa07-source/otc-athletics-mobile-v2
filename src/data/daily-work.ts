@@ -5,7 +5,6 @@
  *   2 Hitting drills (from diagnostic results)
  *   1 Strength movement
  *   1 Mental task
- *   1 Community challenge
  *
  * Plans are generated once per day and persisted via AsyncStorage.
  * Rotation uses day-of-epoch for simple, deterministic variety.
@@ -27,7 +26,7 @@ import {
   QUICKFIX_TO_FOCUS,
 } from './quick-fix-data';
 import {
-  loadGeneratedProgram,
+  loadValidatedProgram,
   loadStrengthProgress,
   getNextWorkout,
 } from './strength-program-engine';
@@ -152,14 +151,12 @@ export const WEEKLY_CHALLENGES: WeeklyChallenge[] = [
 
 export interface DailyWorkItem {
   id: string;
-  type: 'hitting' | 'foundation' | 'strength' | 'mental' | 'challenge';
+  type: 'hitting' | 'foundation' | 'strength' | 'mental';
   title: string;
   subtitle?: string;
   /** Quick fix tag label (hitting drills only) */
   tag?: string;
   tagColor?: string;
-  /** Challenge data (challenge type only) */
-  challenge?: WeeklyChallenge;
 }
 
 export interface UnifiedDailyWork {
@@ -194,7 +191,6 @@ export function generateUnifiedDailyWork(
   resolvedStrengthTask?: string | null,
 ): UnifiedDailyWork {
   const dayIndex = Math.floor(Date.now() / 86_400_000);
-  const weekIndex = Math.floor(dayIndex / 7);
   const date = getLocalDateString();
 
   // ── Hitting drills (via recommendation engine) ────
@@ -227,9 +223,6 @@ export function generateUnifiedDailyWork(
 
   // ── Mental (smart selection based on ISS/HSS) ───
   const mentalTask = getSmartMentalTask(dayIndex, mentalScores?.iss, mentalScores?.hss);
-
-  // ── Challenge (rotates weekly) ────────────────────
-  const challenge = WEEKLY_CHALLENGES[weekIndex % WEEKLY_CHALLENGES.length];
 
   // ── Build items list ──────────────────────────────
   const items: DailyWorkItem[] = [];
@@ -278,14 +271,6 @@ export function generateUnifiedDailyWork(
     type: 'mental',
     title: mentalTask,
     subtitle: 'Mental work',
-  });
-
-  items.push({
-    id: 'challenge',
-    type: 'challenge',
-    title: challenge.name,
-    subtitle: challenge.goal,
-    challenge,
   });
 
   // Default all completion to false
@@ -345,7 +330,7 @@ export async function toggleDailyWorkItem(
 export async function getStrengthTaskForToday(): Promise<string> {
   try {
     const [program, progress] = await Promise.all([
-      loadGeneratedProgram(),
+      loadValidatedProgram(),
       loadStrengthProgress(),
     ]);
     if (program && progress) {

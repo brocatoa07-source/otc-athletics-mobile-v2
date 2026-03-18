@@ -11,7 +11,8 @@ import {
 } from '@/data/accountability-engine';
 import { loadTodayCheckIn } from '@/data/own-the-cost-checkin';
 import { useAthleteScProfile } from '@/hooks/useAthleteScProfile';
-import { useRequiredTodayConfig } from '@/hooks/useRequiredTodayConfig';
+import { getStandardsEnabledForTier } from '@/hooks/useRequiredTodayConfig';
+import { useTier } from '@/hooks/useTier';
 
 const CHECKLIST_KEY   = 'otc:accountability';
 const SKILL_WORK_KEY  = 'otc:skill-work-date';
@@ -32,7 +33,8 @@ function todayStr(): string {
  */
 export function useAccountability() {
   const { profile } = useAthleteScProfile();
-  const { enabled } = useRequiredTodayConfig();
+  const { tier, isCoach } = useTier();
+  const enabled = getStandardsEnabledForTier(isCoach ? 'COACH' : tier);
   const [checklist, setChecklist] = useState<WeeklyChecklist | null>(null);
   const [loaded, setLoaded] = useState(false);
   const [skillWorkDate, setSkillWorkDate] = useState<string | null>(null);

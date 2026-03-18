@@ -1,5 +1,5 @@
 import {
-  View, Text, ScrollView, TouchableOpacity, StyleSheet,
+  View, Text, ScrollView, TouchableOpacity, StyleSheet, Alert,
 } from 'react-native';
 import { SafeAreaView } from 'react-native-safe-area-context';
 import { router } from 'expo-router';
@@ -64,10 +64,11 @@ export default function HittingIdentityQuizScreen() {
       const resolvedId = liveUser?.id ?? user?.id;
       if (resolvedId) {
         try {
+          if (__DEV__) console.log('[hitting-identity] submitting diagnostic for user:', resolvedId);
           await submitDiagnostic(supabase, {
             userId: resolvedId,
             vaultType: 'hitting',
-            diagnosticType: 'hitting-identity-v2',
+            diagnosticType: 'mover-type',
             resultPayload: {
               movementType: scored.movementType,
               batPathType: scored.batPathType,
@@ -76,10 +77,17 @@ export default function HittingIdentityQuizScreen() {
               batPathScores: scored.batPathScores,
             },
           });
-        } catch (err) {
-          if (__DEV__) console.warn('[hitting-identity] submitDiagnostic error:', err);
+          if (__DEV__) console.log('[hitting-identity] submitDiagnostic OK');
+        } catch (err: any) {
+          console.error('[hitting-identity] submitDiagnostic FAILED:', err?.message ?? err);
+          Alert.alert(
+            'Save Error',
+            'Your results are saved locally but could not sync to the server. Please check your connection and try again.',
+          );
         }
         queryClient.invalidateQueries({ queryKey: ['gate-state', resolvedId] });
+      } else {
+        console.warn('[hitting-identity] no userId — skipping Supabase submit');
       }
     } else {
       setCurrentQ(currentQ + 1);

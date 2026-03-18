@@ -40,14 +40,6 @@ export const LOCKED_GATE_STATE: GateState = {
   hitting: { moverDone: false, mechanicalDone: false },
 };
 
-/**
- * Diagnostic keys that satisfy the same requirement (e.g. new quiz replaces old).
- * If a requirement is 'mover-type', having 'hitting-identity-v2' also satisfies it.
- */
-const EQUIVALENT_DIAGNOSTICS: Partial<Record<DiagnosticKey, DiagnosticKey[]>> = {
-  'mover-type': ['hitting-identity-v2'],
-};
-
 function isVaultUnlocked(
   vaultType: VaultType,
   submissions: DiagnosticSubmission[],
@@ -55,12 +47,7 @@ function isVaultUnlocked(
   const config = VAULT_CONFIGS[vaultType];
   const vaultSubs = submissions.filter((s) => s.vault_type === vaultType);
   const completedTypes = new Set(vaultSubs.map((s) => s.diagnostic_type));
-  return config.requirements.every((req) => {
-    if (completedTypes.has(req.diagnosticType)) return true;
-    // Check equivalents
-    const alts = EQUIVALENT_DIAGNOSTICS[req.diagnosticType];
-    return alts ? alts.some((alt) => completedTypes.has(alt)) : false;
-  });
+  return config.requirements.every((req) => completedTypes.has(req.diagnosticType));
 }
 
 function isDiagnosticDone(
@@ -99,8 +86,7 @@ export async function getGateState(
     const hittingUnlocked = isVaultUnlocked('hitting', submissions);
     const scUnlocked = isVaultUnlocked('sc', submissions);
 
-    const hittingMoverDone = isDiagnosticDone('hitting', 'mover-type', submissions)
-      || isDiagnosticDone('hitting', 'hitting-identity-v2', submissions);
+    const hittingMoverDone = isDiagnosticDone('hitting', 'mover-type', submissions);
     const hittingMechanicalDone = isDiagnosticDone('hitting', 'mechanical', submissions);
     const scMoverDone = isDiagnosticDone('sc', 'lifting-mover', submissions);
 

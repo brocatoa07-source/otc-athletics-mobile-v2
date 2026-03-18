@@ -37,6 +37,43 @@ export default function CourseScreen() {
     );
   }
 
+  if (course.placeholder) {
+    return (
+      <SafeAreaView style={styles.safe}>
+        <View style={styles.header}>
+          <TouchableOpacity onPress={() => router.back()} style={styles.backBtn}>
+            <Ionicons name="chevron-back" size={24} color={colors.textPrimary} />
+          </TouchableOpacity>
+          <View style={{ flex: 1 }}>
+            <Text style={[styles.headerSup, { color: course.color }]}>
+              SKILL #{course.skillNum}
+            </Text>
+            <Text style={styles.headerTitle}>{course.label}</Text>
+          </View>
+        </View>
+        <View style={styles.placeholderBody}>
+          <View style={[styles.placeholderIcon, { backgroundColor: course.color + '15' }]}>
+            <Ionicons name="hammer-outline" size={40} color={course.color} />
+          </View>
+          <Text style={styles.placeholderTitle}>Coming Soon</Text>
+          <Text style={styles.placeholderText}>
+            This advanced course is currently being developed. Check back soon for full content.
+          </Text>
+          <TouchableOpacity
+            style={[styles.placeholderBtn, { borderColor: course.color + '40' }]}
+            onPress={() => router.back()}
+            activeOpacity={0.7}
+          >
+            <Ionicons name="arrow-back-outline" size={16} color={course.color} />
+            <Text style={[styles.placeholderBtnText, { color: course.color }]}>
+              Back to Courses
+            </Text>
+          </TouchableOpacity>
+        </View>
+      </SafeAreaView>
+    );
+  }
+
   const ACCENT = course.color;
   const week: CourseWeek = phase === 'shadow' ? course.shadow : course.mastery;
   const weekNum = phase === 'shadow' ? course.skillNum * 2 - 1 : course.skillNum * 2;
@@ -278,4 +315,25 @@ const styles = StyleSheet.create({
     borderRadius: radius.lg, padding: 14,
   },
   upgradeBannerText: { flex: 1, fontSize: 13, fontWeight: '700' },
+
+  placeholderBody: {
+    flex: 1, alignItems: 'center', justifyContent: 'center',
+    paddingHorizontal: 32, gap: 12,
+  },
+  placeholderIcon: {
+    width: 80, height: 80, borderRadius: 20,
+    alignItems: 'center', justifyContent: 'center', marginBottom: 4,
+  },
+  placeholderTitle: {
+    fontSize: 22, fontWeight: '900', color: colors.textPrimary,
+  },
+  placeholderText: {
+    fontSize: 14, color: colors.textSecondary, textAlign: 'center', lineHeight: 20,
+  },
+  placeholderBtn: {
+    flexDirection: 'row', alignItems: 'center', gap: 8,
+    borderWidth: 1, borderRadius: radius.md,
+    paddingHorizontal: 16, paddingVertical: 10, marginTop: 8,
+  },
+  placeholderBtnText: { fontSize: 14, fontWeight: '700' },
 });

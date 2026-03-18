@@ -22,12 +22,12 @@ import type { DailyWorkItem } from '@/data/daily-work';
 type ItemType = DailyWorkItem['type'];
 
 const TIER_ALLOWED_TYPES: Record<CanonicalTier | 'COACH', Set<ItemType>> = {
-  WALK:     new Set(['hitting', 'foundation', 'challenge']),
-  SINGLE:   new Set(['hitting', 'foundation', 'challenge']),
-  DOUBLE:   new Set(['hitting', 'foundation', 'challenge', 'mental']),
-  TRIPLE:   new Set(['hitting', 'foundation', 'challenge', 'mental', 'strength']),
-  HOME_RUN: new Set(['hitting', 'foundation', 'challenge', 'mental', 'strength']),
-  COACH:    new Set(['hitting', 'foundation', 'challenge', 'mental', 'strength']),
+  WALK:     new Set(['hitting', 'foundation']),
+  SINGLE:   new Set(['hitting', 'foundation']),
+  DOUBLE:   new Set(['hitting', 'foundation', 'mental']),
+  TRIPLE:   new Set(['hitting', 'foundation', 'mental', 'strength']),
+  HOME_RUN: new Set(['hitting', 'foundation', 'mental', 'strength']),
+  COACH:    new Set(['hitting', 'foundation', 'mental', 'strength']),
 };
 
 /**
@@ -52,7 +52,7 @@ export function getLockedTypes(
 ): ItemType[] {
   if (isCoach) return [];
   const allowed = TIER_ALLOWED_TYPES[tier];
-  const all: ItemType[] = ['hitting', 'foundation', 'strength', 'mental', 'challenge'];
+  const all: ItemType[] = ['hitting', 'foundation', 'strength', 'mental'];
   return all.filter((t) => !allowed.has(t));
 }
 

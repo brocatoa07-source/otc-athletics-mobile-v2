@@ -1,4 +1,4 @@
-import { useEffect, useState, useMemo } from 'react';
+import { useState, useMemo, useCallback } from 'react';
 import {
   View,
   Text,
@@ -11,6 +11,7 @@ import { router } from 'expo-router';
 import { Ionicons } from '@expo/vector-icons';
 import { colors, radius } from '@/theme';
 import { useAuthStore } from '@/store/auth.store';
+import { useFocusEffect } from 'expo-router';
 import { supabase } from '@/lib/supabase';
 import { useTier } from '@/hooks/useTier';
 import { useMyProgram } from '@/hooks/useMyProgram';
@@ -19,8 +20,8 @@ import { useMetricsStatus } from '@/hooks/useMetricsStatus';
 import { loadTodayCheckIn, scoreDayCheckIn, type OwnTheCostCheckInLog } from '@/data/own-the-cost-checkin';
 import { TierBadge } from '@/components/common/TierBadge';
 import { PerformanceTrendCard } from '@/components/dashboard/PerformanceTrendCard';
-import { StandardEngineCard } from '@/components/dashboard/StandardEngineCard';
-import { RequiredTodayPanel } from '@/components/dashboard/RequiredTodayPanel';
+import { DailyStandardsCard } from '@/components/dashboard/DailyStandardsCard';
+import { TodaysMissionHeader } from '@/components/dashboard/TodaysMissionHeader';
 import { loadDailyWork, type UnifiedDailyWork } from '@/data/daily-work';
 import { filterDailyWorkItems } from '@/lib/tier-content';
 import { loadGames } from '@/data/at-bat-accountability';
@@ -31,9 +32,8 @@ import { loadGames } from '@/data/at-bat-accountability';
  * Section order:
  *   1. Header (identity + tier)
  *   2. Athlete Status (from OTC Check-In)
- *   3. Standard Engine (always visible)
- *   4. Required Today (incomplete daily CTAs)
- *   5. Performance Trend
+ *   3. Daily Standards (always visible)
+ *   4. Performance Trend
  * ──────────────────────────────────────────────── */
 
 /* ─── Athlete Status helpers ────────────────────── */
@@ -75,25 +75,26 @@ export default function DashboardScreen() {
   const [showAbCard, setShowAbCard] = useState(false);
   const [todayCheckIn, setTodayCheckIn] = useState<OwnTheCostCheckInLog | null>(null);
 
-  useEffect(() => {
-    loadDailyWork().then((plan) => { if (plan) setDailyWork(plan); });
-    loadTodayCheckIn().then((log) => { setTodayCheckIn(log); });
-    // Show AB card if a game was logged today or yesterday
-    loadGames().then((games) => {
-      if (games.length === 0) return;
-      const now = new Date();
-      const todayStr = `${now.getFullYear()}-${String(now.getMonth() + 1).padStart(2, '0')}-${String(now.getDate()).padStart(2, '0')}`;
-      const yest = new Date(now.getTime() - 86_400_000);
-      const yestStr = `${yest.getFullYear()}-${String(yest.getMonth() + 1).padStart(2, '0')}-${String(yest.getDate()).padStart(2, '0')}`;
-      setShowAbCard(games.some((g) => g.date === todayStr || g.date === yestStr));
-    });
-  }, []);
+  // Reload dashboard state on every focus (return from other screens)
+  useFocusEffect(
+    useCallback(() => {
+      loadDailyWork().then((plan) => { if (plan) setDailyWork(plan); });
+      loadTodayCheckIn().then((log) => { setTodayCheckIn(log); });
+      // Show AB card if a game was logged today or yesterday
+      loadGames().then((games) => {
+        if (games.length === 0) return;
+        const now = new Date();
+        const todayStr = `${now.getFullYear()}-${String(now.getMonth() + 1).padStart(2, '0')}-${String(now.getDate()).padStart(2, '0')}`;
+        const yest = new Date(now.getTime() - 86_400_000);
+        const yestStr = `${yest.getFullYear()}-${String(yest.getMonth() + 1).padStart(2, '0')}-${String(yest.getDate()).padStart(2, '0')}`;
+        setShowAbCard(games.some((g) => g.date === todayStr || g.date === yestStr));
+      });
+    }, []),
+  );
 
   useMyProgram();
-  const { result: accountability, loaded: accountabilityLoaded, otcCheckedInToday } = useAccountability();
+  const { loaded: accountabilityLoaded, otcCheckedInToday } = useAccountability();
   const {
-    developmentStatus,
-    standardStatus,
     keyMetrics,
     daysSinceLastKeyMetric,
   } = useMetricsStatus();
@@ -156,6 +157,9 @@ export default function DashboardScreen() {
             </TouchableOpacity>
           </View>
         </View>
+
+        {/* ── 0. Today's Mission ─────────────────── */}
+        <TodaysMissionHeader tier={tier} isCoach={isCoach} />
 
         {/* ── 1. Athlete Status ──────────────────── */}
         {athleteStatus ? (
@@ -231,12 +235,8 @@ export default function DashboardScreen() {
           </TouchableOpacity>
         ) : null}
 
-        {/* ── 2. Standard Engine (always visible) ── */}
-        <StandardEngineCard
-          accountability={accountability}
-          developmentStatus={developmentStatus}
-          standardStatus={standardStatus}
-        />
+        {/* ── 2. Daily Standards (always visible) ── */}
+        <DailyStandardsCard tier={tier} isCoach={isCoach} />
 
         {/* ── 3. Required Today (incomplete daily CTAs) ── */}
 
@@ -304,7 +304,7 @@ export default function DashboardScreen() {
           );
         })()}
 
-        {/* At-Bat Accountability (conditional on recent game) */}
+        {/* At-Bat Accountability — grouped under Today's Work */}
         {showAbCard && (
           <TouchableOpacity
             style={styles.otcCard}
@@ -313,7 +313,7 @@ export default function DashboardScreen() {
           >
             <View style={[styles.otcAccent, { backgroundColor: '#E10600' }]} />
             <View style={styles.otcBody}>
-              <Text style={[styles.otcLabel, { color: '#E10600' }]}>POST-GAME</Text>
+              <Text style={[styles.otcLabel, { color: '#E10600' }]}>TODAY'S WORK</Text>
               <View style={styles.otcRow}>
                 <View style={[styles.otcIconWrap, { backgroundColor: '#E1060018' }]}>
                   <Ionicons name="baseball-outline" size={22} color="#E10600" />
@@ -327,10 +327,6 @@ export default function DashboardScreen() {
             </View>
           </TouchableOpacity>
         )}
-
-        {/* Required Today checklist */}
-        <Text style={styles.sectionLabel}>REQUIRED TODAY</Text>
-        <RequiredTodayPanel />
 
         {/* ── 4. Performance Trend Card ──────────── */}
         <View style={{ marginTop: 12 }}>
@@ -392,15 +388,6 @@ const styles = StyleSheet.create({
     alignItems: 'center', justifyContent: 'center',
   },
   avatarText: { color: colors.textPrimary, fontWeight: '800', fontSize: 14 },
-
-  sectionLabel: {
-    fontSize: 10,
-    fontWeight: '900',
-    letterSpacing: 1.5,
-    color: colors.textMuted,
-    marginBottom: 8,
-    marginTop: 12,
-  },
 
   /* ── Athlete Status Card ───────────────────── */
   statusCard: {

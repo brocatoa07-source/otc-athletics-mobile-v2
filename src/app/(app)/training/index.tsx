@@ -14,6 +14,30 @@ import { useGating, type GateState } from '@/hooks/useGating';
  * MY PATH cards and additional tiles come later.
  * ──────────────────────────────────────────────── */
 
+const COMING_SOON_TILES = [
+  {
+    icon: 'add-circle-outline' as const,
+    title: 'Add-Ons',
+    subtitle: 'Coming soon',
+    accent: 'hitting' as const,
+    route: '/(app)/training/placeholder?section=add-ons',
+  },
+  {
+    icon: 'school-outline' as const,
+    title: 'College Recruiting',
+    subtitle: 'Coming soon',
+    accent: 'mental' as const,
+    route: '/(app)/training/placeholder?section=recruiting',
+  },
+  {
+    icon: 'clipboard-outline' as const,
+    title: 'Programs',
+    subtitle: 'Coming soon',
+    accent: 'lifting' as const,
+    route: '/(app)/training/placeholder?section=programs',
+  },
+];
+
 const VAULT_TILES = [
   {
     icon: 'baseball-outline' as const,
@@ -25,14 +49,14 @@ const VAULT_TILES = [
   {
     icon: 'sparkles-outline' as const,
     title: 'Mental Vault',
-    subtitle: '11 skills. Mental edge.',
+    subtitle: '11 mental skills\nComplete mental performance system',
     accent: 'mental' as const,
     route: '/(app)/training/mental',
   },
   {
     icon: 'barbell-outline' as const,
     title: 'Lifting Vault',
-    subtitle: '149 exercises. Full system.',
+    subtitle: 'Full training library',
     accent: 'lifting' as const,
     route: '/(app)/training/sc',
   },
@@ -107,6 +131,26 @@ export default function TrainingHub() {
               />
             );
           })}
+        </IconGrid>
+
+        {/* ─── Coming Soon Sections ──────────────── */}
+        <View style={styles.hubHeader}>
+          <Text style={styles.hubLabel}>More</Text>
+          <Text style={styles.hubSub}>New features in development</Text>
+        </View>
+
+        <IconGrid>
+          {COMING_SOON_TILES.map((tile) => (
+            <IconTile
+              key={tile.title}
+              icon={tile.icon}
+              title={tile.title}
+              subtitle={tile.subtitle}
+              accent={tile.accent}
+              onPress={() => router.push(tile.route as any)}
+              badge="SOON"
+            />
+          ))}
         </IconGrid>
       </ScrollView>
     </SafeAreaView>

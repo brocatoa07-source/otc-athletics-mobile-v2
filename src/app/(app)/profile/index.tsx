@@ -11,6 +11,7 @@ import { router } from 'expo-router';
 import { Ionicons } from '@expo/vector-icons';
 import { supabase } from '@/lib/supabase';
 import { useAuthStore } from '@/store/auth.store';
+import { clearUserLocalState } from '@/lib/user-storage';
 import { useTier } from '@/hooks/useTier';
 import { Colors } from '@/constants/colors';
 import { TierBadge } from '@/components/common/TierBadge';
@@ -44,6 +45,7 @@ export default function ProfileScreen() {
         text: 'Sign Out',
         style: 'destructive',
         onPress: async () => {
+          await clearUserLocalState();
           await supabase.auth.signOut();
           clearAuth();
           router.replace('/(auth)/login');

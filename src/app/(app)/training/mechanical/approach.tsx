@@ -59,7 +59,7 @@ export default function ApproachScreen() {
           <Ionicons name="bulb" size={28} color="#f59e0b" />
           <Text style={styles.heroTitle}>The Goal of Hitting</Text>
           <Text style={styles.heroText}>
-            Consistent hard contact with backspin that can be driven to all fields.
+            The goal of hitting is to swing at your pitches and hit them hard.
           </Text>
         </View>
 

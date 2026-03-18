@@ -1,4 +1,4 @@
-import { Redirect, Tabs } from 'expo-router';
+import { Redirect, Tabs, router } from 'expo-router';
 import { View, ActivityIndicator } from 'react-native';
 import { Ionicons } from '@expo/vector-icons';
 import { useAuthStore } from '@/store/auth.store';
@@ -52,6 +52,19 @@ export default function AppLayout() {
         tabBarInactiveTintColor: colors.textMuted,
         tabBarLabelStyle: { fontSize: 10, fontWeight: '700', letterSpacing: 0.4 },
       }}
+      screenListeners={({ route, navigation }) => ({
+        tabPress: (e) => {
+          // When the user taps the already-active tab, reset its Stack to
+          // the root index screen. Without this, cross-tab pushes (e.g.
+          // Dashboard → /(app)/training/mental) leave the Stack with only
+          // the deep route, and popToTop does nothing because there's no
+          // root screen underneath.
+          if (navigation.isFocused()) {
+            e.preventDefault();
+            router.navigate(`/(app)/${route.name}` as any);
+          }
+        },
+      })}
     >
       {/*
        * Coach tab declared FIRST. Expo Router v6 uses the first

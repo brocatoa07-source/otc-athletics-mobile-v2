@@ -29,7 +29,7 @@ export default function PositionSelectScreen() {
           <Text style={styles.headerSup}>STRENGTH SETUP</Text>
           <Text style={styles.headerTitle}>Select Your Position</Text>
         </View>
-        <Text style={styles.stepBadge}>Step 1 of 2</Text>
+        <Text style={styles.stepBadge}>Step 1 of 3</Text>
       </View>
 
       <ScrollView contentContainerStyle={styles.content} showsVerticalScrollIndicator={false}>

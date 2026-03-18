@@ -15,6 +15,10 @@ import {
   type OtcsBlockKey,
   type OtcsDayKey,
 } from '@/data/otcs-types';
+import {
+  CONDITIONING_CATALOG,
+  CONDITIONING_CATEGORIES,
+} from '@/data/conditioning-catalog';
 
 /* ─── Category → Block Key Mapping (SCOPED) ─────── */
 
@@ -65,11 +69,7 @@ const SUBCATEGORIES: Record<string, SubcategoryDef[]> = {
   ],
   conditioning: [
     { key: 'all', label: 'All' },
-    { key: 'sprint', label: 'Sprint Conditioning' },
-    { key: 'tempo', label: 'Tempo Runs' },
-    { key: 'cod', label: 'Change of Direction' },
-    { key: 'aerobic', label: 'Aerobic Base' },
-    { key: 'recovery', label: 'Recovery Conditioning' },
+    ...CONDITIONING_CATEGORIES.map((c) => ({ key: c.key, label: c.label })),
   ],
 };
 
@@ -87,12 +87,6 @@ const KW: Record<string, Record<string, RegExp>> = {
     acceleration: /sled|resisted|sprint|acceleration|push\s*start/i,
     lateral: /lateral|shuffle|crossover|side.*bound|skater/i,
   },
-  conditioning: {
-    tempo: /tempo|jog|easy\s*run|aerobic\s*run/i,
-    cod: /shuttle|agility|lateral\s*run|cut|change.*dir|pro\s*agility|5-10-5/i,
-    aerobic: /aerobic|base|steady\s*state/i,
-    recovery: /recovery|cool.*down|walk|light/i,
-  },
 };
 
 /* ─── Types ──────────────────────────────────────── */
@@ -107,6 +101,11 @@ interface UniqueExercise {
   blockLabel: string;
   dayKey: OtcsDayKey;
   subcategory: string;
+  /* Conditioning-only metadata */
+  distance?: string;
+  restInterval?: string;
+  energySystem?: string;
+  goal?: string;
 }
 
 /* ─── Subcategory assignment ─────────────────────── */
@@ -145,11 +144,8 @@ function assignSubcategory(
     return 'plyometrics';
   }
 
-  if (category === 'conditioning') {
-    for (const [k, re] of Object.entries(KW.conditioning)) { if (re.test(name)) return k; }
-    if (blockKey === 'sprint-drills') return 'sprint';
-    return 'sprint';
-  }
+  // conditioning uses static catalog — this path shouldn't be reached
+  if (category === 'conditioning') return 'sprint';
 
   return 'all';
 }
@@ -208,7 +204,24 @@ export default function ExercisesScreen() {
   const [search, setSearch] = useState('');
   const [activeSubcat, setActiveSubcat] = useState('all');
 
-  const allExercises = useMemo(() => extractExercises(filterBlocks, category), [category]);
+  const allExercises = useMemo(() => {
+    if (category === 'conditioning') {
+      return CONDITIONING_CATALOG.map((ex): UniqueExercise => ({
+        name: ex.name,
+        cue: ex.cue,
+        sets: ex.sets,
+        blockKey: 'sprint-work' as OtcsBlockKey,
+        blockLabel: CONDITIONING_CATEGORIES.find((c) => c.key === ex.mainCategory)?.label ?? ex.mainCategory,
+        dayKey: 'sprint-1' as OtcsDayKey,
+        subcategory: ex.mainCategory,
+        distance: ex.distance,
+        restInterval: ex.restInterval,
+        energySystem: ex.energySystem,
+        goal: ex.goal,
+      }));
+    }
+    return extractExercises(filterBlocks, category);
+  }, [category]);
 
   const filtered = useMemo(() => {
     let items = allExercises;
@@ -330,6 +343,25 @@ export default function ExercisesScreen() {
                   <Text style={styles.exerciseName}>{ex.name}</Text>
                   <Text style={styles.exerciseSets}>{ex.sets}</Text>
                   <Text style={styles.exerciseCue}>{ex.cue}</Text>
+                  {(ex.distance || ex.restInterval || ex.goal) && (
+                    <View style={styles.metaRow}>
+                      {ex.distance && (
+                        <View style={styles.metaTag}>
+                          <Ionicons name="resize-outline" size={11} color={colors.textMuted} />
+                          <Text style={styles.metaText}>{ex.distance}</Text>
+                        </View>
+                      )}
+                      {ex.restInterval && (
+                        <View style={styles.metaTag}>
+                          <Ionicons name="time-outline" size={11} color={colors.textMuted} />
+                          <Text style={styles.metaText}>{ex.restInterval}</Text>
+                        </View>
+                      )}
+                      {ex.goal && (
+                        <Text style={styles.goalText}>{ex.goal}</Text>
+                      )}
+                    </View>
+                  )}
                 </View>
               ))}
             </View>
@@ -403,4 +435,13 @@ const styles = StyleSheet.create({
   exerciseName: { fontSize: 15, fontWeight: '800', color: colors.textPrimary },
   exerciseSets: { fontSize: 13, fontWeight: '700', color: colors.textSecondary },
   exerciseCue: { fontSize: 12, color: colors.textMuted, lineHeight: 17, marginTop: 2 },
+
+  metaRow: { flexDirection: 'row', flexWrap: 'wrap', gap: 8, marginTop: 6 },
+  metaTag: {
+    flexDirection: 'row', alignItems: 'center', gap: 4,
+    backgroundColor: colors.bg, paddingHorizontal: 8, paddingVertical: 3,
+    borderRadius: 6,
+  },
+  metaText: { fontSize: 11, color: colors.textMuted, fontWeight: '600' },
+  goalText: { fontSize: 11, color: colors.textSecondary, fontStyle: 'italic', fontWeight: '600' },
 });

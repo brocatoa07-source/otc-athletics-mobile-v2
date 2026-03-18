@@ -194,14 +194,19 @@ export interface OtcsGeneratedMonth {
   weeks: OtcsGeneratedWeek[];
 }
 
+export type OtcsDaysPerWeek = 1 | 2 | 3 | 4 | 5;
+export type OtcsSeasonPhase = 'IN_SEASON' | 'PRESEASON' | 'OFFSEASON';
+
 export interface OtcsGeneratedProgram {
   archetype: OtcsArchetype;
   position: OtcsPosition;
   deficiency: OtcsDeficiency;
+  daysPerWeek: OtcsDaysPerWeek;
+  seasonPhase: OtcsSeasonPhase;
   months: OtcsGeneratedMonth[];
   totalWeeks: number;
   generatedAt: string;
-  version: 2;
+  version: 3;
 }
 
 /* ─── Block Metadata (for UI) ────────────────────── */

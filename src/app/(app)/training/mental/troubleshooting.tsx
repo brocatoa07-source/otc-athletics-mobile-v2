@@ -8,6 +8,7 @@ import { Ionicons } from '@expo/vector-icons';
 import AsyncStorage from '@react-native-async-storage/async-storage';
 import { colors, radius } from '@/theme';
 import { useTier } from '@/hooks/useTier';
+import { useGating } from '@/hooks/useGating';
 import { getUpgradeTargetLabel, WALK_TROUBLESHOOTING_DRILL_LIMIT } from '@/lib/tier-content';
 import { MENTAL_PROFILES, type MentalProfileData } from '@/data/mental-profile-data';
 import { type MentalDiagnosticResult } from '@/data/mental-struggles-data';
@@ -47,8 +48,12 @@ function getTroubleshootingTools(
 
 export default function MentalTroubleshootingScreen() {
   const { tier, hasLimitedMental } = useTier();
+  const { gate, isLoading: gateLoading } = useGating();
   const [profile, setProfile] = useState<MentalProfileData | null>(null);
   const [diagnostic, setDiagnostic] = useState<MentalDiagnosticResult | null>(null);
+  const [localLoaded, setLocalLoaded] = useState(false);
+
+  const mentalDiagDone = gate.mental.archetypeDone && gate.mental.identityDone && gate.mental.habitsDone;
 
   useEffect(() => {
     Promise.all([
@@ -66,11 +71,15 @@ export default function MentalTroubleshootingScreen() {
       if (dVal) {
         try { setDiagnostic(JSON.parse(dVal)); } catch {}
       }
+      setLocalLoaded(true);
     });
   }, []);
 
+  // ── Wait for gate + local data before deciding state ──
+  if (gateLoading || !localLoaded) return null;
+
   // ── Empty state ───────────────────────────────────
-  if (!diagnostic) {
+  if (!mentalDiagDone && !diagnostic) {
     return (
       <SafeAreaView style={styles.safe}>
         <View style={styles.header}>
@@ -100,6 +109,9 @@ export default function MentalTroubleshootingScreen() {
       </SafeAreaView>
     );
   }
+
+  // Gate passed but legacy struggles data missing — nothing to render
+  if (!diagnostic) return null;
 
   const { primary: primaryIssues, secondary: secondaryIssues } =
     getMentalTroubleshootingIssuesForDiagnostic(diagnostic.primary, diagnostic.secondary);

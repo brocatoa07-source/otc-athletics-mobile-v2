@@ -24,9 +24,35 @@ import {
   scoreIdentity,
   scoreHabits,
   buildMentalProfilePayload,
+  type ArchetypeResult,
 } from '@/utils/mentalDiagnosticScoring';
+import type { MentalStruggle } from '@/data/mental-struggles-data';
 
 const ACCENT = accents.mental;
+
+/**
+ * Bridge: map new archetype results to legacy MentalDiagnosticResult
+ * so daily-work.tsx (which reads 'otc:mental-struggles') still works.
+ */
+const ARCHETYPE_TO_STRUGGLE: Record<string, MentalStruggle> = {
+  reactor:     'emotional_frustration',
+  overthinker: 'overthinking',
+  avoider:     'fear_of_failure',
+  performer:   'pregame_nerves',
+  doubter:     'confidence_drop',
+  driver:      'burnout',
+};
+
+function deriveLegacyStruggles(archetype: ArchetypeResult): {
+  primary: MentalStruggle;
+  secondary: MentalStruggle;
+} {
+  const primary = ARCHETYPE_TO_STRUGGLE[archetype.primary] ?? 'overthinking';
+  const secondary = archetype.secondary
+    ? (ARCHETYPE_TO_STRUGGLE[archetype.secondary] ?? 'focus_loss')
+    : 'focus_loss';
+  return { primary, secondary };
+}
 
 // ── Step card ─────────────────────────────────────────────────────────────────
 
@@ -202,9 +228,9 @@ export default function DiagnosticsEntryScreen() {
                 }
 
                 // Re-score from stored answers (or use stored scored results)
-                const archetypePayload = byType.archetype;
-                const identityPayload = byType.identity;
-                const habitsPayload = byType.habits;
+                const archetypePayload = byType['archetype'];
+                const identityPayload = byType['identity'];
+                const habitsPayload = byType['habits'];
 
                 if (!archetypePayload || !identityPayload || !habitsPayload) {
                   throw new Error('Missing diagnostic data. Please retake diagnostics.');
@@ -249,6 +275,10 @@ export default function DiagnosticsEntryScreen() {
                     hss: profilePayload.hss ?? null,
                   }));
                 }
+
+                // Bridge: write legacy struggles data so daily-work.tsx can generate plans
+                const legacyStruggles = deriveLegacyStruggles(archetypeResult);
+                await AsyncStorage.setItem('otc:mental-struggles', JSON.stringify(legacyStruggles));
 
                 // Invalidate profile query so MentalProfileCard picks up new data
                 queryClient.invalidateQueries({ queryKey: ['mental-profile', liveUser.id] });

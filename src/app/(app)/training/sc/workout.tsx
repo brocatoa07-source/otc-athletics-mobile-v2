@@ -6,10 +6,11 @@ import { SafeAreaView } from 'react-native-safe-area-context';
 import { router, useLocalSearchParams } from 'expo-router';
 import { useFocusEffect } from '@react-navigation/native';
 import { Ionicons } from '@expo/vector-icons';
+import AsyncStorage from '@react-native-async-storage/async-storage';
 import { colors, radius } from '@/theme';
 import { useTier } from '@/hooks/useTier';
 import {
-  loadGeneratedProgram,
+  loadValidatedProgram,
   loadStrengthProgress,
   saveStrengthProgress,
   getNextWorkout,
@@ -50,7 +51,7 @@ export default function WorkoutScreen() {
     useCallback(() => {
       let cancelled = false;
       (async () => {
-        const [prog, prog2] = await Promise.all([loadGeneratedProgram(), loadStrengthProgress()]);
+        const [prog, prog2] = await Promise.all([loadValidatedProgram(), loadStrengthProgress()]);
         if (cancelled || !prog || !prog2) return;
         setProgram(prog);
         setProgress(prog2);
@@ -118,6 +119,17 @@ export default function WorkoutScreen() {
     }
 
     await saveStrengthProgress(updated);
+
+    // Mark today's session complete for Daily Standards tracking
+    const now = new Date().toISOString();
+    const today = now.slice(0, 10);
+    try {
+      const raw = await AsyncStorage.getItem('otc:workout-completions');
+      const map = raw ? JSON.parse(raw) : {};
+      map[today] = now;
+      await AsyncStorage.setItem('otc:workout-completions', JSON.stringify(map));
+    } catch {}
+
     setProgress(updated);
     setWorkoutComplete(true);
   }
@@ -131,13 +143,22 @@ export default function WorkoutScreen() {
           </TouchableOpacity>
           <View style={{ flex: 1 }}>
             <Text style={styles.headerSup}>WORKOUT</Text>
-            <Text style={styles.headerTitle}>Loading...</Text>
+            <Text style={styles.headerTitle}>No Workout</Text>
           </View>
         </View>
         <View style={styles.center}>
           <Ionicons name="barbell-outline" size={48} color={colors.textMuted} />
           <Text style={styles.emptyTitle}>No Workout Available</Text>
-          <Text style={styles.emptySub}>Complete your strength profile to generate workouts.</Text>
+          <Text style={styles.emptySub}>
+            Your program may need to be generated or updated. Head to My Path to get started.
+          </Text>
+          <TouchableOpacity
+            style={[styles.emptyBtn]}
+            onPress={() => router.replace('/(app)/training/sc/my-path' as any)}
+          >
+            <Text style={styles.emptyBtnText}>Go to My Path</Text>
+            <Ionicons name="arrow-forward" size={16} color="#fff" />
+          </TouchableOpacity>
         </View>
       </SafeAreaView>
     );
@@ -296,6 +317,11 @@ const styles = StyleSheet.create({
   center: { flex: 1, alignItems: 'center', justifyContent: 'center', gap: 14, paddingHorizontal: 32 },
   emptyTitle: { fontSize: 17, fontWeight: '800', color: colors.textPrimary, textAlign: 'center' },
   emptySub: { fontSize: 13, color: colors.textSecondary, lineHeight: 20, textAlign: 'center' },
+  emptyBtn: {
+    flexDirection: 'row' as const, alignItems: 'center' as const, justifyContent: 'center' as const,
+    gap: 8, backgroundColor: '#1DB954', paddingVertical: 14, paddingHorizontal: 24, borderRadius: radius.md, marginTop: 4,
+  },
+  emptyBtnText: { fontSize: 15, fontWeight: '800' as const, color: '#fff' },
 
   header: {
     flexDirection: 'row', alignItems: 'center', gap: 10,

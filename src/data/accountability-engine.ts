@@ -1,8 +1,8 @@
 /* ────────────────────────────────────────────────────
  * ACCOUNTABILITY SCORE ENGINE
  *
- * Config-aware: score is computed only from the items
- * the athlete has enabled in their Required Today config.
+ * Tier-aware: score is computed only from the items
+ * required at the athlete's current tier.
  * Weights are normalized across enabled items.
  *
  * Score is 0-100. Resets every Monday.
@@ -35,15 +35,13 @@ export interface AccountabilityResult {
   weekStart: string;            // ISO date of Monday
 }
 
-/** Base weights per Required Today item — normalized at runtime by which are enabled. */
+/** Base weights per standard item — normalized at runtime by which are enabled for the tier. */
 const BASE_WEIGHTS: Record<keyof RequiredTodayEnabled, number> = {
-  training:  0.35,
+  training:  0.30,
   readiness: 0.20,
-  skillWork: 0.15,
-  mental:    0.15,
+  skillWork: 0.20,
+  mental:    0.20,
   journal:   0.10,
-  habits:    0.15,
-  addons:    0.10,
 };
 
 function pct(done: number, target: number): number {
@@ -55,10 +53,9 @@ export function computeAccountabilityScore(
   checklist: WeeklyChecklist,
   enabled?: RequiredTodayEnabled,
 ): number {
-  // Default: core items enabled (backwards compatible)
+  // Default: all items enabled (backwards compatible)
   const cfg: RequiredTodayEnabled = enabled ?? {
-    training: true, readiness: true, skillWork: true, mental: true,
-    journal: true, habits: false, addons: false,
+    training: true, readiness: true, skillWork: true, mental: true, journal: true,
   };
 
   const completions: Record<keyof RequiredTodayEnabled, number> = {
@@ -67,8 +64,6 @@ export function computeAccountabilityScore(
     skillWork: pct(checklist.skillWorkDaysCount ?? 0, Math.max(1, checklist.workoutsTarget)),
     mental:    pct(checklist.courseSessionsDone, checklist.courseSessionsTarget),
     journal:   pct(checklist.journalEntries, checklist.journalTarget),
-    habits:    pct(checklist.habitsDaysCount ?? 0, Math.max(1, checklist.habitsTarget ?? checklist.workoutsTarget)),
-    addons:    pct(checklist.addonDaysCount ?? 0, Math.max(1, checklist.addonTarget ?? 1)),
   };
 
   let weightedSum = 0;

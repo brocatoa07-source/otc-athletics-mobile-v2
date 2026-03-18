@@ -7,10 +7,19 @@ import { router } from 'expo-router';
 import { Ionicons } from '@expo/vector-icons';
 import { colors, radius } from '@/theme';
 import { useTier } from '@/hooks/useTier';
-import { loadStrengthProfile, ARCHETYPE_META, POSITION_META, DEFICIENCY_META, type StrengthProfile } from '@/data/strength-profile';
 import {
-  loadGeneratedProgram,
+  loadStrengthProfile,
+  ARCHETYPE_META,
+  POSITION_META,
+  DEFICIENCY_META,
+  SEASON_PHASE_META,
+  STRENGTH_PROFILE_DEFAULTS,
+  type StrengthProfile,
+} from '@/data/strength-profile';
+import {
+  loadValidatedProgram,
   loadStrengthProgress,
+  regenerateFromProfile,
   getCompletionCount,
   getWorkoutKey,
   type OtcsGeneratedProgram,
@@ -25,6 +34,7 @@ export default function SCMyPathScreen() {
   const [profile, setProfile] = useState<StrengthProfile | null>(null);
   const [program, setProgram] = useState<OtcsGeneratedProgram | null>(null);
   const [progress, setProgress] = useState<StrengthProgress | null>(null);
+  const [regenerating, setRegenerating] = useState(false);
 
   // Single/Walk tier guard — redirect to SC home (diagnostic-only gate)
   useEffect(() => {
@@ -35,11 +45,23 @@ export default function SCMyPathScreen() {
 
   useEffect(() => {
     loadStrengthProfile().then(setProfile);
-    loadGeneratedProgram().then(setProgram);
+    loadValidatedProgram().then(setProgram);
     loadStrengthProgress().then(setProgress);
   }, []);
 
-  if (!profile || !program || !progress) {
+  async function handleRegenerate() {
+    setRegenerating(true);
+    const newProgram = await regenerateFromProfile();
+    if (newProgram) {
+      setProgram(newProgram);
+      const prog = await loadStrengthProgress();
+      setProgress(prog);
+    }
+    setRegenerating(false);
+  }
+
+  // No profile at all — send to setup
+  if (!profile) {
     return (
       <SafeAreaView style={styles.safe}>
         <View style={styles.header}>
@@ -69,9 +91,46 @@ export default function SCMyPathScreen() {
     );
   }
 
+  // Profile exists but program is stale/missing — offer regeneration
+  if (!program || !progress) {
+    return (
+      <SafeAreaView style={styles.safe}>
+        <View style={styles.header}>
+          <TouchableOpacity onPress={() => router.back()} style={styles.backBtn}>
+            <Ionicons name="chevron-back" size={24} color={colors.textPrimary} />
+          </TouchableOpacity>
+          <View style={{ flex: 1 }}>
+            <Text style={styles.headerSup}>MY PATH</Text>
+            <Text style={styles.headerTitle}>Strength Program</Text>
+          </View>
+        </View>
+        <View style={styles.center}>
+          <Ionicons name="refresh-outline" size={48} color={ACCENT} />
+          <Text style={styles.emptyTitle}>Program Needs Update</Text>
+          <Text style={styles.emptySub}>
+            Your profile settings have changed. Generate a fresh program to match your current schedule.
+          </Text>
+          <TouchableOpacity
+            style={[styles.ctaBtn, regenerating && { opacity: 0.5 }]}
+            onPress={handleRegenerate}
+            disabled={regenerating}
+          >
+            <Text style={styles.ctaBtnText}>
+              {regenerating ? 'Generating...' : 'Generate Program'}
+            </Text>
+            {!regenerating && <Ionicons name="arrow-forward" size={16} color={colors.bg} />}
+          </TouchableOpacity>
+        </View>
+      </SafeAreaView>
+    );
+  }
+
   const archMeta = ARCHETYPE_META[profile.archetype];
   const posMeta = POSITION_META[profile.position];
   const defMeta = DEFICIENCY_META[profile.deficiency];
+  const daysPerWeek = profile.daysPerWeek ?? STRENGTH_PROFILE_DEFAULTS.daysPerWeek;
+  const seasonPhase = profile.seasonPhase ?? STRENGTH_PROFILE_DEFAULTS.seasonPhase;
+  const seasonMeta = SEASON_PHASE_META[seasonPhase];
   const completedTotal = getCompletionCount(progress);
   const totalWorkouts = program.months.reduce(
     (sum: number, m) => sum + m.weeks.reduce((ws: number, w) => ws + w.days.length, 0),
@@ -112,6 +171,18 @@ export default function SCMyPathScreen() {
               <Text style={styles.metaText}>{defMeta.label} Focus</Text>
             </View>
           </View>
+          <View style={styles.divider} />
+          <View style={styles.metaRow}>
+            <View style={styles.metaItem}>
+              <Ionicons name="calendar-outline" size={14} color={colors.textSecondary} />
+              <Text style={styles.metaText}>{daysPerWeek} day{daysPerWeek !== 1 ? 's' : ''}/week</Text>
+            </View>
+            <View style={styles.metaItem}>
+              <Ionicons name={seasonMeta.icon as any} size={14} color={seasonMeta.color} />
+              <Text style={[styles.metaText, { color: seasonMeta.color }]}>{seasonMeta.label}</Text>
+            </View>
+          </View>
+          <Text style={styles.seasonNote}>{seasonMeta.description}</Text>
         </View>
 
         {/* ── Progress ────────────────────────── */}
@@ -264,6 +335,7 @@ const styles = StyleSheet.create({
   metaRow: { flexDirection: 'row', gap: 20 },
   metaItem: { flexDirection: 'row', alignItems: 'center', gap: 6 },
   metaText: { fontSize: 13, fontWeight: '700', color: colors.textSecondary },
+  seasonNote: { fontSize: 12, color: colors.textMuted, lineHeight: 17 },
 
   /* Progress */
   progressRow: { flexDirection: 'row', justifyContent: 'space-around' },

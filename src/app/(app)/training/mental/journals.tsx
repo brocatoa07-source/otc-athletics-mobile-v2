@@ -1,10 +1,10 @@
-import { useState } from 'react';
+import { useState, useEffect } from 'react';
 import {
   View, Text, ScrollView, TouchableOpacity, TextInput,
   StyleSheet, KeyboardAvoidingView, Platform,
 } from 'react-native';
 import { SafeAreaView } from 'react-native-safe-area-context';
-import { router } from 'expo-router';
+import { router, useLocalSearchParams } from 'expo-router';
 import { Ionicons } from '@expo/vector-icons';
 import AsyncStorage from '@react-native-async-storage/async-storage';
 import { colors, radius } from '@/theme';
@@ -33,6 +33,7 @@ interface JournalTarget {
 }
 
 export default function JournalsScreen() {
+  const { type: deepLinkType } = useLocalSearchParams<{ type?: string }>();
   const { hasFullMental, isCoach } = useTier();
   const canAccess = hasFullMental || isCoach;
   const { markJournalDoneToday } = useAccountability();
@@ -41,8 +42,24 @@ export default function JournalsScreen() {
   const [target, setTarget] = useState<JournalTarget | null>(null);
   const [entry, setEntry] = useState('');
   const [saved, setSaved] = useState(false);
+  const [deepLinked, setDeepLinked] = useState(false);
 
   const dayIdx = Math.floor(Date.now() / 86_400_000);
+
+  // Auto-open a specific journal when deep-linked from Daily Work
+  useEffect(() => {
+    if (deepLinked || !deepLinkType) return;
+    const config = SKILL_JOURNAL_CONFIG[deepLinkType as SkillJournalType];
+    if (config) {
+      setDeepLinked(true);
+      openJournal({
+        key: deepLinkType,
+        label: config.label,
+        color: config.color,
+        prompts: config.prompts,
+      });
+    }
+  }, [deepLinkType, deepLinked]);
 
   const openJournal = (t: JournalTarget) => {
     setTarget(t);

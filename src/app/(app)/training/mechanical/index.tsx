@@ -19,6 +19,7 @@ import {
   type HittingIdentityDiagnosticResult,
 } from '@/data/hitting-identity-data';
 import { HITTING_VAULT_SECTIONS } from '@/data/hitting-vault-sections';
+import { WEEKLY_CHALLENGES } from '@/data/daily-work';
 
 /* ─── Flatten drills for search ──────────────────── */
 interface SearchableDrill {
@@ -62,18 +63,25 @@ const EXPLORE_ITEMS: ExploreItem[] = [
   { key: 'connection', label: 'Connection', sub: 'Arms, hands, and barrel', icon: 'link-outline', color: '#06b6d4', route: '/(app)/training/mechanical/connection' },
   { key: 'extension', label: 'Extension', sub: 'Contact zone and follow-through', icon: 'expand-outline', color: '#ec4899', route: '/(app)/training/mechanical/extension' },
   { key: 'troubleshoot', label: 'Troubleshooting', sub: 'Fix common mechanical issues', icon: 'hammer-outline', color: '#ef4444', route: '/(app)/training/mechanical/troubleshooting' },
+  { key: 'library', label: 'Hitting Library', sub: 'Full drill catalog with search', icon: 'library-outline', color: '#E10600', route: '/(app)/training/mechanical/hitting-library' },
   { key: 'approach', label: 'Approach', sub: 'OTC Hitting Philosophy', icon: 'bulb-outline', color: '#f59e0b', route: '/(app)/training/mechanical/approach' },
-  { key: 'at-bat', label: 'At-Bat Accountability', sub: 'Post-game review & scoring', icon: 'analytics-outline', color: '#22c55e', route: '/(app)/training/mechanical/at-bat-home' },
   { key: 'video', label: 'Video Breakdown', sub: 'Swing analysis tools (coming soon)', icon: 'videocam-outline', color: '#64748b', route: '' },
 ];
 
 export default function HittingVaultIndex() {
   const { hasLimitedHitting } = useTier();
-  const { gate } = useGating();
+  const { gate, isLoading } = useGating();
   const [identityResult, setIdentityResult] = useState<HittingIdentityDiagnosticResult | null>(null);
   const [mechResult, setMechResult] = useState<MechanicalDiagnosticResult | null>(null);
   const [exploreExpanded, setExploreExpanded] = useState(false);
   const [search, setSearch] = useState('');
+
+  // Gate: redirect to diagnostics if hitting vault is locked
+  useEffect(() => {
+    if (!isLoading && !gate.hittingUnlocked) {
+      router.replace('/(app)/training/mechanical/diagnostics' as any);
+    }
+  }, [isLoading, gate.hittingUnlocked]);
 
   const searchResults = useMemo(() => {
     if (!search.trim()) return [];
@@ -364,6 +372,36 @@ export default function HittingVaultIndex() {
           <Ionicons name="chevron-forward" size={20} color={colors.textMuted} />
         </TouchableOpacity>
 
+        {/* ═══════ WEEKLY CHALLENGE ═══════ */}
+        {(() => {
+          const weekIndex = Math.floor(Date.now() / (7 * 86_400_000));
+          const challenge = WEEKLY_CHALLENGES[weekIndex % WEEKLY_CHALLENGES.length];
+          return (
+            <View style={styles.challengeCard}>
+              <View style={styles.challengeHeader}>
+                <View style={[styles.challengeIcon, { backgroundColor: '#FBBF2418' }]}>
+                  <Ionicons name="trophy-outline" size={20} color="#FBBF24" />
+                </View>
+                <View style={{ flex: 1 }}>
+                  <Text style={styles.challengeSup}>WEEKLY CHALLENGE</Text>
+                  <Text style={styles.challengeName}>{challenge.name}</Text>
+                </View>
+              </View>
+              <Text style={styles.challengeGoal}>{challenge.goal}</Text>
+              <View style={styles.challengeMeta}>
+                <View style={styles.challengeMetaItem}>
+                  <Ionicons name="videocam-outline" size={12} color="#FBBF24" />
+                  <Text style={styles.challengeMetaText}>Video required</Text>
+                </View>
+                <View style={styles.challengeMetaItem}>
+                  <Ionicons name="time-outline" size={12} color={colors.textMuted} />
+                  <Text style={styles.challengeMetaText}>{challenge.submissionDeadline}</Text>
+                </View>
+              </View>
+            </View>
+          );
+        })()}
+
         {/* ═══════ APPROACH CARD ═══════ */}
         <View style={styles.approachCard}>
           <View style={styles.approachCardHeader}>
@@ -371,7 +409,7 @@ export default function HittingVaultIndex() {
             <Text style={styles.approachCardTitle}>OTC Hitting Philosophy</Text>
           </View>
           <Text style={styles.approachCardText}>
-            Hunt your pitch. Find the barrel. Backspin the ball. Mechanics are tools — the goal is becoming a hitter who competes and produces results.
+            Hunt your pitch. Find the barrel. The goal is to become a true hitter who competes and produces.
           </Text>
         </View>
 
@@ -562,4 +600,21 @@ const styles = StyleSheet.create({
   searchResultFixes: { fontSize: 12, color: colors.textSecondary, marginTop: 2 },
   searchResultTag: { paddingHorizontal: 8, paddingVertical: 3, borderRadius: 6 },
   searchResultTagText: { fontSize: 10, fontWeight: '800' },
+
+  /* ── Weekly Challenge ──────────────────────── */
+  challengeCard: {
+    backgroundColor: '#FBBF2408', borderWidth: 1, borderColor: '#FBBF2425',
+    borderRadius: radius.lg, padding: 16, gap: 10,
+  },
+  challengeHeader: { flexDirection: 'row', alignItems: 'center', gap: 12 },
+  challengeIcon: {
+    width: 40, height: 40, borderRadius: 12,
+    alignItems: 'center', justifyContent: 'center',
+  },
+  challengeSup: { fontSize: 9, fontWeight: '900', letterSpacing: 1.2, color: '#FBBF24' },
+  challengeName: { fontSize: 16, fontWeight: '900', color: colors.textPrimary },
+  challengeGoal: { fontSize: 13, color: colors.textSecondary, lineHeight: 20 },
+  challengeMeta: { flexDirection: 'row', gap: 16 },
+  challengeMetaItem: { flexDirection: 'row', alignItems: 'center', gap: 4 },
+  challengeMetaText: { fontSize: 11, fontWeight: '600', color: colors.textMuted },
 });

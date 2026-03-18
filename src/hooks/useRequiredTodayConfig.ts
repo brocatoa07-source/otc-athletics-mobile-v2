@@ -1,16 +1,11 @@
-import { useState, useEffect, useCallback } from 'react';
-import AsyncStorage from '@react-native-async-storage/async-storage';
-
-const CONFIG_KEY = 'otc:required-today-config';
+import type { CanonicalTier } from '@/hooks/useTier';
 
 export type RequiredTodayItemKey =
   | 'readiness'
   | 'training'
   | 'skillWork'
   | 'mental'
-  | 'journal'
-  | 'habits'
-  | 'addons';
+  | 'journal';
 
 export type RequiredTodayEnabled = Record<RequiredTodayItemKey, boolean>;
 
@@ -21,8 +16,6 @@ export const REQUIRED_TODAY_ORDER: RequiredTodayItemKey[] = [
   'skillWork',
   'mental',
   'journal',
-  'habits',
-  'addons',
 ];
 
 export const REQUIRED_TODAY_META: Record<
@@ -59,62 +52,32 @@ export const REQUIRED_TODAY_META: Record<
     route: '/(app)/training/mental/journals',
     description: 'Reflect on training and mindset',
   },
-  habits: {
-    label: 'Habit Tracker',
-    icon: 'checkmark-done-outline',
-    route: '/(app)/training',
-    description: 'Daily non-negotiables — coming soon',
-  },
-  addons: {
-    label: 'Add-On Session',
-    icon: 'add-circle-outline',
-    route: '/(app)/training',
-    description: 'Add-on content — coming soon',
-  },
 };
 
-/** Keys that are always enabled and cannot be toggled off */
-export const LOCKED_KEYS: ReadonlySet<RequiredTodayItemKey> = new Set(['readiness']);
+/* ─── Tier-based standard definitions ────────────── */
 
-const DEFAULT_ENABLED: RequiredTodayEnabled = {
-  readiness: true,
-  training: true,
-  skillWork: true,
-  mental: true,
-  journal: true,
-  habits: false,
-  addons: false,
+const TIER_KEYS: Record<string, RequiredTodayItemKey[]> = {
+  WALK:     [],
+  SINGLE:   ['readiness', 'mental', 'journal'],
+  DOUBLE:   ['readiness', 'mental', 'journal', 'skillWork'],
+  TRIPLE:   ['readiness', 'mental', 'journal', 'skillWork', 'training'],
+  HOME_RUN: ['readiness', 'mental', 'journal', 'skillWork', 'training'],
 };
 
-export function useRequiredTodayConfig() {
-  const [enabled, setEnabled] = useState<RequiredTodayEnabled>(DEFAULT_ENABLED);
-  const [loaded, setLoaded] = useState(false);
+/** Returns the ordered list of standard keys for a given tier. */
+export function getStandardKeysForTier(tier: CanonicalTier | 'COACH'): RequiredTodayItemKey[] {
+  if (tier === 'COACH') return TIER_KEYS.HOME_RUN;
+  return TIER_KEYS[tier] ?? [];
+}
 
-  const load = useCallback(async () => {
-    const raw = await AsyncStorage.getItem(CONFIG_KEY);
-    if (raw) {
-      try {
-        setEnabled({ ...DEFAULT_ENABLED, ...JSON.parse(raw), readiness: true });
-      } catch {}
-    }
-    setLoaded(true);
-  }, []);
-
-  useEffect(() => { load(); }, [load]);
-
-  const toggle = async (key: RequiredTodayItemKey) => {
-    // OTC Check-In (readiness) is always on — cannot be toggled off
-    if (key === 'readiness') return;
-    const next = { ...enabled, [key]: !enabled[key] };
-    // Require at least 1 item to remain enabled (readiness always counts)
-    if (Object.values(next).some(Boolean)) {
-      setEnabled(next);
-      await AsyncStorage.setItem(CONFIG_KEY, JSON.stringify(next));
-    }
+/** Returns the enabled map for the accountability engine based on tier. */
+export function getStandardsEnabledForTier(tier: CanonicalTier | 'COACH'): RequiredTodayEnabled {
+  const keys = getStandardKeysForTier(tier);
+  return {
+    readiness: keys.includes('readiness'),
+    training:  keys.includes('training'),
+    skillWork: keys.includes('skillWork'),
+    mental:    keys.includes('mental'),
+    journal:   keys.includes('journal'),
   };
-
-  /** Ordered list of enabled item keys */
-  const enabledInOrder = REQUIRED_TODAY_ORDER.filter((k) => enabled[k]);
-
-  return { enabled, enabledInOrder, loaded, toggle };
 }

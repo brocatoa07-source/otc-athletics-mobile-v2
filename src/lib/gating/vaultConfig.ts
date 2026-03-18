@@ -18,7 +18,6 @@ export type DiagnosticKey =
   | 'identity'
   | 'habits'
   | 'mover-type'
-  | 'hitting-identity-v2'
   | 'mechanical'
   | 'lifting-mover';
 
@@ -33,7 +32,6 @@ export const CANONICAL_PAIRS: readonly { vault: VaultType; diagnostic: Diagnosti
   { vault: 'mental', diagnostic: 'identity' },
   { vault: 'mental', diagnostic: 'habits' },
   { vault: 'hitting', diagnostic: 'mover-type' },
-  { vault: 'hitting', diagnostic: 'hitting-identity-v2' },
   { vault: 'hitting', diagnostic: 'mechanical' },
   { vault: 'sc', diagnostic: 'lifting-mover' },
 ] as const;
