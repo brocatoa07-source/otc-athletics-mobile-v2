@@ -499,11 +499,26 @@ export async function loadValidatedProgram(): Promise<OtcsGeneratedProgram | nul
     const p = JSON.parse(profileRaw);
     const profileDays = p.daysPerWeek ?? 3;
     const profileSeason = p.seasonPhase ?? 'OFFSEASON';
+    const profileArchetype = p.archetype ?? null;
+    const profilePosition = p.position ?? null;
+    const profileDeficiency = p.deficiency ?? null;
 
-    if (program.daysPerWeek !== profileDays || program.seasonPhase !== profileSeason) {
+    const mismatch =
+      program.daysPerWeek !== profileDays ||
+      program.seasonPhase !== profileSeason ||
+      program.archetype !== profileArchetype ||
+      program.position !== profilePosition ||
+      program.deficiency !== profileDeficiency;
+
+    if (mismatch) {
       if (__DEV__) {
-        console.log('[strength-engine] loadValidatedProgram — profile/program MISMATCH, forcing regen.',
-          { programDays: program.daysPerWeek, profileDays, programSeason: program.seasonPhase, profileSeason });
+        console.log('[strength-engine] loadValidatedProgram — profile/program MISMATCH, forcing regen.', {
+          programDays: program.daysPerWeek, profileDays,
+          programSeason: program.seasonPhase, profileSeason,
+          programArchetype: program.archetype, profileArchetype,
+          programPosition: program.position, profilePosition,
+          programDeficiency: program.deficiency, profileDeficiency,
+        });
       }
       return null;
     }
@@ -543,29 +558,34 @@ export async function initStrengthProgress(): Promise<StrengthProgress> {
  * Returns the new program, or null if no valid profile exists.
  */
 export async function regenerateFromProfile(): Promise<OtcsGeneratedProgram | null> {
-  const { loadStrengthProfile } = await import('./strength-profile');
-  const profile = await loadStrengthProfile();
-  if (!profile) {
-    if (__DEV__) console.log('[strength-engine] regenerateFromProfile — no profile found');
+  try {
+    const { loadStrengthProfile } = await import('./strength-profile');
+    const profile = await loadStrengthProfile();
+    if (!profile) {
+      if (__DEV__) console.log('[strength-engine] regenerateFromProfile — no profile found');
+      return null;
+    }
+
+    if (__DEV__) {
+      console.log('[strength-engine] regenerateFromProfile — generating from profile:',
+        { archetype: profile.archetype, position: profile.position, deficiency: profile.deficiency,
+          daysPerWeek: profile.daysPerWeek, seasonPhase: profile.seasonPhase });
+    }
+
+    const program = generateProgram(profile);
+    await saveGeneratedProgram(program);
+    await initStrengthProgress();
+
+    if (__DEV__) {
+      console.log('[strength-engine] regenerateFromProfile — OK, months:', program.months.length,
+        'daysPerWeek:', program.daysPerWeek, 'seasonPhase:', program.seasonPhase);
+    }
+
+    return program;
+  } catch (err) {
+    console.error('[strength-engine] regenerateFromProfile FAILED:', err);
     return null;
   }
-
-  if (__DEV__) {
-    console.log('[strength-engine] regenerateFromProfile — generating from profile:',
-      { archetype: profile.archetype, position: profile.position, deficiency: profile.deficiency,
-        daysPerWeek: profile.daysPerWeek, seasonPhase: profile.seasonPhase });
-  }
-
-  const program = generateProgram(profile);
-  await saveGeneratedProgram(program);
-  await initStrengthProgress();
-
-  if (__DEV__) {
-    console.log('[strength-engine] regenerateFromProfile — OK, months:', program.months.length,
-      'daysPerWeek:', program.daysPerWeek, 'seasonPhase:', program.seasonPhase);
-  }
-
-  return program;
 }
 
 export function getWorkoutKey(month: number, week: number, day: number): string {

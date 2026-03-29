@@ -13,8 +13,14 @@ export type LiftingMoverType = 'static' | 'spring' | 'hybrid';
 export interface LiftingMoverTypeData {
   slug: LiftingMoverType;
   name: string;
+  shortLabel: string;
   tagline: string;
   description: string;
+  summary: string;
+  strengths: string[];
+  watchOuts: string[];
+  cues: string[];
+  trainingEmphasis: string[];
   primaryCue: string;
   trainingFocus: string[];
   color: string;
@@ -35,9 +41,34 @@ export const LIFTING_MOVER_TYPES: Record<LiftingMoverType, LiftingMoverTypeData>
   static: {
     slug: 'static',
     name: 'Static Mover',
+    shortLabel: 'Force-first · Stable · Ground-driven',
     tagline: 'Strength through grinding',
     description:
       'You are built to move heavy weight deliberately. Your power comes from maximal force production — you overpower resistance through controlled, high-tension reps. Slow eccentrics, grinding through sticking points, and heavy compound work are your weapons.',
+    summary:
+      'You tend to produce force best from strong positions, controlled intent, and stable loading patterns. You benefit from owning shapes, building strength through the ground, and layering elasticity on top rather than relying on bounce alone.',
+    strengths: [
+      'Stable under load',
+      'Good positional control',
+      'Strong force transfer from fixed positions',
+    ],
+    watchOuts: [
+      'Can get too stiff',
+      'May lose rhythm and reactivity',
+      'Needs elasticity support work',
+    ],
+    cues: [
+      'Own the ground',
+      'Be stable, not rigid',
+      'Create force without getting stuck',
+    ],
+    trainingEmphasis: [
+      'Strength work',
+      'Isometrics',
+      'Controlled eccentrics',
+      'Med ball power',
+      'Reactive support work',
+    ],
     primaryCue: 'Control the load. Grind through the sticking point.',
     trainingFocus: [
       'Max Strength Cycles',
@@ -51,9 +82,34 @@ export const LIFTING_MOVER_TYPES: Record<LiftingMoverType, LiftingMoverTypeData>
   spring: {
     slug: 'spring',
     name: 'Spring Mover',
+    shortLabel: 'Explosive · Elastic · Fast-twitch',
     tagline: 'Strength through explosion',
     description:
       'You are fast-twitch dominant and thrive on explosive power. You use the stretch-shortening cycle to generate force quickly — bouncing out of the hole, driving through the lift in milliseconds. Olympic-style movements, jumps, and velocity-based training fit your profile best.',
+    summary:
+      'You produce force best with speed and elastic intent. You thrive on reactive movements, quick transitions, and explosive outputs. Your training should prioritize rate of force development while building enough base strength to support your speed.',
+    strengths: [
+      'Explosive off the ground',
+      'Natural reactive ability',
+      'Quick rate of force development',
+    ],
+    watchOuts: [
+      'May lack grinding strength',
+      'Can break down under heavy loads',
+      'Needs base strength support',
+    ],
+    cues: [
+      'Load the spring, release with intent',
+      'Be fast, not frantic',
+      'Use the bounce — own the transition',
+    ],
+    trainingEmphasis: [
+      'Plyometrics',
+      'Olympic lift variations',
+      'Velocity-based training',
+      'Sprint mechanics',
+      'Base strength maintenance',
+    ],
     primaryCue: 'Load the spring. Release with full intent.',
     trainingFocus: [
       'Power Development',
@@ -67,9 +123,34 @@ export const LIFTING_MOVER_TYPES: Record<LiftingMoverType, LiftingMoverTypeData>
   hybrid: {
     slug: 'hybrid',
     name: 'Hybrid Mover',
+    shortLabel: 'Versatile · Balanced · Adaptable',
     tagline: 'Strength across the full curve',
     description:
       'You are the most versatile athletic profile. You develop strength through both grinding and explosive work, adapting to what the session demands. Your training should balance maximal strength blocks with power phases to maximize performance across all physical qualities.',
+    summary:
+      'You can produce force across the entire spectrum — from grinding to explosive. You adapt well to varied training demands. Your challenge is building real depth in both ends rather than staying average across all qualities.',
+    strengths: [
+      'Adapts to varied training demands',
+      'Can grind and explode',
+      'Versatile athletic output',
+    ],
+    watchOuts: [
+      'Can stay average across all qualities',
+      'May lack peak specialization',
+      'Needs intentional block focus',
+    ],
+    cues: [
+      'Train the quality of the day with full intent',
+      'Build depth, not just breadth',
+      'Strength today, speed tomorrow — own both',
+    ],
+    trainingEmphasis: [
+      'Block periodization',
+      'Conjugate method',
+      'Strength-power alternation',
+      'Sport-specific power',
+      'Full-spectrum conditioning',
+    ],
     primaryCue: 'Build strength across the entire force-velocity curve.',
     trainingFocus: [
       'Strength-Power Block Training',

@@ -9,6 +9,11 @@ interface AuthState {
   dbUser: DBUser | null;
   athlete: Athlete | null;
   coach: Coach | null;
+  /** For PARENT role: all linked athlete user_ids */
+  parentLinkedAthleteIds: string[];
+  /** For PARENT role: currently selected athlete user_id */
+  parentLinkedAthleteId: string | null;
+  setParentActiveAthlete: (athleteUserId: string) => void;
   isHydrated: boolean;
 
   setSession: (session: Session | null) => void;
@@ -23,7 +28,13 @@ export const useAuthStore = create<AuthState>((set) => ({
   dbUser: null,
   athlete: null,
   coach: null,
+  parentLinkedAthleteIds: [],
+  parentLinkedAthleteId: null,
   isHydrated: false,
+
+  setParentActiveAthlete: (athleteUserId: string) => {
+    set({ parentLinkedAthleteId: athleteUserId });
+  },
 
   setSession: (session) => {
     set({ session, user: session?.user ?? null });
@@ -80,6 +91,8 @@ export const useAuthStore = create<AuthState>((set) => ({
       dbUser: null,
       athlete: null,
       coach: null,
+      parentLinkedAthleteIds: [],
+      parentLinkedAthleteId: null,
     }),
 
   hydrate: async () => {
@@ -116,7 +129,32 @@ async function fetchRoleRow(
       .maybeSingle();
 
     if (error) console.error('[auth] Failed to fetch coach row:', error.message);
-    set({ coach: (coach as Coach) ?? null, athlete: null });
+    set({ coach: (coach as Coach) ?? null, athlete: null, parentLinkedAthleteIds: [], parentLinkedAthleteId: null });
+  } else if (dbUser.role === 'PARENT') {
+    // Load all linked athletes for this parent
+    // Real table: public.athlete_parent_links
+    // Real columns: parent_id, athlete_id (confirmed from RLS policy)
+    if (__DEV__) console.log('[auth:parent] fetching links for parent_id:', userId);
+
+    const { data: links, error: linkErr } = await supabase
+      .from('athlete_parent_links')
+      .select('athlete_id')
+      .eq('parent_id', userId);
+
+    if (__DEV__) console.log('[auth:parent] query result:', { links, error: linkErr?.message ?? null });
+
+    if (linkErr) console.error('[auth] Failed to fetch parent links:', linkErr.message);
+
+    const ids = (links ?? []).map((l: any) => l.athlete_id as string).filter(Boolean);
+
+    if (__DEV__) console.log('[auth:parent] mapped athlete ids:', ids, 'active:', ids[0] ?? null);
+
+    set({
+      athlete: null,
+      coach: null,
+      parentLinkedAthleteIds: ids,
+      parentLinkedAthleteId: ids[0] ?? null,
+    });
   } else {
     const { data: athlete, error } = await supabase
       .from('athletes')
@@ -125,6 +163,6 @@ async function fetchRoleRow(
       .maybeSingle();
 
     if (error) console.error('[auth] Failed to fetch athlete row:', error.message);
-    set({ athlete: (athlete as Athlete) ?? null, coach: null });
+    set({ athlete: (athlete as Athlete) ?? null, coach: null, parentLinkedAthleteIds: [], parentLinkedAthleteId: null });
   }
 }

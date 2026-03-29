@@ -1,15 +1,16 @@
-import { useEffect, useState } from 'react';
+import { useEffect, useState, useCallback } from 'react';
 import {
   View, Text, ScrollView, TouchableOpacity, StyleSheet,
 } from 'react-native';
 import { SafeAreaView } from 'react-native-safe-area-context';
-import { router } from 'expo-router';
+import { router, useFocusEffect } from 'expo-router';
 import { Ionicons } from '@expo/vector-icons';
 import { colors, radius } from '@/theme';
 import { useTier } from '@/hooks/useTier';
+import { useDiagnosticResult } from '@/hooks/useDiagnosticResult';
+import { LIFTING_MOVER_TYPES } from '@/data/lifting-mover-type-data';
 import {
   loadStrengthProfile,
-  ARCHETYPE_META,
   POSITION_META,
   DEFICIENCY_META,
   SEASON_PHASE_META,
@@ -31,6 +32,7 @@ const ACCENT = '#1DB954';
 
 export default function SCMyPathScreen() {
   const { hasFullLifting, isCoach } = useTier();
+  const { result: moverType } = useDiagnosticResult('sc', 'lifting-mover');
   const [profile, setProfile] = useState<StrengthProfile | null>(null);
   const [program, setProgram] = useState<OtcsGeneratedProgram | null>(null);
   const [progress, setProgress] = useState<StrengthProgress | null>(null);
@@ -43,11 +45,13 @@ export default function SCMyPathScreen() {
     }
   }, [hasFullLifting, isCoach]);
 
-  useEffect(() => {
-    loadStrengthProfile().then(setProfile);
-    loadValidatedProgram().then(setProgram);
-    loadStrengthProgress().then(setProgress);
-  }, []);
+  useFocusEffect(
+    useCallback(() => {
+      loadStrengthProfile().then(setProfile);
+      loadValidatedProgram().then(setProgram);
+      loadStrengthProgress().then(setProgress);
+    }, []),
+  );
 
   async function handleRegenerate() {
     setRegenerating(true);
@@ -60,8 +64,20 @@ export default function SCMyPathScreen() {
     setRegenerating(false);
   }
 
-  // No profile at all — send to setup
+  // Derive setup progress for display
+  const diagDone = !!moverType;
+  const moverLabel = moverType ? LIFTING_MOVER_TYPES[moverType]?.name ?? null : null;
+
+  // No profile at all — show clear setup steps
   if (!profile) {
+    const setupSteps = [
+      { label: 'Athletic Profile Diagnostic', done: diagDone, detail: moverLabel },
+      { label: 'Position', done: false, detail: null },
+      { label: 'Movement Weakness', done: false, detail: null },
+      { label: 'Season Phase', done: false, detail: null },
+      { label: 'Training Days / Week', done: false, detail: null },
+    ];
+
     return (
       <SafeAreaView style={styles.safe}>
         <View style={styles.header}>
@@ -73,26 +89,87 @@ export default function SCMyPathScreen() {
             <Text style={styles.headerTitle}>Strength Program</Text>
           </View>
         </View>
-        <View style={styles.center}>
-          <Ionicons name="map-outline" size={48} color={colors.textMuted} />
-          <Text style={styles.emptyTitle}>No Program Generated</Text>
-          <Text style={styles.emptySub}>
-            Complete your strength profile setup to generate your personalized 6-month program.
-          </Text>
+        <ScrollView contentContainerStyle={styles.setupContent}>
+          <View style={styles.setupHero}>
+            <Ionicons name="barbell" size={36} color={ACCENT} />
+            <Text style={styles.emptyTitle}>Complete Setup to Get Your Plan</Text>
+            <Text style={styles.emptySub}>
+              Your personalized 6-month lifting program is built from 5 inputs. Complete the setup below to generate it.
+            </Text>
+          </View>
+
+          {/* Setup progress checklist */}
+          <View style={styles.setupCard}>
+            <Text style={styles.setupCardLabel}>SETUP PROGRESS</Text>
+            {setupSteps.map((step, i) => (
+              <View key={i} style={styles.setupRow}>
+                <Ionicons
+                  name={step.done ? 'checkmark-circle' : 'ellipse-outline'}
+                  size={18}
+                  color={step.done ? '#22c55e' : colors.textMuted}
+                />
+                <View style={{ flex: 1 }}>
+                  <Text style={[styles.setupStepLabel, step.done && { color: colors.textPrimary }]}>
+                    {step.label}
+                  </Text>
+                  {step.detail && (
+                    <Text style={styles.setupStepDetail}>{step.detail}</Text>
+                  )}
+                </View>
+              </View>
+            ))}
+          </View>
+
+          {/* What goes into the program */}
+          <View style={styles.setupCard}>
+            <Text style={styles.setupCardLabel}>YOUR PROGRAM WILL BE BUILT FROM</Text>
+            {[
+              { icon: 'body-outline', text: 'Your athletic mover type (how you produce force)' },
+              { icon: 'baseball-outline', text: 'Your baseball position (position-specific demands)' },
+              { icon: 'fitness-outline', text: 'Your primary movement weakness' },
+              { icon: 'calendar-outline', text: 'Your current season phase' },
+              { icon: 'time-outline', text: 'How many days per week you train' },
+            ].map((item, i) => (
+              <View key={i} style={styles.setupInfoRow}>
+                <Ionicons name={item.icon as any} size={14} color={ACCENT} />
+                <Text style={styles.setupInfoText}>{item.text}</Text>
+              </View>
+            ))}
+          </View>
+
           <TouchableOpacity
             style={styles.ctaBtn}
-            onPress={() => router.push('/(app)/training/sc/diagnostics' as any)}
+            onPress={() => {
+              if (!diagDone) {
+                router.push('/(app)/training/sc/diagnostics' as any);
+              } else {
+                router.push('/(app)/training/sc/position-select' as any);
+              }
+            }}
           >
-            <Text style={styles.ctaBtnText}>Start Setup</Text>
+            <Text style={styles.ctaBtnText}>
+              {diagDone ? 'Continue Setup' : 'Start Setup'}
+            </Text>
             <Ionicons name="arrow-forward" size={16} color={colors.bg} />
           </TouchableOpacity>
-        </View>
+
+          {diagDone && (
+            <Text style={styles.setupHint}>
+              Diagnostic complete. Next: select your position.
+            </Text>
+          )}
+        </ScrollView>
       </SafeAreaView>
     );
   }
 
-  // Profile exists but program is stale/missing — offer regeneration
+  // Profile exists but program is stale/missing — show what changed and offer regen
   if (!program || !progress) {
+    const daysLabel = `${profile.daysPerWeek ?? STRENGTH_PROFILE_DEFAULTS.daysPerWeek} days/week`;
+    const seasonLabel = SEASON_PHASE_META[profile.seasonPhase ?? STRENGTH_PROFILE_DEFAULTS.seasonPhase]?.label ?? 'Offseason';
+    const posLabel = POSITION_META[profile.position]?.label ?? profile.position;
+    const defLabel = DEFICIENCY_META[profile.deficiency]?.label ?? profile.deficiency;
+
     return (
       <SafeAreaView style={styles.safe}>
         <View style={styles.header}>
@@ -104,12 +181,33 @@ export default function SCMyPathScreen() {
             <Text style={styles.headerTitle}>Strength Program</Text>
           </View>
         </View>
-        <View style={styles.center}>
-          <Ionicons name="refresh-outline" size={48} color={ACCENT} />
-          <Text style={styles.emptyTitle}>Program Needs Update</Text>
-          <Text style={styles.emptySub}>
-            Your profile settings have changed. Generate a fresh program to match your current schedule.
-          </Text>
+        <ScrollView contentContainerStyle={styles.setupContent}>
+          <View style={styles.setupHero}>
+            <Ionicons name="refresh-circle" size={36} color={ACCENT} />
+            <Text style={styles.emptyTitle}>Program Needs Regeneration</Text>
+            <Text style={styles.emptySub}>
+              Your profile is complete, but the plan needs to be regenerated. This happens when setup info changes or an older plan version becomes outdated.
+            </Text>
+          </View>
+
+          {/* Current profile summary */}
+          <View style={styles.setupCard}>
+            <Text style={styles.setupCardLabel}>YOUR CURRENT PROFILE</Text>
+            {[
+              { icon: 'body-outline', label: 'Mover Type', value: moverLabel ?? profile.archetype },
+              { icon: 'baseball-outline', label: 'Position', value: posLabel },
+              { icon: 'fitness-outline', label: 'Focus Area', value: defLabel },
+              { icon: 'calendar-outline', label: 'Season', value: seasonLabel },
+              { icon: 'time-outline', label: 'Schedule', value: daysLabel },
+            ].map((item, i) => (
+              <View key={i} style={styles.setupInfoRow}>
+                <Ionicons name={item.icon as any} size={14} color={ACCENT} />
+                <Text style={styles.setupInfoLabel}>{item.label}</Text>
+                <Text style={styles.setupInfoValue}>{item.value}</Text>
+              </View>
+            ))}
+          </View>
+
           <TouchableOpacity
             style={[styles.ctaBtn, regenerating && { opacity: 0.5 }]}
             onPress={handleRegenerate}
@@ -118,14 +216,24 @@ export default function SCMyPathScreen() {
             <Text style={styles.ctaBtnText}>
               {regenerating ? 'Generating...' : 'Generate Program'}
             </Text>
-            {!regenerating && <Ionicons name="arrow-forward" size={16} color={colors.bg} />}
+            {!regenerating && <Ionicons name="flash" size={16} color={colors.bg} />}
           </TouchableOpacity>
-        </View>
+
+          <TouchableOpacity
+            style={styles.secondaryBtn}
+            onPress={() => router.push('/(app)/training/sc/position-select' as any)}
+          >
+            <Ionicons name="settings-outline" size={14} color={colors.textMuted} />
+            <Text style={styles.secondaryBtnText}>Change Setup</Text>
+          </TouchableOpacity>
+        </ScrollView>
       </SafeAreaView>
     );
   }
 
-  const archMeta = ARCHETYPE_META[profile.archetype];
+  // Use Supabase-backed mover type as canonical source; fall back to profile.archetype
+  const canonicalMover = moverType ?? profile.archetype;
+  const liftingData = LIFTING_MOVER_TYPES[canonicalMover];
   const posMeta = POSITION_META[profile.position];
   const defMeta = DEFICIENCY_META[profile.deficiency];
   const daysPerWeek = profile.daysPerWeek ?? STRENGTH_PROFILE_DEFAULTS.daysPerWeek;
@@ -150,15 +258,20 @@ export default function SCMyPathScreen() {
       </View>
 
       <ScrollView contentContainerStyle={styles.content} showsVerticalScrollIndicator={false}>
-        {/* ── Profile Summary ─────────────────── */}
-        <Text style={styles.sectionLabel}>YOUR PROFILE</Text>
-        <View style={styles.card}>
+        {/* ── Lifting Profile ─────────────────── */}
+        <Text style={styles.sectionLabel}>LIFTING PROFILE</Text>
+        <View style={[styles.card, { borderColor: liftingData.color + '25' }]}>
           <View style={styles.profileRow}>
-            <View style={[styles.profileDot, { backgroundColor: archMeta.color }]} />
+            <View style={[styles.profileDot, { backgroundColor: liftingData.color }]} />
             <View style={{ flex: 1 }}>
-              <Text style={[styles.profileName, { color: archMeta.color }]}>{archMeta.label}</Text>
-              <Text style={styles.profileTagline}>{archMeta.tagline}</Text>
+              <Text style={[styles.profileName, { color: liftingData.color }]}>{liftingData.name}</Text>
+              <Text style={styles.profileTagline}>{liftingData.description.split('.')[0]}.</Text>
             </View>
+          </View>
+          <View style={styles.divider} />
+          <View style={{ gap: 4 }}>
+            <Text style={styles.metaLabel}>Strength Tendency</Text>
+            <Text style={styles.tendencyText}>{liftingData.primaryCue}</Text>
           </View>
           <View style={styles.divider} />
           <View style={styles.metaRow}>
@@ -168,10 +281,9 @@ export default function SCMyPathScreen() {
             </View>
             <View style={styles.metaItem}>
               <Ionicons name={defMeta.icon as any} size={14} color={colors.textSecondary} />
-              <Text style={styles.metaText}>{defMeta.label} Focus</Text>
+              <Text style={styles.metaText}>{defMeta.label}</Text>
             </View>
           </View>
-          <View style={styles.divider} />
           <View style={styles.metaRow}>
             <View style={styles.metaItem}>
               <Ionicons name="calendar-outline" size={14} color={colors.textSecondary} />
@@ -182,7 +294,6 @@ export default function SCMyPathScreen() {
               <Text style={[styles.metaText, { color: seasonMeta.color }]}>{seasonMeta.label}</Text>
             </View>
           </View>
-          <Text style={styles.seasonNote}>{seasonMeta.description}</Text>
         </View>
 
         {/* ── Progress ────────────────────────── */}
@@ -332,6 +443,8 @@ const styles = StyleSheet.create({
   profileName: { fontSize: 18, fontWeight: '900' },
   profileTagline: { fontSize: 12, color: colors.textSecondary, marginTop: 2, lineHeight: 17 },
   divider: { height: 1, backgroundColor: colors.border },
+  metaLabel: { fontSize: 9, fontWeight: '900', letterSpacing: 1, color: colors.textMuted },
+  tendencyText: { fontSize: 12, fontWeight: '700', color: colors.textSecondary, fontStyle: 'italic' },
   metaRow: { flexDirection: 'row', gap: 20 },
   metaItem: { flexDirection: 'row', alignItems: 'center', gap: 6 },
   metaText: { fontSize: 13, fontWeight: '700', color: colors.textSecondary },
@@ -378,4 +491,29 @@ const styles = StyleSheet.create({
     paddingVertical: 10,
   },
   resetText: { fontSize: 12, fontWeight: '700', color: colors.textMuted },
+
+  /* Setup states */
+  setupContent: { padding: 16, paddingBottom: 60, gap: 14 },
+  setupHero: { alignItems: 'center', gap: 10, paddingVertical: 8 },
+  setupCard: {
+    backgroundColor: colors.surface, borderWidth: 1, borderColor: colors.border,
+    borderRadius: radius.lg, padding: 14, gap: 8,
+  },
+  setupCardLabel: { fontSize: 9, fontWeight: '900', letterSpacing: 1.2, color: colors.textMuted },
+  setupRow: {
+    flexDirection: 'row', alignItems: 'center', gap: 10,
+    paddingVertical: 4,
+  },
+  setupStepLabel: { fontSize: 13, fontWeight: '700', color: colors.textMuted },
+  setupStepDetail: { fontSize: 11, fontWeight: '600', color: ACCENT, marginTop: 1 },
+  setupInfoRow: { flexDirection: 'row', alignItems: 'center', gap: 8 },
+  setupInfoText: { flex: 1, fontSize: 12, color: colors.textSecondary, lineHeight: 17 },
+  setupInfoLabel: { fontSize: 12, fontWeight: '700', color: colors.textSecondary, width: 90 },
+  setupInfoValue: { flex: 1, fontSize: 13, fontWeight: '800', color: colors.textPrimary },
+  setupHint: { fontSize: 12, fontWeight: '700', color: ACCENT, textAlign: 'center' },
+  secondaryBtn: {
+    flexDirection: 'row', alignItems: 'center', justifyContent: 'center', gap: 6,
+    paddingVertical: 10,
+  },
+  secondaryBtnText: { fontSize: 12, fontWeight: '700', color: colors.textMuted },
 });

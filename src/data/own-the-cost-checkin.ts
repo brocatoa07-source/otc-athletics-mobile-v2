@@ -138,32 +138,44 @@ export function getFeedbackMessage(tier: FeedbackTier, date: string): string {
 export function calculateStreak(logs: OwnTheCostCheckInLog[], todayStr: string): number {
   if (logs.length === 0) return 0;
 
-  // Sort by date descending
-  const sorted = [...logs].sort((a, b) => b.date.localeCompare(a.date));
+  // Deduplicate: keep only unique dates, sorted descending
+  const uniqueDates = [...new Set(logs.map((l) => l.date))].sort((a, b) => b.localeCompare(a));
+
+  if (uniqueDates.length === 0) return 0;
 
   // Must include today or yesterday to have an active streak
-  const mostRecent = sorted[0].date;
-  const yesterday = getDateString(new Date(new Date(todayStr).getTime() - 86_400_000));
+  const mostRecent = uniqueDates[0];
+  const yesterday = subtractOneDay(todayStr);
 
   if (mostRecent !== todayStr && mostRecent !== yesterday) return 0;
 
   let streak = 1;
   let currentDate = mostRecent;
 
-  for (let i = 1; i < sorted.length; i++) {
-    const prevDate = getDateString(new Date(new Date(currentDate).getTime() - 86_400_000));
-    if (sorted[i].date === prevDate) {
+  for (let i = 1; i < uniqueDates.length; i++) {
+    const expectedPrev = subtractOneDay(currentDate);
+    if (uniqueDates[i] === expectedPrev) {
       streak++;
-      currentDate = prevDate;
-    } else if (sorted[i].date === currentDate) {
-      // Duplicate for same day, skip
-      continue;
+      currentDate = expectedPrev;
     } else {
+      // Gap found — streak ends
       break;
     }
   }
 
   return streak;
+}
+
+/**
+ * Subtract one calendar day from a YYYY-MM-DD string.
+ * Uses local Date construction to avoid UTC date-parsing bugs.
+ */
+function subtractOneDay(dateStr: string): string {
+  const [y, m, d] = dateStr.split('-').map(Number);
+  // Construct with local midnight (year, monthIndex, day)
+  const date = new Date(y, m - 1, d);
+  date.setDate(date.getDate() - 1);
+  return getDateString(date);
 }
 
 export function getStreakMessage(streak: number): string {

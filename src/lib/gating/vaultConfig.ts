@@ -77,13 +77,9 @@ export const VAULT_CONFIGS: Record<VaultType, VaultConfig> = {
   hitting: {
     vaultType: 'hitting',
     label: 'Hitting Vault',
-    requirements: [
-      {
-        diagnosticType: 'mover-type',
-        label: 'OTC Swing Identity Assessment',
-        description: 'Your hitting power generation style',
-      },
-    ],
+    // No diagnostics required — vault is open. Troubleshooting is the main feature.
+    // "Where Should I Start?" guide replaces diagnostics.
+    requirements: [],
   },
   sc: {
     vaultType: 'sc',
@@ -109,9 +105,14 @@ export const OPTIONAL_DIAGNOSTICS: Record<VaultType, DiagnosticRequirement[]> = 
   mental: [],
   hitting: [
     {
+      diagnosticType: 'mover-type',
+      label: 'Swing Type & Power Style',
+      description: 'Optional — understand your movement pattern',
+    },
+    {
       diagnosticType: 'mechanical',
-      label: 'OTC Swing Diagnostic',
-      description: 'Your primary mechanical focus areas',
+      label: 'Swing Problem',
+      description: 'Optional — identify mechanical focus areas',
     },
   ],
   sc: [],

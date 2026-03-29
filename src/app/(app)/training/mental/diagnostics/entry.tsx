@@ -280,6 +280,9 @@ export default function DiagnosticsEntryScreen() {
                 const legacyStruggles = deriveLegacyStruggles(archetypeResult);
                 await AsyncStorage.setItem('otc:mental-struggles', JSON.stringify(legacyStruggles));
 
+                // Clear stale daily work cache so it regenerates with new profile
+                await AsyncStorage.removeItem('otc:mental-daily-work');
+
                 // Invalidate profile query so MentalProfileCard picks up new data
                 queryClient.invalidateQueries({ queryKey: ['mental-profile', liveUser.id] });
 

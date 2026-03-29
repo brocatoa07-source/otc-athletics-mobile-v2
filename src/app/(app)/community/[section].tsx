@@ -709,9 +709,18 @@ export default function SectionFeed() {
       </View>
 
       {sectionKey === 'leaderboards' && <LeaderboardSection />}
-      {sectionKey === 'challenges' && <ChallengesSection />}
-      {(sectionKey === 'announcements' || sectionKey === 'live_archive') && (
+      {sectionKey === 'announcements' && (
         <GenericFeed sectionKey={sectionKey} config={config} canPost={canPost} color={color} />
+      )}
+      {sectionKey === 'challenges' && <ChallengesSection />}
+      {sectionKey !== 'leaderboards' && sectionKey !== 'announcements' && sectionKey !== 'challenges' && (
+        <View style={{ flex: 1, alignItems: 'center', justifyContent: 'center', padding: 32 }}>
+          <Ionicons name="construct-outline" size={40} color={Colors.textMuted} />
+          <Text style={{ fontSize: 16, fontWeight: '800', color: Colors.textPrimary, marginTop: 12 }}>Coming Soon</Text>
+          <Text style={{ fontSize: 13, color: Colors.textSecondary, textAlign: 'center', marginTop: 4 }}>
+            This section is being built for full launch.
+          </Text>
+        </View>
       )}
     </SafeAreaView>
   );

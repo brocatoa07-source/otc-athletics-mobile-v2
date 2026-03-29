@@ -33,23 +33,24 @@ const SINGLE_BULLETS = [
 
 const DOUBLE_BULLETS = [
   'Everything in Single',
-  'Mental Vault (coming soon)',
-  'Mental tasks in Daily Work',
+  'Full Mental Vault access',
+  'Mental training in Daily Work',
   'Pre-game routines, resets & journaling',
+  'Direct coach messaging',
 ];
 
 const TRIPLE_BULLETS = [
   'Everything in Double',
-  'Strength Vault (coming soon)',
-  'Strength tasks in Daily Work',
-  'Strength & conditioning development',
+  'Full Strength Vault access',
+  'Strength training in Daily Work',
+  'Personalized strength programming',
 ];
 
 const HOME_RUN_BULLETS = [
   'Everything in Triple',
-  'Direct coach messaging',
-  'Custom coaching & personalized programming',
-  'Video breakdowns & film review',
+  'Priority coach access',
+  'Inquire about 1-on-1 coaching',
+  'Early access to new features',
 ];
 
 // ── Tier card definitions ──────────────────────────────────────────────────

@@ -29,8 +29,10 @@ const DEV_TIER_OPTIONS: { label: string; value: TierOverride }[] = [
 
 export default function ProfileScreen() {
   const user = useAuthStore((s) => s.user);
+  const dbUser = useAuthStore((s) => s.dbUser);
   const athlete = useAuthStore((s) => s.athlete);
   const clearAuth = useAuthStore((s) => s.clearAuth);
+  const isParent = dbUser?.role === 'PARENT';
   const { isCoach, tier } = useTier();
   const devTierOverride = useDevTierOverride();
 
@@ -118,13 +120,35 @@ export default function ProfileScreen() {
             </TouchableOpacity>
           )}
 
-          {!isCoach && (
+          {!isCoach && !isParent && (
             <TouchableOpacity
               style={styles.menuItem}
               onPress={() => router.push('/(app)/profile/connect-coach' as any)}
             >
               <Ionicons name="key" size={20} color="#8b5cf6" />
               <Text style={styles.menuLabel}>Coach Connection</Text>
+              <Ionicons name="chevron-forward" size={16} color={Colors.textMuted} />
+            </TouchableOpacity>
+          )}
+
+          {!isCoach && !isParent && (
+            <TouchableOpacity
+              style={styles.menuItem}
+              onPress={() => router.push('/(app)/profile/invite-parent' as any)}
+            >
+              <Ionicons name="people" size={20} color="#8b5cf6" />
+              <Text style={styles.menuLabel}>Parent Access</Text>
+              <Ionicons name="chevron-forward" size={16} color={Colors.textMuted} />
+            </TouchableOpacity>
+          )}
+
+          {isParent && (
+            <TouchableOpacity
+              style={styles.menuItem}
+              onPress={() => router.push('/(app)/profile/redeem-parent-code' as any)}
+            >
+              <Ionicons name="add-circle" size={20} color="#8b5cf6" />
+              <Text style={styles.menuLabel}>Link Another Athlete</Text>
               <Ionicons name="chevron-forward" size={16} color={Colors.textMuted} />
             </TouchableOpacity>
           )}

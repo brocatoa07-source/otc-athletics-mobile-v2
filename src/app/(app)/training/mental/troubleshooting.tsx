@@ -200,13 +200,38 @@ export default function MentalTroubleshootingScreen() {
         {/* Recommended Fixes */}
         <Text style={styles.fixesHeader}>RECOMMENDED TOOLS</Text>
         {tools.map((tool, idx) => (
-          <View key={`${tool.name}-${idx}`} style={styles.toolRow}>
+          <TouchableOpacity
+            key={`${tool.name}-${idx}`}
+            style={styles.toolRow}
+            onPress={() => {
+              // Route to specific known screens, otherwise to toolbox
+              const name = tool.name.toLowerCase();
+              if (name.includes('between-pitch') || name.includes('pitch-to-pitch')) {
+                router.push('/(app)/training/mental/ten-second-reset' as any);
+              } else if (name.includes('emergency') || name.includes('3-step')) {
+                router.push('/(app)/training/mental/emergency-reset' as any);
+              } else if (name.includes('post-game') || name.includes('flush')) {
+                router.push('/(app)/training/mental/post-game' as any);
+              } else if (name.includes('visualization') || name.includes('arrival')) {
+                router.push('/(app)/training/mental/meditations' as any);
+              } else if (name.includes('journal') || name.includes('gratitude') || name.includes('win/learn')) {
+                router.push('/(app)/training/mental/journals' as any);
+              } else if (name.includes('identity') || name.includes('ownership') || name.includes('standard')) {
+                router.push('/(app)/training/mental/identity-builder' as any);
+              } else {
+                // Default: route to toolbox where all tools live by category
+                router.push('/(app)/training/mental/toolbox' as any);
+              }
+            }}
+            activeOpacity={0.8}
+          >
             <View style={[styles.toolDot, { backgroundColor: tool.tagColor }]} />
             <View style={{ flex: 1 }}>
               <Text style={styles.toolName}>{tool.name}</Text>
               <Text style={[styles.toolTag, { color: tool.tagColor }]}>{tool.tag}</Text>
             </View>
-          </View>
+            <Ionicons name="chevron-forward" size={14} color={colors.textMuted} />
+          </TouchableOpacity>
         ))}
 
         {/* Upgrade banner */}
@@ -229,10 +254,10 @@ export default function MentalTroubleshootingScreen() {
         {/* Retake */}
         <TouchableOpacity
           style={styles.retakeBtn}
-          onPress={() => router.push('/(app)/training/mental/mental-struggles-quiz' as any)}
+          onPress={() => router.push('/(app)/training/mental/diagnostics/entry' as any)}
           activeOpacity={0.7}
         >
-          <Text style={styles.retakeBtnText}>Retake Assessment</Text>
+          <Text style={styles.retakeBtnText}>Retake Mental Diagnostic</Text>
         </TouchableOpacity>
       </ScrollView>
     </SafeAreaView>

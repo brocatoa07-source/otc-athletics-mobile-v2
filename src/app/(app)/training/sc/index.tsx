@@ -1,24 +1,41 @@
-import { useEffect, useState } from 'react';
+/**
+ * Strength Home — Execution-first landing screen.
+ *
+ * Architecture (mirrors Mental Home / Hitting Home):
+ *   1. EXECUTION: Today's Strength Focus + Quick Compete + Today's Cue
+ *   2. BUILD YOUR GAME: Exercise library, mobility, power, conditioning, etc.
+ */
+
 import {
   View, Text, ScrollView, TouchableOpacity, StyleSheet,
 } from 'react-native';
 import { SafeAreaView } from 'react-native-safe-area-context';
 import { router } from 'expo-router';
 import { Ionicons } from '@expo/vector-icons';
-import AsyncStorage from '@react-native-async-storage/async-storage';
 import { colors, radius } from '@/theme';
 import { useTier } from '@/hooks/useTier';
 import { useGating } from '@/hooks/useGating';
-import {
-  LIFTING_MOVER_TYPES,
-  type LiftingMoverType,
-} from '@/data/lifting-mover-type-data';
-import { loadStrengthProfile, ARCHETYPE_META, type StrengthProfile } from '@/data/strength-profile';
-import { loadValidatedProgram, loadStrengthProgress, regenerateFromProfile, type GeneratedProgram, type StrengthProgress, getCompletionCount } from '@/data/strength-program-engine';
+import { useDiagnosticResult } from '@/hooks/useDiagnosticResult';
+import { LIFTING_MOVER_TYPES } from '@/data/lifting-mover-type-data';
+import { ExpandableProfileCard } from '@/components/training/ExpandableProfileCard';
 
 const ACCENT = '#1DB954';
 
-interface ExploreItem {
+// ── Daily cue rotation ──────────────────────────────────────────────────────
+
+const DAILY_CUES = [
+  'Own the ground. Build force from the floor up.',
+  'Quality over volume. Every rep counts.',
+  'Train your weakness. Protect your strength.',
+  'Move with intent. Nothing casual.',
+  'Recovery is part of the plan.',
+  'Control the load. Don\'t let it control you.',
+  'Strength serves the game. Train for performance.',
+];
+
+// ── Build Your Game items ───────────────────────────────────────────────────
+
+interface BuildItem {
   key: string;
   label: string;
   sub: string;
@@ -27,49 +44,57 @@ interface ExploreItem {
   route: string;
 }
 
-const EXPLORE_ITEMS: ExploreItem[] = [
-  { key: 'exercises', label: 'Exercise Library', sub: 'Strength, accessory & core exercises', icon: 'barbell-outline', color: '#3b82f6', route: '/(app)/training/sc/exercises?category=exercises' },
-  { key: 'mobility', label: 'Mobility Bank', sub: 'Warm-up, recovery & mobility drills', icon: 'body-outline', color: '#22c55e', route: '/(app)/training/sc/exercises?category=mobility' },
-  { key: 'power', label: 'Power Drills', sub: 'Plyometrics & explosive movements', icon: 'flash-outline', color: '#f59e0b', route: '/(app)/training/sc/exercises?category=power' },
-  { key: 'conditioning', label: 'Conditioning', sub: 'Sprint work & conditioning drills', icon: 'heart-outline', color: '#ef4444', route: '/(app)/training/sc/exercises?category=conditioning' },
+const BUILD_ITEMS: BuildItem[] = [
+  { key: 'exercises', label: 'Exercise Library', sub: 'Strength, accessory & core', icon: 'barbell-outline', color: '#3b82f6', route: '/(app)/training/sc/exercises?category=exercises' },
+  { key: 'mobility', label: 'Mobility Bank', sub: 'Mobility, movement prep & recovery flows', icon: 'body-outline', color: '#0891b2', route: '/(app)/training/sc/mobility' },
+  { key: 'power', label: 'Power Drills', sub: 'Plyometrics & explosive work', icon: 'flash-outline', color: '#f59e0b', route: '/(app)/training/sc/exercises?category=power' },
+  { key: 'conditioning', label: 'Conditioning', sub: 'Sprint work & game conditioning', icon: 'heart-outline', color: '#ef4444', route: '/(app)/training/sc/exercises?category=conditioning' },
   { key: 'fuel', label: 'Fuel The Engine', sub: 'Performance nutrition', icon: 'flame-outline', color: '#10b981', route: '/(app)/training/sc/fuel' },
+  { key: 'my-path', label: 'My Path', sub: '6-month personalized program', icon: 'map-outline', color: '#8b5cf6', route: '/(app)/training/sc/my-path' },
+  { key: 'philosophy', label: 'Why We Train This Way', sub: 'Training philosophy & system', icon: 'bulb-outline', color: '#f59e0b', route: '/(app)/training/sc/philosophy' },
 ];
 
-export default function SCVaultIndex() {
+// ── Resolve focus items from mover type ─────────────────────────────────────
+
+interface FocusItem {
+  name: string;
+  color: string;
+  route: string;
+}
+
+function resolveFocusItems(moverType: string): FocusItem[] {
+  const mt = LIFTING_MOVER_TYPES[moverType as keyof typeof LIFTING_MOVER_TYPES];
+  if (!mt) return [];
+
+  const items: FocusItem[] = [];
+
+  // First training emphasis item
+  if (mt.trainingEmphasis[0]) {
+    items.push({ name: mt.trainingEmphasis[0], color: ACCENT, route: '/(app)/training/sc/workout' });
+  }
+  if (mt.trainingEmphasis[1]) {
+    items.push({ name: mt.trainingEmphasis[1], color: '#3b82f6', route: '/(app)/training/sc/exercises?category=exercises' });
+  }
+  if (mt.trainingEmphasis[2]) {
+    items.push({ name: mt.trainingEmphasis[2], color: '#f59e0b', route: '/(app)/training/sc/exercises?category=power' });
+  }
+
+  return items.slice(0, 3);
+}
+
+// ── Component ───────────────────────────────────────────────────────────────
+
+export default function StrengthHome() {
   const { isWalk, hasLimitedLifting, hasFullLifting } = useTier();
   const { gate } = useGating();
-  const [moverType, setMoverType] = useState<LiftingMoverType | null>(null);
-  const [profile, setProfile] = useState<StrengthProfile | null>(null);
-  const [program, setProgram] = useState<GeneratedProgram | null>(null);
-  const [progress, setProgress] = useState<StrengthProgress | null>(null);
-  const [exploreExpanded, setExploreExpanded] = useState(false);
-  const [regenerating, setRegenerating] = useState(false);
+  const { result: moverType } = useDiagnosticResult('sc', 'lifting-mover');
 
   const moverDone = gate.sc.moverDone;
 
-  useEffect(() => {
-    AsyncStorage.getItem('otc:lifting-mover-type').then((val) => {
-      if (val) setMoverType(val as LiftingMoverType);
-    });
-    loadStrengthProfile().then(setProfile);
-    loadValidatedProgram().then(setProgram);
-    loadStrengthProgress().then(setProgress);
-  }, []);
-
-  const profileComplete = moverDone && !!profile;
-  const programReady = profileComplete && !!program;
-  const needsRegeneration = profileComplete && !program;
-
-  async function handleRegenerate() {
-    setRegenerating(true);
-    const newProgram = await regenerateFromProfile();
-    if (newProgram) {
-      setProgram(newProgram);
-      const prog = await loadStrengthProgress();
-      setProgress(prog);
-    }
-    setRegenerating(false);
-  }
+  const moverData = moverType ? LIFTING_MOVER_TYPES[moverType] : null;
+  const focusItems = moverType ? resolveFocusItems(moverType) : [];
+  const dayIndex = Math.floor(Date.now() / 86_400_000);
+  const todayCue = DAILY_CUES[dayIndex % DAILY_CUES.length];
 
   // Walk tier — fully locked
   if (isWalk) {
@@ -80,22 +105,22 @@ export default function SCVaultIndex() {
             <Ionicons name="chevron-back" size={24} color={colors.textPrimary} />
           </TouchableOpacity>
           <View style={{ flex: 1 }}>
-            <Text style={styles.headerSup}>STRENGTH VAULT</Text>
-            <Text style={styles.headerTitle}>OTC Strength System</Text>
+            <Text style={styles.headerSup}>STRENGTH</Text>
+            <Text style={styles.headerTitle}>Strength System</Text>
           </View>
         </View>
         <View style={styles.lockedState}>
           <Ionicons name="lock-closed-outline" size={48} color={colors.textMuted} />
-          <Text style={styles.lockedTitle}>Strength Vault Locked</Text>
+          <Text style={styles.lockedTitle}>Strength System Locked</Text>
           <Text style={styles.lockedDesc}>
-            Upgrade to unlock the full Strength System with personalized programs, exercise library, and daily training.
+            Upgrade to unlock personalized strength programming, exercise library, and daily training.
           </Text>
           <TouchableOpacity
-            style={[styles.ctaBtn, { backgroundColor: ACCENT }]}
+            style={[styles.ctaFull, { backgroundColor: ACCENT }]}
             onPress={() => router.push('/(app)/upgrade' as any)}
             activeOpacity={0.8}
           >
-            <Text style={styles.ctaBtnText}>Upgrade to Single</Text>
+            <Text style={styles.ctaFullText}>Upgrade to Triple</Text>
             <Ionicons name="arrow-forward" size={16} color="#fff" />
           </TouchableOpacity>
         </View>
@@ -103,7 +128,7 @@ export default function SCVaultIndex() {
     );
   }
 
-  // Single tier — diagnostic-only access
+  // Limited tier — preview with upgrade CTA
   if (hasLimitedLifting && !hasFullLifting) {
     return (
       <SafeAreaView style={styles.safe}>
@@ -112,8 +137,8 @@ export default function SCVaultIndex() {
             <Ionicons name="chevron-back" size={24} color={colors.textPrimary} />
           </TouchableOpacity>
           <View style={{ flex: 1 }}>
-            <Text style={styles.headerSup}>STRENGTH VAULT</Text>
-            <Text style={styles.headerTitle}>OTC Strength System</Text>
+            <Text style={styles.headerSup}>STRENGTH</Text>
+            <Text style={styles.headerTitle}>Strength System</Text>
           </View>
         </View>
         <View style={styles.lockedState}>
@@ -123,25 +148,25 @@ export default function SCVaultIndex() {
           </Text>
           <Text style={styles.lockedDesc}>
             {moverDone
-              ? 'Your Strength diagnostic is complete. Upgrade to Double to unlock the full Strength Vault with personalized programs, exercise library, and daily training.'
-              : 'Take the Athletic Profile Assessment to discover your mover type. Upgrade to Double to unlock the full Strength Vault.'}
+              ? 'Your strength diagnostic is complete. Upgrade to Triple for full access to personalized programs and daily training.'
+              : 'Take the Athletic Profile Assessment to discover your mover type. Upgrade to Triple for full access.'}
           </Text>
           {!moverDone && (
             <TouchableOpacity
-              style={[styles.ctaBtn, { backgroundColor: ACCENT }]}
+              style={[styles.ctaFull, { backgroundColor: ACCENT }]}
               onPress={() => router.push('/(app)/training/sc/diagnostics' as any)}
               activeOpacity={0.8}
             >
-              <Text style={styles.ctaBtnText}>Start Assessment</Text>
+              <Text style={styles.ctaFullText}>Start Assessment</Text>
               <Ionicons name="arrow-forward" size={16} color="#fff" />
             </TouchableOpacity>
           )}
           <TouchableOpacity
-            style={[styles.ctaBtn, { backgroundColor: colors.surface, borderWidth: 1, borderColor: ACCENT + '40' }]}
+            style={[styles.ctaFull, { backgroundColor: colors.surface, borderWidth: 1, borderColor: ACCENT + '40' }]}
             onPress={() => router.push('/(app)/upgrade' as any)}
             activeOpacity={0.8}
           >
-            <Text style={[styles.ctaBtnText, { color: ACCENT }]}>Upgrade to Double</Text>
+            <Text style={[styles.ctaFullText, { color: ACCENT }]}>Upgrade to Triple</Text>
             <Ionicons name="arrow-forward" size={16} color={ACCENT} />
           </TouchableOpacity>
         </View>
@@ -157,8 +182,8 @@ export default function SCVaultIndex() {
           <Ionicons name="chevron-back" size={24} color={colors.textPrimary} />
         </TouchableOpacity>
         <View style={{ flex: 1 }}>
-          <Text style={styles.headerSup}>STRENGTH VAULT</Text>
-          <Text style={styles.headerTitle}>OTC Strength System</Text>
+          <Text style={styles.headerSup}>STRENGTH</Text>
+          <Text style={styles.headerTitle}>Strength System</Text>
         </View>
         <TouchableOpacity
           style={styles.diagBtn}
@@ -168,201 +193,137 @@ export default function SCVaultIndex() {
         </TouchableOpacity>
       </View>
 
-      <ScrollView
-        contentContainerStyle={styles.content}
-        showsVerticalScrollIndicator={false}
-      >
-        {/* Mover Type Profile Card */}
-        {moverType && (
-          <TouchableOpacity
-            style={[styles.profileBanner, { borderColor: LIFTING_MOVER_TYPES[moverType].color + '40' }]}
-            onPress={() => router.push('/(app)/training/sc/lifting-mover-quiz' as any)}
-            activeOpacity={0.8}
-          >
-            <View style={[styles.profileDot, { backgroundColor: LIFTING_MOVER_TYPES[moverType].color }]} />
-            <View style={{ flex: 1 }}>
-              <Text style={styles.profileLabel}>YOUR MOVER TYPE</Text>
-              <Text style={[styles.profileType, { color: LIFTING_MOVER_TYPES[moverType].color }]}>
-                {LIFTING_MOVER_TYPES[moverType].name}
-              </Text>
-              {profile && (
-                <Text style={styles.profileSub}>
-                  {ARCHETYPE_META[profile.archetype].label} · {profile.position.charAt(0).toUpperCase() + profile.position.slice(1)}
-                </Text>
-              )}
-            </View>
-            <Ionicons name="chevron-forward" size={16} color={colors.textMuted} />
-          </TouchableOpacity>
-        )}
+      <ScrollView contentContainerStyle={styles.content} showsVerticalScrollIndicator={false}>
+        {/* ═══════ EXECUTION LAYER ═══════ */}
 
-        {/* Setup CTA if profile not complete */}
-        {moverDone && !profile && (
-          <TouchableOpacity
-            style={styles.setupCard}
-            onPress={() => router.push('/(app)/training/sc/position-select' as any)}
-            activeOpacity={0.8}
-          >
-            <View style={[styles.setupIcon, { backgroundColor: ACCENT + '18' }]}>
-              <Ionicons name="settings-outline" size={24} color={ACCENT} />
+        {/* A. Today's Strength Focus */}
+        {moverDone && moverData ? (
+          <View style={[styles.focusCard, { borderColor: ACCENT + '30' }]}>
+            <View style={styles.focusHeader}>
+              <View style={[styles.focusIconWrap, { backgroundColor: ACCENT + '15' }]}>
+                <Ionicons name="flash" size={18} color={ACCENT} />
+              </View>
+              <View style={{ flex: 1 }}>
+                <Text style={styles.focusLabel}>TODAY'S STRENGTH FOCUS</Text>
+                <Text style={styles.focusArchetype}>{moverData.name}</Text>
+              </View>
             </View>
-            <View style={{ flex: 1 }}>
-              <Text style={styles.setupTitle}>Complete Your Profile</Text>
-              <Text style={styles.setupSub}>Select your position and movement focus to generate your program.</Text>
-            </View>
-            <Ionicons name="chevron-forward" size={20} color={colors.textMuted} />
-          </TouchableOpacity>
-        )}
 
-        {/* Regenerate CTA if profile exists but program is stale/missing */}
-        {needsRegeneration && (
-          <TouchableOpacity
-            style={styles.setupCard}
-            onPress={handleRegenerate}
-            activeOpacity={0.8}
-            disabled={regenerating}
-          >
-            <View style={[styles.setupIcon, { backgroundColor: ACCENT + '18' }]}>
-              <Ionicons name="refresh-outline" size={24} color={ACCENT} />
-            </View>
-            <View style={{ flex: 1 }}>
-              <Text style={styles.setupTitle}>
-                {regenerating ? 'Generating...' : 'Generate Your Program'}
-              </Text>
-              <Text style={styles.setupSub}>
-                Your profile is ready. Tap to generate your personalized 6-month program.
-              </Text>
-            </View>
-            {!regenerating && <Ionicons name="chevron-forward" size={20} color={colors.textMuted} />}
-          </TouchableOpacity>
-        )}
-
-        {/* Not assessed yet */}
-        {!moverDone && (
-          <TouchableOpacity
-            style={styles.setupCard}
-            onPress={() => router.push('/(app)/training/sc/diagnostics' as any)}
-            activeOpacity={0.8}
-          >
-            <View style={[styles.setupIcon, { backgroundColor: ACCENT + '18' }]}>
-              <Ionicons name="clipboard-outline" size={24} color={ACCENT} />
-            </View>
-            <View style={{ flex: 1 }}>
-              <Text style={styles.setupTitle}>Start Your Assessment</Text>
-              <Text style={styles.setupSub}>Take the Athletic Profile Assessment to unlock your personalized lifting path.</Text>
-            </View>
-            <Ionicons name="chevron-forward" size={20} color={colors.textMuted} />
-          </TouchableOpacity>
-        )}
-
-        {/* Preview mode banner */}
-        {hasLimitedLifting && (
-          <TouchableOpacity
-            style={styles.upgradeBanner}
-            onPress={() => router.push('/(app)/upgrade' as any)}
-            activeOpacity={0.8}
-          >
-            <Ionicons name="lock-open-outline" size={18} color={ACCENT} />
-            <View style={{ flex: 1 }}>
-              <Text style={styles.upgradeTitle}>Preview Mode</Text>
-              <Text style={styles.upgradeSub}>
-                Basic exercises unlocked. Upgrade to Double for personalized programs.
-              </Text>
-            </View>
-            <Ionicons name="chevron-forward" size={14} color={colors.textMuted} />
-          </TouchableOpacity>
-        )}
-
-        {/* ═══════ BLOCK 1: MY PATH ═══════ */}
-        <TouchableOpacity
-          style={styles.primaryCard}
-          onPress={() => {
-            if (programReady) {
-              router.push('/(app)/training/sc/my-path' as any);
-            } else if (needsRegeneration) {
-              handleRegenerate();
-            } else if (moverDone && !profile) {
-              router.push('/(app)/training/sc/position-select' as any);
-            } else {
-              router.push('/(app)/training/sc/diagnostics' as any);
-            }
-          }}
-          activeOpacity={0.8}
-        >
-          <View style={[styles.primaryIcon, { backgroundColor: '#3b82f618' }]}>
-            <Ionicons name="map-outline" size={24} color="#3b82f6" />
-          </View>
-          <View style={{ flex: 1 }}>
-            <Text style={styles.primaryLabel}>My Path</Text>
-            <Text style={styles.primarySub}>
-              {programReady
-                ? `Month ${progress?.currentMonth ?? 1} · Week ${progress?.currentWeek ?? 1}`
-                : 'Complete setup to unlock'}
-            </Text>
-          </View>
-          <Ionicons name="chevron-forward" size={20} color={colors.textMuted} />
-        </TouchableOpacity>
-
-        {/* ═══════ BLOCK 2: TODAY'S WORK ═══════ */}
-        <TouchableOpacity
-          style={[styles.primaryCard, { backgroundColor: ACCENT + '06', borderColor: ACCENT + '25' }]}
-          onPress={() => {
-            if (programReady) {
-              router.push('/(app)/training/sc/workout' as any);
-            } else {
-              router.push('/(app)/training/sc/diagnostics' as any);
-            }
-          }}
-          activeOpacity={0.8}
-        >
-          <View style={[styles.primaryIcon, { backgroundColor: ACCENT + '18' }]}>
-            <Ionicons name="flash" size={24} color={ACCENT} />
-          </View>
-          <View style={{ flex: 1 }}>
-            <Text style={styles.primaryLabel}>Today's Workout</Text>
-            <Text style={styles.primarySub}>
-              {programReady
-                ? `${progress ? getCompletionCount(progress) : 0} workouts completed`
-                : 'Complete setup to unlock'}
-            </Text>
-          </View>
-          <Ionicons name="chevron-forward" size={20} color={colors.textMuted} />
-        </TouchableOpacity>
-
-        {/* ═══════ BLOCK 3: EXPLORE MORE ═══════ */}
-        <TouchableOpacity
-          style={styles.exploreHeader}
-          onPress={() => setExploreExpanded(!exploreExpanded)}
-          activeOpacity={0.7}
-        >
-          <Ionicons name="compass-outline" size={20} color={ACCENT} />
-          <Text style={styles.exploreHeaderText}>Explore More</Text>
-          <View style={{ flex: 1 }} />
-          <Text style={styles.exploreCount}>{EXPLORE_ITEMS.length} areas</Text>
-          <Ionicons
-            name={exploreExpanded ? 'chevron-up' : 'chevron-down'}
-            size={18}
-            color={colors.textMuted}
-          />
-        </TouchableOpacity>
-
-        {exploreExpanded && (
-          <View style={styles.exploreGrid}>
-            {EXPLORE_ITEMS.map((item) => (
+            {/* Focus items */}
+            {focusItems.map((item, idx) => (
               <TouchableOpacity
-                key={item.key}
-                style={styles.exploreCard}
+                key={idx}
+                style={styles.toolRow}
                 onPress={() => router.push(item.route as any)}
                 activeOpacity={0.8}
               >
-                <View style={[styles.exploreIcon, { backgroundColor: item.color + '15' }]}>
-                  <Ionicons name={item.icon} size={20} color={item.color} />
-                </View>
-                <Text style={styles.exploreLabel}>{item.label}</Text>
-                <Text style={styles.exploreSub} numberOfLines={1}>{item.sub}</Text>
+                <View style={[styles.toolDot, { backgroundColor: item.color }]} />
+                <Text style={styles.toolName}>{item.name}</Text>
+                <Ionicons name="chevron-forward" size={14} color={colors.textMuted} />
               </TouchableOpacity>
             ))}
+
+            {/* CTA */}
+            <TouchableOpacity
+              style={[styles.ctaBtn, { backgroundColor: ACCENT }]}
+              onPress={() => router.push('/(app)/training/sc/workout' as any)}
+              activeOpacity={0.85}
+            >
+              <Ionicons name="play-circle" size={18} color="#fff" />
+              <Text style={styles.ctaBtnText}>Start Today's Workout</Text>
+            </TouchableOpacity>
           </View>
+        ) : (
+          <TouchableOpacity
+            style={[styles.focusCard, { borderColor: ACCENT + '30' }]}
+            onPress={() => router.push('/(app)/training/sc/diagnostics' as any)}
+            activeOpacity={0.85}
+          >
+            <View style={styles.focusHeader}>
+              <View style={[styles.focusIconWrap, { backgroundColor: ACCENT + '15' }]}>
+                <Ionicons name="clipboard-outline" size={18} color={ACCENT} />
+              </View>
+              <View style={{ flex: 1 }}>
+                <Text style={styles.focusLabel}>STRENGTH DIAGNOSTIC</Text>
+                <Text style={styles.focusArchetype}>Complete Your Assessment</Text>
+                <Text style={styles.focusSub}>Athletic Profile Assessment · Personalized program</Text>
+              </View>
+              <Ionicons name="arrow-forward-circle" size={24} color={ACCENT} />
+            </View>
+          </TouchableOpacity>
         )}
+
+        {/* B. Quick Compete */}
+        {/* Expandable Profile Card */}
+        {moverData && (
+          <ExpandableProfileCard
+            accent={ACCENT}
+            title={moverData.name}
+            subtitle={moverData.shortLabel}
+            collapsedStrengths={moverData.strengths.slice(0, 3)}
+            collapsedWatchOuts={moverData.watchOuts.slice(0, 2)}
+            expandedSections={[
+              { label: 'STRENGTHS', items: moverData.strengths, color: ACCENT },
+              { label: 'WATCH-OUTS', items: moverData.watchOuts, color: '#f59e0b' },
+              { label: 'KEY CUES', items: moverData.cues, color: ACCENT },
+              { label: 'TRAINING EMPHASIS', items: moverData.trainingEmphasis, color: ACCENT },
+            ]}
+          />
+        )}
+
+        <Text style={styles.sectionLabel}>QUICK ACTIONS</Text>
+        <View style={styles.quickRow}>
+          <TouchableOpacity
+            style={styles.quickCard}
+            onPress={() => router.push('/(app)/training/sc/mobility/category?cat=movement_prep' as any)}
+            activeOpacity={0.8}
+          >
+            <Ionicons name="flash-outline" size={22} color={ACCENT} />
+            <Text style={styles.quickTitle}>Movement{'\n'}Prep</Text>
+          </TouchableOpacity>
+          <TouchableOpacity
+            style={styles.quickCard}
+            onPress={() => router.push('/(app)/training/sc/mobility/category?cat=yoga_flow' as any)}
+            activeOpacity={0.8}
+          >
+            <Ionicons name="leaf-outline" size={22} color="#8b5cf6" />
+            <Text style={styles.quickTitle}>Recovery{'\n'}Flows</Text>
+          </TouchableOpacity>
+          <TouchableOpacity
+            style={styles.quickCard}
+            onPress={() => router.push('/(app)/training/sc/mobility/category?cat=mobility' as any)}
+            activeOpacity={0.8}
+          >
+            <Ionicons name="body-outline" size={22} color="#0891b2" />
+            <Text style={styles.quickTitle}>Mobility{'\n'}Flows</Text>
+          </TouchableOpacity>
+        </View>
+
+        {/* C. Today's Cue */}
+        <View style={styles.cueCard}>
+          <Ionicons name="mic-outline" size={14} color={ACCENT} />
+          <Text style={styles.cueText}>{todayCue}</Text>
+        </View>
+
+        {/* ═══════ BUILD YOUR GAME ═══════ */}
+        <Text style={[styles.sectionLabel, { marginTop: 8 }]}>BUILD YOUR GAME</Text>
+
+        <View style={styles.buildGrid}>
+          {BUILD_ITEMS.map((item) => (
+            <TouchableOpacity
+              key={item.key}
+              style={styles.buildCard}
+              onPress={() => router.push(item.route as any)}
+              activeOpacity={0.8}
+            >
+              <View style={[styles.buildIcon, { backgroundColor: item.color + '15' }]}>
+                <Ionicons name={item.icon} size={20} color={item.color} />
+              </View>
+              <Text style={styles.buildLabel}>{item.label}</Text>
+              <Text style={styles.buildSub} numberOfLines={1}>{item.sub}</Text>
+            </TouchableOpacity>
+          ))}
+        </View>
       </ScrollView>
     </SafeAreaView>
   );
@@ -384,78 +345,77 @@ const styles = StyleSheet.create({
     backgroundColor: ACCENT + '15', alignItems: 'center', justifyContent: 'center',
   },
 
-  content: { padding: 16, paddingBottom: 60, gap: 12 },
+  content: { padding: 16, paddingBottom: 60, gap: 10 },
 
-  profileBanner: {
+  /* ── Execution: Today's Focus ────────── */
+  focusCard: {
+    backgroundColor: colors.surface, borderWidth: 1, borderRadius: radius.lg,
+    padding: 16, gap: 10,
+  },
+  focusHeader: {
     flexDirection: 'row', alignItems: 'center', gap: 12,
-    backgroundColor: colors.surface, borderWidth: 1, borderRadius: radius.lg, padding: 14,
   },
-  profileDot: { width: 10, height: 10, borderRadius: 5 },
-  profileLabel: { fontSize: 9, fontWeight: '900', color: colors.textMuted, letterSpacing: 1 },
-  profileType: { fontSize: 16, fontWeight: '900' },
-  profileSub: { fontSize: 12, color: colors.textSecondary, marginTop: 2 },
-
-  setupCard: {
-    flexDirection: 'row', alignItems: 'center', gap: 14,
-    backgroundColor: ACCENT + '08', borderWidth: 1, borderColor: ACCENT + '25',
-    borderRadius: radius.lg, padding: 16,
-  },
-  setupIcon: {
-    width: 48, height: 48, borderRadius: 14,
-    alignItems: 'center', justifyContent: 'center',
-  },
-  setupTitle: { fontSize: 15, fontWeight: '800', color: colors.textPrimary },
-  setupSub: { fontSize: 12, color: colors.textSecondary, lineHeight: 17, marginTop: 2 },
-
-  upgradeBanner: {
-    flexDirection: 'row', alignItems: 'center', gap: 12,
-    backgroundColor: ACCENT + '08', borderWidth: 1, borderColor: ACCENT + '30',
-    borderRadius: radius.lg, padding: 14,
-  },
-  upgradeTitle: { fontSize: 13, fontWeight: '800', color: colors.textPrimary },
-  upgradeSub: { fontSize: 11, color: colors.textSecondary, lineHeight: 16, marginTop: 2 },
-
-  /* ── Primary blocks ─── */
-  primaryCard: {
-    flexDirection: 'row', alignItems: 'center', gap: 14,
-    backgroundColor: colors.surface, borderWidth: 1, borderColor: colors.border,
-    borderRadius: radius.lg, padding: 18,
-  },
-  primaryIcon: {
-    width: 48, height: 48, borderRadius: 14,
-    alignItems: 'center', justifyContent: 'center',
-  },
-  primaryLabel: { fontSize: 17, fontWeight: '900', color: colors.textPrimary },
-  primarySub: { fontSize: 13, color: colors.textSecondary, marginTop: 2 },
-
-  /* ── Explore More ──────────────────────────── */
-  exploreHeader: {
-    flexDirection: 'row', alignItems: 'center', gap: 8,
-    paddingVertical: 12, paddingHorizontal: 4, marginTop: 4,
-  },
-  exploreHeaderText: { fontSize: 16, fontWeight: '900', color: colors.textPrimary },
-  exploreCount: { fontSize: 11, fontWeight: '700', color: colors.textMuted },
-
-  exploreGrid: { flexDirection: 'row', flexWrap: 'wrap', gap: 10 },
-  exploreCard: {
-    width: '48%' as any,
-    backgroundColor: colors.surface, borderWidth: 1, borderColor: colors.border,
-    borderRadius: radius.lg, padding: 14, gap: 8,
-  },
-  exploreIcon: {
+  focusIconWrap: {
     width: 40, height: 40, borderRadius: 12,
+    alignItems: 'center', justifyContent: 'center', flexShrink: 0,
+  },
+  focusLabel: { fontSize: 9, fontWeight: '900', letterSpacing: 1.2, color: colors.textMuted },
+  focusArchetype: { fontSize: 16, fontWeight: '900', color: colors.textPrimary },
+  focusSub: { fontSize: 11, color: colors.textSecondary, marginTop: 1 },
+
+  toolRow: {
+    flexDirection: 'row', alignItems: 'center', gap: 10,
+    paddingVertical: 8, borderTopWidth: 1, borderTopColor: colors.border,
+  },
+  toolDot: { width: 8, height: 8, borderRadius: 4, flexShrink: 0 },
+  toolName: { flex: 1, fontSize: 14, fontWeight: '700', color: colors.textSecondary },
+
+  ctaBtn: {
+    flexDirection: 'row', alignItems: 'center', justifyContent: 'center', gap: 8,
+    paddingVertical: 12, borderRadius: radius.md,
+  },
+  ctaBtnText: { fontSize: 14, fontWeight: '900', color: '#fff' },
+
+  /* ── Quick Compete ──────────────────── */
+  sectionLabel: { fontSize: 10, fontWeight: '900', letterSpacing: 1.5, color: colors.textMuted, marginTop: 4 },
+
+  quickRow: { flexDirection: 'row', gap: 8 },
+  quickCard: {
+    flex: 1, alignItems: 'center', gap: 6,
+    backgroundColor: colors.surface, borderWidth: 1, borderColor: colors.border,
+    borderRadius: radius.md, padding: 14,
+  },
+  quickTitle: { fontSize: 11, fontWeight: '800', color: colors.textPrimary, textAlign: 'center', lineHeight: 15 },
+
+  /* ── Today's Cue ────────────────────── */
+  cueCard: {
+    flexDirection: 'row', alignItems: 'center', gap: 8,
+    backgroundColor: ACCENT + '08', borderWidth: 1, borderColor: ACCENT + '20',
+    borderRadius: radius.md, padding: 12,
+  },
+  cueText: { flex: 1, fontSize: 13, fontWeight: '700', color: colors.textPrimary, fontStyle: 'italic' },
+
+  /* ── Build Your Game ────────────────── */
+  buildGrid: { flexDirection: 'row', flexWrap: 'wrap', gap: 10 },
+  buildCard: {
+    width: '47%' as any,
+    backgroundColor: colors.surface, borderWidth: 1, borderColor: colors.border,
+    borderRadius: radius.lg, padding: 14, gap: 6,
+  },
+  buildIcon: {
+    width: 36, height: 36, borderRadius: 10,
     alignItems: 'center', justifyContent: 'center',
   },
-  exploreLabel: { fontSize: 14, fontWeight: '800', color: colors.textPrimary },
-  exploreSub: { fontSize: 11, color: colors.textSecondary, lineHeight: 15 },
+  buildLabel: { fontSize: 13, fontWeight: '800', color: colors.textPrimary },
+  buildSub: { fontSize: 10, color: colors.textSecondary, lineHeight: 14 },
 
-  /* ── Locked state ──────────────────────────── */
+  /* ── Locked state ──────────────────── */
   lockedState: { flex: 1, alignItems: 'center', justifyContent: 'center', padding: 32, gap: 12 },
   lockedTitle: { fontSize: 18, fontWeight: '900', color: colors.textPrimary, textAlign: 'center' },
   lockedDesc: { fontSize: 13, color: colors.textSecondary, textAlign: 'center', lineHeight: 19 },
-  ctaBtn: {
+  ctaFull: {
     flexDirection: 'row', alignItems: 'center', justifyContent: 'center', gap: 8,
     paddingVertical: 16, paddingHorizontal: 24, borderRadius: radius.lg, marginTop: 4,
   },
-  ctaBtnText: { fontSize: 15, fontWeight: '900', color: '#fff' },
+  ctaFullText: { fontSize: 15, fontWeight: '900', color: '#fff' },
 });

@@ -53,41 +53,42 @@ export default function HittingIdentityQuizScreen() {
 
     if (next.length >= TOTAL_QUESTIONS) {
       const scored = scoreHittingIdentity(next);
-      setResult(scored);
-      setScreen('results');
 
-      // Persist locally
-      AsyncStorage.setItem(HITTING_IDENTITY_STORAGE_KEY, JSON.stringify(scored));
-
-      // Submit to Supabase as the new diagnostic type
+      // Submit to Supabase FIRST — do not show results until backend confirms
       const liveUser = await getLiveUser();
       const resolvedId = liveUser?.id ?? user?.id;
-      if (resolvedId) {
-        try {
-          if (__DEV__) console.log('[hitting-identity] submitting diagnostic for user:', resolvedId);
-          await submitDiagnostic(supabase, {
-            userId: resolvedId,
-            vaultType: 'hitting',
-            diagnosticType: 'mover-type',
-            resultPayload: {
-              movementType: scored.movementType,
-              batPathType: scored.batPathType,
-              combinedProfile: scored.combinedProfile,
-              movementScores: scored.movementScores,
-              batPathScores: scored.batPathScores,
-            },
-          });
-          if (__DEV__) console.log('[hitting-identity] submitDiagnostic OK');
-        } catch (err: any) {
-          console.error('[hitting-identity] submitDiagnostic FAILED:', err?.message ?? err);
-          Alert.alert(
-            'Save Error',
-            'Your results are saved locally but could not sync to the server. Please check your connection and try again.',
-          );
-        }
+      if (!resolvedId) {
+        Alert.alert('Session Error', 'Could not identify your account. Please sign in again.');
+        return;
+      }
+
+      try {
+        if (__DEV__) console.log('[hitting-identity] submitting diagnostic for user:', resolvedId);
+        await submitDiagnostic(supabase, {
+          userId: resolvedId,
+          vaultType: 'hitting',
+          diagnosticType: 'mover-type',
+          resultPayload: {
+            movementType: scored.movementType,
+            batPathType: scored.batPathType,
+            combinedProfile: scored.combinedProfile,
+            movementScores: scored.movementScores,
+            batPathScores: scored.batPathScores,
+          },
+        });
+        if (__DEV__) console.log('[hitting-identity] submitDiagnostic OK');
+
+        // Supabase succeeded — now safe to cache locally and show results
+        AsyncStorage.setItem(HITTING_IDENTITY_STORAGE_KEY, JSON.stringify(scored));
         queryClient.invalidateQueries({ queryKey: ['gate-state', resolvedId] });
-      } else {
-        console.warn('[hitting-identity] no userId — skipping Supabase submit');
+        setResult(scored);
+        setScreen('results');
+      } catch (err: any) {
+        console.error('[hitting-identity] submitDiagnostic FAILED:', err?.message ?? err);
+        Alert.alert(
+          'Save Error',
+          'Your results could not be saved. Please check your connection and try again.',
+        );
       }
     } else {
       setCurrentQ(currentQ + 1);

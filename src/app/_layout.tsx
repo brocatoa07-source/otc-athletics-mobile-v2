@@ -1,4 +1,5 @@
 import { useEffect, useRef } from 'react';
+import { AppState } from 'react-native';
 import { Stack } from 'expo-router';
 import { StatusBar } from 'expo-status-bar';
 import { QueryClientProvider } from '@tanstack/react-query';
@@ -59,7 +60,20 @@ export default function RootLayout() {
       }
     });
 
-    return () => subscription.unsubscribe();
+    // Refresh athlete profile (including tier) when app returns to foreground
+    const appStateSub = AppState.addEventListener('change', (nextState) => {
+      if (nextState === 'active' && hydrated.current) {
+        const userId = useAuthStore.getState().user?.id;
+        if (userId) {
+          fetchProfile(userId);
+        }
+      }
+    });
+
+    return () => {
+      subscription.unsubscribe();
+      appStateSub.remove();
+    };
   }, []);
 
   return (

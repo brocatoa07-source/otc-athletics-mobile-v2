@@ -46,9 +46,9 @@ export function useTier() {
   const hasFullHitting = isCoach || isSingle || isDouble || isTriple || isHomeRun;
 
   // ── Lifting Vault ──────────────────────────────────
-  // Walk: none, Single: limited, Double+: complete
-  const hasLimitedLifting = isSingle;
-  const hasFullLifting = isCoach || isDouble || isTriple || isHomeRun;
+  // Walk: none, Single: limited preview, Double: limited preview, Triple+: complete
+  const hasLimitedLifting = isSingle || isDouble;
+  const hasFullLifting = isCoach || isTriple || isHomeRun;
 
   // ── Mental Vault ───────────────────────────────────
   // Walk: none, Single: limited (preview), Double+: complete
@@ -62,13 +62,13 @@ export function useTier() {
   // ── Coach's Corner ────────────────────────────────
   const hasCoachesCorner = isCoach || isSingle || isDouble || isTriple || isHomeRun;
 
-  // ── 1-on-1 Coaching ───────────────────────────────
+  // ── 1-on-1 Coaching (inquire through app, delivered outside) ──
   const hasCoaching = isCoach || isHomeRun;
 
   // ── Messaging ─────────────────────────────────────
-  // Direct messaging is Home Run only (+ coaches)
-  const canMessage = isCoach || isHomeRun;
-  const hasUnlimitedMessaging = isCoach || isHomeRun;
+  // Double, Triple, Home Run can DM coach. Walk + Single cannot.
+  const canMessage = isCoach || isDouble || isTriple || isHomeRun;
+  const hasUnlimitedMessaging = isCoach || isDouble || isTriple || isHomeRun;
 
   return {
     isCoach,

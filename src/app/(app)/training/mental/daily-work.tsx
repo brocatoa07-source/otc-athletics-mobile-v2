@@ -8,8 +8,19 @@ import { Ionicons } from '@expo/vector-icons';
 import AsyncStorage from '@react-native-async-storage/async-storage';
 import { colors, radius } from '@/theme';
 import { useGating } from '@/hooks/useGating';
+import { useMentalProfile } from '@/hooks/useMentalProfile';
 import { MENTAL_PROFILES, type MentalProfileData } from '@/data/mental-profile-data';
-import { type MentalDiagnosticResult } from '@/data/mental-struggles-data';
+import { type MentalDiagnosticResult, type MentalStruggle } from '@/data/mental-struggles-data';
+
+/** Map archetype → legacy struggle key so DB profile can drive recommendations */
+const ARCHETYPE_TO_STRUGGLE: Record<string, MentalStruggle> = {
+  reactor: 'emotional_frustration',
+  overthinker: 'overthinking',
+  avoider: 'fear_of_failure',
+  performer: 'pregame_nerves',
+  doubter: 'confidence_drop',
+  driver: 'burnout',
+};
 import {
   getRecommendedMentalTools,
   flattenMentalRecommendation,
@@ -69,6 +80,9 @@ function generateMentalDailyPlan(
   const primaryTool = flat.find((f) => f.role === 'primary');
   if (primaryTool) {
     const sectionKey = TOOL_TO_SECTION[primaryTool.name];
+    if (__DEV__ && !sectionKey) {
+      console.warn(`[mental/daily-work] Tool "${primaryTool.name}" has no matching section in TOOL_TO_SECTION — falling back to toolbox`);
+    }
     items.push({
       id: 'mental-primary',
       type: 'tool',
@@ -107,6 +121,9 @@ function generateMentalDailyPlan(
   const secondaryTool = flat.find((f) => f.role === 'secondary');
   if (secondaryTool) {
     const sectionKey = TOOL_TO_SECTION[secondaryTool.name];
+    if (__DEV__ && !sectionKey) {
+      console.warn(`[mental/daily-work] Tool "${secondaryTool.name}" has no matching section in TOOL_TO_SECTION — falling back to toolbox`);
+    }
     items.push({
       id: 'mental-secondary',
       type: 'tool',
@@ -130,6 +147,7 @@ function generateMentalDailyPlan(
 
 export default function MentalDailyWorkScreen() {
   const { gate, isLoading: gateLoading } = useGating();
+  const { profile: dbProfile } = useMentalProfile();
   const { markMentalDoneToday } = useAccountability();
   const [profile, setProfile] = useState<MentalProfileData | null>(null);
   const [diagnostic, setDiagnostic] = useState<MentalDiagnosticResult | null>(null);
@@ -142,8 +160,21 @@ export default function MentalDailyWorkScreen() {
     console.log('[mental/daily-work] gateLoading:', gateLoading, 'mentalDiagDone:', mentalDiagDone, 'localLoaded:', localLoaded, 'diagnostic:', !!diagnostic);
   }
 
-  // Load profile + diagnostic from storage
+  // Load profile + diagnostic — prefer DB profile, fall back to AsyncStorage
   useEffect(() => {
+    // If DB profile exists, derive struggles from archetype (no AsyncStorage needed)
+    if (dbProfile?.primary_archetype) {
+      const archKey = dbProfile.primary_archetype;
+      const primary = ARCHETYPE_TO_STRUGGLE[archKey] ?? 'overthinking';
+      const secondary = dbProfile.secondary_archetype
+        ? (ARCHETYPE_TO_STRUGGLE[dbProfile.secondary_archetype] ?? 'focus_loss')
+        : 'focus_loss';
+      setDiagnostic({ primary, secondary });
+      setLocalLoaded(true);
+      return;
+    }
+
+    // Fallback: load from AsyncStorage (legacy path)
     Promise.all([
       AsyncStorage.getItem('otc:mental-profile'),
       AsyncStorage.getItem('otc:mental-struggles'),
@@ -161,7 +192,7 @@ export default function MentalDailyWorkScreen() {
       }
       setLocalLoaded(true);
     });
-  }, []);
+  }, [dbProfile]);
 
   // Load or generate today's plan
   useEffect(() => {

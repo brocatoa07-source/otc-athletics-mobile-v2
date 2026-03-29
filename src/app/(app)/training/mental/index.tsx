@@ -1,43 +1,48 @@
-import { useEffect, useState, useMemo } from 'react';
+/**
+ * Mental Home — Execution-first landing screen.
+ *
+ * Architecture:
+ *   1. EXECUTION: Today's Mental Focus + Quick Compete + Today's Cue
+ *   2. DEVELOPMENT: Build Your Game (courses, toolbox, journals, etc.)
+ *
+ * The top half emphasizes what to do TODAY.
+ * The bottom half provides access to deeper training.
+ */
+
+import { useState, useCallback } from 'react';
 import {
-  View, Text, ScrollView, TouchableOpacity, TextInput, StyleSheet,
+  View, Text, ScrollView, TouchableOpacity, StyleSheet,
 } from 'react-native';
 import { SafeAreaView } from 'react-native-safe-area-context';
-import { router } from 'expo-router';
+import { router, useFocusEffect } from 'expo-router';
 import { Ionicons } from '@expo/vector-icons';
 import AsyncStorage from '@react-native-async-storage/async-storage';
 import { colors, radius } from '@/theme';
 import { useTier } from '@/hooks/useTier';
 import { useGating } from '@/hooks/useGating';
 import { useMentalProfile } from '@/hooks/useMentalProfile';
-import { MENTAL_PROFILES, type MentalProfileData } from '@/data/mental-profile-data';
-import { MentalProfileCard } from '@/components/training/MentalProfileCard';
+import { ARCHETYPE_INFO, type ArchetypeKey } from '@/data/mental-diagnostics-data';
+import { ExpandableProfileCard } from '@/components/training/ExpandableProfileCard';
+import { ARCHETYPE_PATHS } from '@/data/mental-archetype-paths';
 import { MENTAL_VAULT_SECTIONS } from '@/data/mental-vault-sections';
-
-/* ─── Flatten tools for search ───────────────────── */
-interface SearchableTool {
-  name: string;
-  fixes: string;
-  focus: string;
-  sectionKey: string;
-  sectionLabel: string;
-  sectionColor: string;
-}
-
-const ALL_TOOLS: SearchableTool[] = MENTAL_VAULT_SECTIONS.flatMap((s) =>
-  s.tools.map((t) => ({
-    name: t.name,
-    fixes: t.fixes,
-    focus: t.focus,
-    sectionKey: s.key,
-    sectionLabel: s.label,
-    sectionColor: s.color,
-  })),
-);
 
 const ACCENT = '#8b5cf6';
 
-interface ExploreItem {
+// ── Today's Cue rotation (one per day) ──────────────────────────────────────
+
+const DAILY_CUES = [
+  'Trust the work. Compete clean.',
+  'Next pitch mentality. Always.',
+  'Control what you can. Release everything else.',
+  'Be here now. This pitch is all that exists.',
+  'Compete — don\'t perform.',
+  'Slow breath, slow heart, clear mind.',
+  'Attack the moment. Don\'t avoid it.',
+];
+
+// ── Build Your Game items ───────────────────────────────────────────────────
+
+interface BuildItem {
   key: string;
   label: string;
   sub: string;
@@ -46,50 +51,72 @@ interface ExploreItem {
   route: string;
 }
 
-const EXPLORE_ITEMS: ExploreItem[] = [
-  { key: 'courses', label: 'Courses', sub: '11 mental skills · Shadow → Mastery', icon: 'school-outline', color: '#8b5cf6', route: '/(app)/training/mental/courses-list' },
-  { key: 'toolbox', label: 'Toolbox', sub: '5 categories · 70+ tools', icon: 'build-outline', color: '#f59e0b', route: '/(app)/training/mental/toolbox' },
-  { key: 'journals', label: 'Journals', sub: '5 standard + 11 skill journals', icon: 'book-outline', color: '#3b82f6', route: '/(app)/training/mental/journals' },
+const BUILD_ITEMS: BuildItem[] = [
+  { key: 'program', label: 'Mental Training Program', sub: '6 core courses · Shadow → Mastery', icon: 'school-outline', color: '#8b5cf6', route: '/(app)/training/mental/courses-list' },
+  { key: 'toolbox', label: 'Toolbox', sub: '45 tools across 9 categories', icon: 'build-outline', color: '#f59e0b', route: '/(app)/training/mental/toolbox' },
+  { key: 'journals', label: 'Journals', sub: 'Skill journals + daily reflection', icon: 'book-outline', color: '#3b82f6', route: '/(app)/training/mental/journals' },
   { key: 'meditations', label: 'Meditations', sub: '7 guided sessions · 3–8 min', icon: 'leaf-outline', color: '#a855f7', route: '/(app)/training/mental/meditations' },
-  { key: 'reset', label: '10-Step Reset', sub: 'In-game re-center routine', icon: 'refresh-circle-outline', color: ACCENT, route: '/(app)/training/mental/ten-step-reset' },
-  { key: 'dugout', label: 'Dugout Card', sub: 'Your game-time cue card', icon: 'document-text-outline', color: '#E10600', route: '/(app)/training/mental/dugout-card' },
+  { key: 'troubleshoot', label: 'Troubleshooting', sub: 'Problem → action → protocol', icon: 'hammer-outline', color: '#ef4444', route: '/(app)/training/mental/troubleshooting' },
   { key: 'identity', label: 'Identity Builder', sub: 'Statement, habits, tracker', icon: 'construct-outline', color: '#22c55e', route: '/(app)/training/mental/identity-builder' },
-  { key: 'troubleshoot', label: 'Troubleshooting', sub: 'Fix common mental issues', icon: 'hammer-outline', color: '#ef4444', route: '/(app)/training/mental/troubleshooting' },
 ];
 
-export default function MentalVaultIndex() {
+// ── Resolve weekly focus tools from archetype ───────────────────────────────
+
+interface FocusTool {
+  name: string;
+  sectionKey: string;
+  sectionColor: string;
+}
+
+function resolveFocusTools(archetypeKey: string): FocusTool[] {
+  const path = ARCHETYPE_PATHS[archetypeKey];
+  if (!path) return [];
+
+  // Map archetype focus skills to vault section tools
+  const results: FocusTool[] = [];
+  for (const section of MENTAL_VAULT_SECTIONS) {
+    if (path.focusSkills.some((f) => section.label.toLowerCase().includes(f.toLowerCase()))) {
+      if (section.tools[0]) {
+        results.push({
+          name: section.tools[0].name,
+          sectionKey: section.key,
+          sectionColor: section.color,
+        });
+      }
+    }
+    if (results.length >= 3) break;
+  }
+
+  // If not enough, add first tool from the first section not yet covered
+  if (results.length < 2) {
+    for (const section of MENTAL_VAULT_SECTIONS) {
+      if (!results.some((r) => r.sectionKey === section.key) && section.tools[0]) {
+        results.push({
+          name: section.tools[0].name,
+          sectionKey: section.key,
+          sectionColor: section.color,
+        });
+        if (results.length >= 2) break;
+      }
+    }
+  }
+
+  return results.slice(0, 3);
+}
+
+// ── Component ───────────────────────────────────────────────────────────────
+
+export default function MentalHome() {
   const { isWalk, hasLimitedMental } = useTier();
   const { gate } = useGating();
-  const { profile: dbProfile, completedTypes } = useMentalProfile();
-  const [profileResult, setProfileResult] = useState<MentalProfileData | null>(null);
-  const [exploreExpanded, setExploreExpanded] = useState(false);
-  const [search, setSearch] = useState('');
-
-  const searchResults = useMemo(() => {
-    if (!search.trim()) return [];
-    const q = search.trim().toLowerCase();
-    return ALL_TOOLS.filter(
-      (t) =>
-        t.name.toLowerCase().includes(q) ||
-        t.fixes.toLowerCase().includes(q) ||
-        t.focus.toLowerCase().includes(q),
-    );
-  }, [search]);
+  const { profile: dbProfile } = useMentalProfile();
 
   const mentalDiagDone = gate.mental.archetypeDone && gate.mental.identityDone && gate.mental.habitsDone;
-
-  useEffect(() => {
-    AsyncStorage.getItem('otc:mental-profile').then((val) => {
-      if (val) {
-        try {
-          const parsed = JSON.parse(val);
-          const slug = parsed.slug ?? parsed;
-          const found = Object.values(MENTAL_PROFILES).find((m) => m.slug === slug);
-          if (found) setProfileResult(found);
-        } catch {}
-      }
-    });
-  }, []);
+  const archKey = dbProfile?.primary_archetype as ArchetypeKey | undefined;
+  const archInfo = archKey ? ARCHETYPE_INFO[archKey] : null;
+  const focusTools = archKey ? resolveFocusTools(archKey) : [];
+  const dayIndex = Math.floor(Date.now() / 86_400_000);
+  const todayCue = DAILY_CUES[dayIndex % DAILY_CUES.length];
 
   // Walk tier — fully locked
   if (isWalk) {
@@ -100,22 +127,22 @@ export default function MentalVaultIndex() {
             <Ionicons name="chevron-back" size={24} color={colors.textPrimary} />
           </TouchableOpacity>
           <View style={{ flex: 1 }}>
-            <Text style={styles.headerSup}>MENTAL VAULT</Text>
-            <Text style={styles.headerTitle}>The OTC Mental System</Text>
+            <Text style={styles.headerSup}>MENTAL</Text>
+            <Text style={styles.headerTitle}>Mental System</Text>
           </View>
         </View>
         <View style={styles.lockedState}>
           <Ionicons name="lock-closed-outline" size={48} color={colors.textMuted} />
-          <Text style={styles.lockedTitle}>Mental Vault Locked</Text>
+          <Text style={styles.lockedTitle}>Mental System Locked</Text>
           <Text style={styles.lockedDesc}>
-            Upgrade to unlock the full Mental Vault with personalized tools, courses, and daily mental work.
+            Upgrade to unlock personalized mental training, tools, courses, and daily routines.
           </Text>
           <TouchableOpacity
-            style={[styles.ctaBtn, { backgroundColor: ACCENT }]}
+            style={[styles.ctaFull, { backgroundColor: ACCENT }]}
             onPress={() => router.push('/(app)/upgrade' as any)}
             activeOpacity={0.8}
           >
-            <Text style={styles.ctaBtnText}>Upgrade to Double</Text>
+            <Text style={styles.ctaFullText}>Upgrade to Double</Text>
             <Ionicons name="arrow-forward" size={16} color="#fff" />
           </TouchableOpacity>
         </View>
@@ -131,8 +158,8 @@ export default function MentalVaultIndex() {
           <Ionicons name="chevron-back" size={24} color={colors.textPrimary} />
         </TouchableOpacity>
         <View style={{ flex: 1 }}>
-          <Text style={styles.headerSup}>MENTAL VAULT</Text>
-          <Text style={styles.headerTitle}>The OTC Mental System</Text>
+          <Text style={styles.headerSup}>MENTAL</Text>
+          <Text style={styles.headerTitle}>Mental System</Text>
         </View>
         <TouchableOpacity
           style={styles.diagBtn}
@@ -142,87 +169,7 @@ export default function MentalVaultIndex() {
         </TouchableOpacity>
       </View>
 
-      {/* Search Bar */}
-      <View style={styles.searchRow}>
-        <Ionicons name="search-outline" size={18} color={colors.textMuted} />
-        <TextInput
-          style={styles.searchInput}
-          placeholder="Search mental tools..."
-          placeholderTextColor={colors.textMuted}
-          value={search}
-          onChangeText={setSearch}
-          returnKeyType="search"
-          autoCorrect={false}
-          autoCapitalize="none"
-        />
-        {search.length > 0 && (
-          <TouchableOpacity onPress={() => setSearch('')} hitSlop={{ top: 8, bottom: 8, left: 8, right: 8 }}>
-            <Ionicons name="close-circle" size={18} color={colors.textMuted} />
-          </TouchableOpacity>
-        )}
-      </View>
-
-      {/* Search Results */}
-      {search.trim().length > 0 ? (
-        <ScrollView style={{ flex: 1 }} contentContainerStyle={styles.content} showsVerticalScrollIndicator={false}>
-          {searchResults.length === 0 ? (
-            <View style={styles.searchEmpty}>
-              <Ionicons name="search-outline" size={40} color={colors.textMuted} />
-              <Text style={styles.searchEmptyTitle}>No results found</Text>
-              <Text style={styles.searchEmptySub}>No tools match "{search}"</Text>
-            </View>
-          ) : (
-            <>
-              <Text style={styles.searchCount}>{searchResults.length} result{searchResults.length !== 1 ? 's' : ''}</Text>
-              {searchResults.map((t) => (
-                <TouchableOpacity
-                  key={`${t.sectionKey}-${t.name}`}
-                  style={styles.searchResultCard}
-                  onPress={() => router.push(`/(app)/training/mental/${t.sectionKey}` as any)}
-                  activeOpacity={0.8}
-                >
-                  <View style={[styles.searchResultDot, { backgroundColor: t.sectionColor }]} />
-                  <View style={{ flex: 1 }}>
-                    <Text style={styles.searchResultName}>{t.name}</Text>
-                    <Text style={styles.searchResultFixes} numberOfLines={1}>{t.fixes}</Text>
-                  </View>
-                  <View style={[styles.searchResultTag, { backgroundColor: t.sectionColor + '15' }]}>
-                    <Text style={[styles.searchResultTagText, { color: t.sectionColor }]}>{t.sectionLabel}</Text>
-                  </View>
-                </TouchableOpacity>
-              ))}
-            </>
-          )}
-        </ScrollView>
-      ) : (
-
-      <ScrollView
-        contentContainerStyle={styles.content}
-        showsVerticalScrollIndicator={false}
-      >
-        {/* Profile Card (DB-backed) */}
-        {dbProfile && (
-          <MentalProfileCard profile={dbProfile} completedTypes={completedTypes} />
-        )}
-
-        {/* Lightweight fallback profile */}
-        {!dbProfile && profileResult && (
-          <TouchableOpacity
-            style={[styles.profileBanner, { borderColor: profileResult.color + '40' }]}
-            onPress={() => router.push('/(app)/training/mental/mental-profile-quiz' as any)}
-            activeOpacity={0.8}
-          >
-            <View style={[styles.profileDot, { backgroundColor: profileResult.color }]} />
-            <View style={{ flex: 1 }}>
-              <Text style={styles.profileLabel}>Your Mental Profile</Text>
-              <Text style={[styles.profileType, { color: profileResult.color }]}>
-                {profileResult.name}
-              </Text>
-            </View>
-            <Ionicons name="chevron-forward" size={16} color={colors.textMuted} />
-          </TouchableOpacity>
-        )}
-
+      <ScrollView contentContainerStyle={styles.content} showsVerticalScrollIndicator={false}>
         {/* Preview mode banner */}
         {hasLimitedMental && (
           <TouchableOpacity
@@ -230,94 +177,146 @@ export default function MentalVaultIndex() {
             onPress={() => router.push('/(app)/upgrade' as any)}
             activeOpacity={0.8}
           >
-            <Ionicons name="lock-open-outline" size={18} color={ACCENT} />
+            <Ionicons name="lock-open-outline" size={16} color={ACCENT} />
             <View style={{ flex: 1 }}>
               <Text style={styles.upgradeTitle}>Preview Mode</Text>
-              <Text style={styles.upgradeSub}>
-                Starter tools unlocked. Upgrade to Double for full access.
-              </Text>
+              <Text style={styles.upgradeSub}>Starter tools unlocked. Upgrade for full access.</Text>
             </View>
-            <Ionicons name="chevron-forward" size={14} color={colors.textMuted} />
           </TouchableOpacity>
         )}
 
-        {/* ═══════ BLOCK 1: MY PATH ═══════ */}
-        <TouchableOpacity
-          style={styles.primaryCard}
-          onPress={() => router.push('/(app)/training/mental/my-path' as any)}
-          activeOpacity={0.8}
-        >
-          <View style={[styles.primaryIcon, { backgroundColor: '#3b82f618' }]}>
-            <Ionicons name="map-outline" size={24} color="#3b82f6" />
-          </View>
-          <View style={{ flex: 1 }}>
-            <Text style={styles.primaryLabel}>My Path</Text>
-            <Text style={styles.primarySub}>
-              {mentalDiagDone
-                ? 'Your personalized mental plan'
-                : 'Complete diagnostics to unlock'}
-            </Text>
-          </View>
-          <Ionicons name="chevron-forward" size={20} color={colors.textMuted} />
-        </TouchableOpacity>
+        {/* ═══════ EXECUTION LAYER ═══════ */}
 
-        {/* ═══════ BLOCK 2: TODAY'S WORK ═══════ */}
-        <TouchableOpacity
-          style={[styles.primaryCard, { backgroundColor: ACCENT + '06', borderColor: ACCENT + '25' }]}
-          onPress={() => router.push('/(app)/training/mental/daily-work' as any)}
-          activeOpacity={0.8}
-        >
-          <View style={[styles.primaryIcon, { backgroundColor: ACCENT + '18' }]}>
-            <Ionicons name="flash" size={24} color={ACCENT} />
-          </View>
-          <View style={{ flex: 1 }}>
-            <Text style={styles.primaryLabel}>Today's Work</Text>
-            <Text style={styles.primarySub}>
-              {mentalDiagDone
-                ? 'Your daily mental training tasks'
-                : 'Complete diagnostics to unlock'}
-            </Text>
-          </View>
-          <Ionicons name="chevron-forward" size={20} color={colors.textMuted} />
-        </TouchableOpacity>
+        {/* A. Today's Mental Focus */}
+        {mentalDiagDone && archInfo ? (
+          <View style={[styles.focusCard, { borderColor: ACCENT + '30' }]}>
+            <View style={styles.focusHeader}>
+              <View style={[styles.focusIconWrap, { backgroundColor: ACCENT + '15' }]}>
+                <Ionicons name="flash" size={18} color={ACCENT} />
+              </View>
+              <View style={{ flex: 1 }}>
+                <Text style={styles.focusLabel}>TODAY'S MENTAL FOCUS</Text>
+                <Text style={styles.focusArchetype}>{archInfo.name}</Text>
+              </View>
+            </View>
 
-        {/* ═══════ BLOCK 3: EXPLORE MORE ═══════ */}
-        <TouchableOpacity
-          style={styles.exploreHeader}
-          onPress={() => setExploreExpanded(!exploreExpanded)}
-          activeOpacity={0.7}
-        >
-          <Ionicons name="compass-outline" size={20} color={ACCENT} />
-          <Text style={styles.exploreHeaderText}>Explore More</Text>
-          <View style={{ flex: 1 }} />
-          <Text style={styles.exploreCount}>{EXPLORE_ITEMS.length} areas</Text>
-          <Ionicons
-            name={exploreExpanded ? 'chevron-up' : 'chevron-down'}
-            size={18}
-            color={colors.textMuted}
-          />
-        </TouchableOpacity>
-
-        {exploreExpanded && (
-          <View style={styles.exploreGrid}>
-            {EXPLORE_ITEMS.map((item) => (
+            {/* Assigned tools */}
+            {focusTools.map((tool) => (
               <TouchableOpacity
-                key={item.key}
-                style={styles.exploreCard}
-                onPress={() => router.push(item.route as any)}
+                key={tool.sectionKey}
+                style={styles.toolRow}
+                onPress={() => router.push(`/(app)/training/mental/${tool.sectionKey}` as any)}
                 activeOpacity={0.8}
               >
-                <View style={[styles.exploreIcon, { backgroundColor: item.color + '15' }]}>
-                  <Ionicons name={item.icon} size={20} color={item.color} />
-                </View>
-                <Text style={styles.exploreLabel}>{item.label}</Text>
-                <Text style={styles.exploreSub} numberOfLines={1}>{item.sub}</Text>
+                <View style={[styles.toolDot, { backgroundColor: tool.sectionColor }]} />
+                <Text style={styles.toolName}>{tool.name}</Text>
+                <Ionicons name="chevron-forward" size={14} color={colors.textMuted} />
               </TouchableOpacity>
             ))}
+
+            {/* CTA */}
+            <TouchableOpacity
+              style={[styles.ctaBtn, { backgroundColor: ACCENT }]}
+              onPress={() => router.push('/(app)/training/mental/daily-work' as any)}
+              activeOpacity={0.85}
+            >
+              <Ionicons name="play-circle" size={18} color="#fff" />
+              <Text style={styles.ctaBtnText}>Start Routine</Text>
+            </TouchableOpacity>
           </View>
+        ) : (
+          <TouchableOpacity
+            style={[styles.focusCard, { borderColor: ACCENT + '30' }]}
+            onPress={() => router.push('/(app)/training/mental/diagnostics/entry' as any)}
+            activeOpacity={0.85}
+          >
+            <View style={styles.focusHeader}>
+              <View style={[styles.focusIconWrap, { backgroundColor: ACCENT + '15' }]}>
+                <Ionicons name="clipboard-outline" size={18} color={ACCENT} />
+              </View>
+              <View style={{ flex: 1 }}>
+                <Text style={styles.focusLabel}>MENTAL DIAGNOSTIC</Text>
+                <Text style={styles.focusArchetype}>Complete Your Assessment</Text>
+                <Text style={styles.focusSub}>3 diagnostics · Personalized mental plan</Text>
+              </View>
+              <Ionicons name="arrow-forward-circle" size={24} color={ACCENT} />
+            </View>
+          </TouchableOpacity>
         )}
+
+        {/* Expandable Profile Card */}
+        {archInfo && (
+          <ExpandableProfileCard
+            accent={ACCENT}
+            title={archInfo.name}
+            subtitle={archInfo.tagline}
+            collapsedStrengths={archInfo.strengths.slice(0, 3)}
+            collapsedWatchOuts={archInfo.watchOuts.slice(0, 2)}
+            expandedSections={[
+              { label: 'UNDER PRESSURE', items: archInfo.pressureResponse, color: '#f59e0b' },
+              { label: 'MENTAL STRENGTHS', items: archInfo.strengths, color: ACCENT },
+              { label: 'WATCH-OUTS', items: archInfo.watchOuts, color: '#f59e0b' },
+              { label: 'GAME DAY CUES', items: archInfo.cues, color: ACCENT },
+              { label: 'DEVELOPMENT FOCUS', items: archInfo.developmentFocus, color: ACCENT },
+            ]}
+          />
+        )}
+
+        {/* B. Quick Compete */}
+        <Text style={styles.sectionLabel}>QUICK COMPETE</Text>
+        <View style={styles.quickRow}>
+          <TouchableOpacity
+            style={styles.quickCard}
+            onPress={() => router.push('/(app)/training/mental/ten-second-reset' as any)}
+            activeOpacity={0.8}
+          >
+            <Ionicons name="refresh-circle-outline" size={22} color={ACCENT} />
+            <Text style={styles.quickTitle}>10-Second{'\n'}Reset</Text>
+          </TouchableOpacity>
+          <TouchableOpacity
+            style={styles.quickCard}
+            onPress={() => router.push('/(app)/training/mental/emergency-reset' as any)}
+            activeOpacity={0.8}
+          >
+            <Ionicons name="alert-circle-outline" size={22} color="#ef4444" />
+            <Text style={styles.quickTitle}>3-Step{'\n'}Emergency</Text>
+          </TouchableOpacity>
+          <TouchableOpacity
+            style={styles.quickCard}
+            onPress={() => router.push('/(app)/training/mental/post-game' as any)}
+            activeOpacity={0.8}
+          >
+            <Ionicons name="checkmark-circle-outline" size={22} color="#22c55e" />
+            <Text style={styles.quickTitle}>Post-Game{'\n'}Flush</Text>
+          </TouchableOpacity>
+        </View>
+
+        {/* C. Today's Cue */}
+        <View style={styles.cueCard}>
+          <Ionicons name="mic-outline" size={14} color={ACCENT} />
+          <Text style={styles.cueText}>{todayCue}</Text>
+        </View>
+
+        {/* ═══════ BUILD YOUR GAME (Development + Support) ═══════ */}
+        <Text style={[styles.sectionLabel, { marginTop: 8 }]}>BUILD YOUR GAME</Text>
+
+        <View style={styles.buildGrid}>
+          {BUILD_ITEMS.map((item) => (
+            <TouchableOpacity
+              key={item.key}
+              style={styles.buildCard}
+              onPress={() => router.push(item.route as any)}
+              activeOpacity={0.8}
+            >
+              <View style={[styles.buildIcon, { backgroundColor: item.color + '15' }]}>
+                <Ionicons name={item.icon} size={20} color={item.color} />
+              </View>
+              <Text style={styles.buildLabel}>{item.label}</Text>
+              <Text style={styles.buildSub} numberOfLines={1}>{item.sub}</Text>
+            </TouchableOpacity>
+          ))}
+        </View>
       </ScrollView>
-      )}
     </SafeAreaView>
   );
 }
@@ -338,91 +337,85 @@ const styles = StyleSheet.create({
     backgroundColor: ACCENT + '15', alignItems: 'center', justifyContent: 'center',
   },
 
-  content: { padding: 16, paddingBottom: 60, gap: 12 },
-
-  profileBanner: {
-    flexDirection: 'row', alignItems: 'center', gap: 12,
-    backgroundColor: colors.surface, borderWidth: 1, borderRadius: radius.lg, padding: 14,
-  },
-  profileDot: { width: 10, height: 10, borderRadius: 5 },
-  profileLabel: { fontSize: 10, fontWeight: '800', color: colors.textMuted, letterSpacing: 0.8 },
-  profileType: { fontSize: 16, fontWeight: '900' },
+  content: { padding: 16, paddingBottom: 60, gap: 10 },
 
   upgradeBanner: {
+    flexDirection: 'row', alignItems: 'center', gap: 10,
+    backgroundColor: ACCENT + '08', borderWidth: 1, borderColor: ACCENT + '25',
+    borderRadius: radius.md, padding: 12,
+  },
+  upgradeTitle: { fontSize: 12, fontWeight: '800', color: colors.textPrimary },
+  upgradeSub: { fontSize: 11, color: colors.textSecondary },
+
+  /* ── Execution: Today's Focus ────────── */
+  focusCard: {
+    backgroundColor: colors.surface, borderWidth: 1, borderRadius: radius.lg,
+    padding: 16, gap: 10,
+  },
+  focusHeader: {
     flexDirection: 'row', alignItems: 'center', gap: 12,
-    backgroundColor: ACCENT + '08', borderWidth: 1, borderColor: ACCENT + '30',
-    borderRadius: radius.lg, padding: 14,
   },
-  upgradeTitle: { fontSize: 13, fontWeight: '800', color: colors.textPrimary },
-  upgradeSub: { fontSize: 11, color: colors.textSecondary, lineHeight: 16, marginTop: 2 },
-
-  /* ── Primary blocks (My Path, Today's Work) ─── */
-  primaryCard: {
-    flexDirection: 'row', alignItems: 'center', gap: 14,
-    backgroundColor: colors.surface, borderWidth: 1, borderColor: colors.border,
-    borderRadius: radius.lg, padding: 18,
-  },
-  primaryIcon: {
-    width: 48, height: 48, borderRadius: 14,
-    alignItems: 'center', justifyContent: 'center',
-  },
-  primaryLabel: { fontSize: 17, fontWeight: '900', color: colors.textPrimary },
-  primarySub: { fontSize: 13, color: colors.textSecondary, marginTop: 2 },
-
-  /* ── Explore More ──────────────────────────── */
-  exploreHeader: {
-    flexDirection: 'row', alignItems: 'center', gap: 8,
-    paddingVertical: 12, paddingHorizontal: 4, marginTop: 4,
-  },
-  exploreHeaderText: { fontSize: 16, fontWeight: '900', color: colors.textPrimary },
-  exploreCount: { fontSize: 11, fontWeight: '700', color: colors.textMuted },
-
-  exploreGrid: {
-    flexDirection: 'row', flexWrap: 'wrap', gap: 10,
-  },
-  exploreCard: {
-    width: '48%' as any,
-    backgroundColor: colors.surface, borderWidth: 1, borderColor: colors.border,
-    borderRadius: radius.lg, padding: 14, gap: 8,
-  },
-  exploreIcon: {
+  focusIconWrap: {
     width: 40, height: 40, borderRadius: 12,
+    alignItems: 'center', justifyContent: 'center', flexShrink: 0,
+  },
+  focusLabel: { fontSize: 9, fontWeight: '900', letterSpacing: 1.2, color: colors.textMuted },
+  focusArchetype: { fontSize: 16, fontWeight: '900', color: colors.textPrimary },
+  focusSub: { fontSize: 11, color: colors.textSecondary, marginTop: 1 },
+
+  toolRow: {
+    flexDirection: 'row', alignItems: 'center', gap: 10,
+    paddingVertical: 8, borderTopWidth: 1, borderTopColor: colors.border,
+  },
+  toolDot: { width: 8, height: 8, borderRadius: 4, flexShrink: 0 },
+  toolName: { flex: 1, fontSize: 14, fontWeight: '700', color: colors.textSecondary },
+
+  ctaBtn: {
+    flexDirection: 'row', alignItems: 'center', justifyContent: 'center', gap: 8,
+    paddingVertical: 12, borderRadius: radius.md,
+  },
+  ctaBtnText: { fontSize: 14, fontWeight: '900', color: '#fff' },
+
+  /* ── Quick Compete ──────────────────── */
+  sectionLabel: { fontSize: 10, fontWeight: '900', letterSpacing: 1.5, color: colors.textMuted, marginTop: 4 },
+
+  quickRow: { flexDirection: 'row', gap: 8 },
+  quickCard: {
+    flex: 1, alignItems: 'center', gap: 6,
+    backgroundColor: colors.surface, borderWidth: 1, borderColor: colors.border,
+    borderRadius: radius.md, padding: 14,
+  },
+  quickTitle: { fontSize: 11, fontWeight: '800', color: colors.textPrimary, textAlign: 'center', lineHeight: 15 },
+
+  /* ── Today's Cue ────────────────────── */
+  cueCard: {
+    flexDirection: 'row', alignItems: 'center', gap: 8,
+    backgroundColor: ACCENT + '08', borderWidth: 1, borderColor: ACCENT + '20',
+    borderRadius: radius.md, padding: 12,
+  },
+  cueText: { flex: 1, fontSize: 13, fontWeight: '700', color: colors.textPrimary, fontStyle: 'italic' },
+
+  /* ── Build Your Game ────────────────── */
+  buildGrid: { flexDirection: 'row', flexWrap: 'wrap', gap: 10 },
+  buildCard: {
+    width: '47%' as any,
+    backgroundColor: colors.surface, borderWidth: 1, borderColor: colors.border,
+    borderRadius: radius.lg, padding: 14, gap: 6,
+  },
+  buildIcon: {
+    width: 36, height: 36, borderRadius: 10,
     alignItems: 'center', justifyContent: 'center',
   },
-  exploreLabel: { fontSize: 14, fontWeight: '800', color: colors.textPrimary },
-  exploreSub: { fontSize: 11, color: colors.textSecondary, lineHeight: 15 },
+  buildLabel: { fontSize: 13, fontWeight: '800', color: colors.textPrimary },
+  buildSub: { fontSize: 10, color: colors.textSecondary, lineHeight: 14 },
 
-  /* ── Locked state ──────────────────────────── */
+  /* ── Locked state ──────────────────── */
   lockedState: { flex: 1, alignItems: 'center', justifyContent: 'center', padding: 32, gap: 12 },
   lockedTitle: { fontSize: 18, fontWeight: '900', color: colors.textPrimary, textAlign: 'center' },
   lockedDesc: { fontSize: 13, color: colors.textSecondary, textAlign: 'center', lineHeight: 19 },
-  ctaBtn: {
+  ctaFull: {
     flexDirection: 'row', alignItems: 'center', justifyContent: 'center', gap: 8,
     paddingVertical: 16, paddingHorizontal: 24, borderRadius: radius.lg, marginTop: 4,
   },
-  ctaBtnText: { fontSize: 15, fontWeight: '900', color: '#fff' },
-
-  /* ── Search ──────────────────────────────────── */
-  searchRow: {
-    flexDirection: 'row', alignItems: 'center', gap: 8,
-    marginHorizontal: 16, marginTop: 12, marginBottom: 4,
-    paddingHorizontal: 12, paddingVertical: 10,
-    backgroundColor: colors.surface, borderWidth: 1, borderColor: colors.border,
-    borderRadius: radius.lg,
-  },
-  searchInput: { flex: 1, fontSize: 14, color: colors.textPrimary, padding: 0 },
-  searchEmpty: { alignItems: 'center', paddingTop: 60, gap: 8 },
-  searchEmptyTitle: { fontSize: 16, fontWeight: '800', color: colors.textPrimary },
-  searchEmptySub: { fontSize: 13, color: colors.textSecondary, textAlign: 'center' },
-  searchCount: { fontSize: 12, fontWeight: '700', color: colors.textMuted },
-  searchResultCard: {
-    flexDirection: 'row', alignItems: 'center', gap: 12,
-    backgroundColor: colors.surface, borderWidth: 1, borderColor: colors.border,
-    borderRadius: radius.lg, padding: 14,
-  },
-  searchResultDot: { width: 8, height: 8, borderRadius: 4 },
-  searchResultName: { fontSize: 14, fontWeight: '800', color: colors.textPrimary },
-  searchResultFixes: { fontSize: 12, color: colors.textSecondary, marginTop: 2 },
-  searchResultTag: { paddingHorizontal: 8, paddingVertical: 3, borderRadius: 6 },
-  searchResultTagText: { fontSize: 10, fontWeight: '800' },
+  ctaFullText: { fontSize: 15, fontWeight: '900', color: '#fff' },
 });

@@ -104,46 +104,26 @@ export interface WeeklyChallenge {
   goal: string;
   rules: string;
   scoring: string;
-  videoRequired: boolean;
-  ageGroups: string[];
-  tieRule: string;
-  medalLogic: string;
-  submissionDeadline: string;
 }
 
 export const WEEKLY_CHALLENGES: WeeklyChallenge[] = [
   {
     name: 'Target Practice',
     goal: 'Hit the target zone 3 out of 5 swings off a tee.',
-    rules: 'Set up a target in center field. 5 swings. Count direct hits only. Film from behind.',
-    scoring: 'Hits out of 5 attempts',
-    videoRequired: true,
-    ageGroups: ['12U', '14U', '16U', '18U', 'College'],
-    tieRule: 'Highest consecutive hits wins the tie.',
-    medalLogic: '5/5 = Gold, 4/5 = Silver, 3/5 = Bronze',
-    submissionDeadline: 'Sunday 11:59 PM local time',
+    rules: 'Set up a target in center field. Take 5 swings off a tee. Count only direct hits to the target zone.',
+    scoring: '5/5 = Elite · 4/5 = Strong · 3/5 = Solid',
   },
   {
-    name: 'Back Net Challenge',
-    goal: 'Hit a fly ball back to the catcher from a deep contact point.',
-    rules: 'Tee set deep. Try to hit the ball backward. 5 attempts. Film from the side.',
-    scoring: 'Best backward distance out of 5',
-    videoRequired: true,
-    ageGroups: ['12U', '14U', '16U', '18U', 'College'],
-    tieRule: 'Most consistent backward contact wins.',
-    medalLogic: 'Top 10% = Gold, Top 25% = Silver, Top 50% = Bronze',
-    submissionDeadline: 'Sunday 11:59 PM local time',
+    name: 'Deep Contact Challenge',
+    goal: 'Drive the ball hard from a deep contact point.',
+    rules: 'Set the tee deep in the zone. Take 5 swings. Focus on staying back and driving through the ball with backspin.',
+    scoring: 'Count the number of hard-hit balls with backspin out of 5',
   },
   {
-    name: 'L-Screen Crossbar Challenge',
-    goal: 'Hit the crossbar of the L-screen on a line drive.',
-    rules: 'Standard front toss distance. 10 swings. Count crossbar hits. Film from the side.',
-    scoring: 'Crossbar hits out of 10',
-    videoRequired: true,
-    ageGroups: ['12U', '14U', '16U', '18U', 'College'],
-    tieRule: 'Fewest total swings to reach score wins.',
-    medalLogic: '3+ hits = Gold, 2 hits = Silver, 1 hit = Bronze',
-    submissionDeadline: 'Sunday 11:59 PM local time',
+    name: 'Line Drive Challenge',
+    goal: 'Hit line drives on front toss.',
+    rules: 'Standard front toss distance. Take 10 swings. Count line drives only — no ground balls, no pop-ups.',
+    scoring: '8+ line drives = Elite · 6–7 = Strong · 4–5 = Solid',
   },
 ];
 

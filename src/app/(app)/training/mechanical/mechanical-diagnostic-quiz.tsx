@@ -1,5 +1,5 @@
 import {
-  View, Text, ScrollView, TouchableOpacity, StyleSheet,
+  View, Text, ScrollView, TouchableOpacity, StyleSheet, Alert,
 } from 'react-native';
 import { SafeAreaView } from 'react-native-safe-area-context';
 import { router } from 'expo-router';
@@ -41,24 +41,34 @@ export default function MechanicalDiagnosticScreen() {
 
     if (next.length >= MECHANICAL_QUESTIONS.length) {
       const res = scoreMechanicalDiagnostic(next);
-      setResult(res);
-      setScreen('results');
-      AsyncStorage.setItem(STORAGE_KEY, JSON.stringify(res));
-      // Record completion via diagnostic submission service
+
+      // Submit to Supabase FIRST — do not show results until backend confirms
       const liveUser = await getLiveUser();
       const resolvedId = liveUser?.id ?? user?.id;
-      if (resolvedId) {
-        try {
-          await submitDiagnostic(supabase, {
-            userId: resolvedId,
-            vaultType: 'hitting',
-            diagnosticType: 'mechanical',
-            resultPayload: { primary: res.primary, secondary: res.secondary },
-          });
-        } catch (err) {
-          if (__DEV__) console.warn('[mechanical-quiz] submitDiagnostic error:', err);
-        }
+      if (!resolvedId) {
+        Alert.alert('Session Error', 'Could not identify your account. Please sign in again.');
+        return;
+      }
+
+      try {
+        await submitDiagnostic(supabase, {
+          userId: resolvedId,
+          vaultType: 'hitting',
+          diagnosticType: 'mechanical',
+          resultPayload: { primary: res.primary, secondary: res.secondary },
+        });
+
+        // Supabase succeeded — now safe to cache locally and show results
+        AsyncStorage.setItem(STORAGE_KEY, JSON.stringify(res));
         queryClient.invalidateQueries({ queryKey: ['gate-state', resolvedId] });
+        setResult(res);
+        setScreen('results');
+      } catch (err: any) {
+        console.error('[mechanical-quiz] submitDiagnostic FAILED:', err?.message ?? err);
+        Alert.alert(
+          'Save Error',
+          'Your results could not be saved. Please check your connection and try again.',
+        );
       }
     } else {
       setCurrentQ(currentQ + 1);

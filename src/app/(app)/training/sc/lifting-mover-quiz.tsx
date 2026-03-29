@@ -1,5 +1,5 @@
 import {
-  View, Text, ScrollView, TouchableOpacity, StyleSheet,
+  View, Text, ScrollView, TouchableOpacity, StyleSheet, Alert,
 } from 'react-native';
 import { SafeAreaView } from 'react-native-safe-area-context';
 import { router } from 'expo-router';
@@ -40,24 +40,34 @@ export default function LiftingMoverQuizScreen() {
 
     if (next.length >= LIFTING_MOVER_QUESTIONS.length) {
       const slug = scoreLiftingMoverQuiz(next);
-      setResult(LIFTING_MOVER_TYPES[slug]);
-      setScreen('results');
-      AsyncStorage.setItem(STORAGE_KEY, slug);
-      // Verify live auth + record submission
+
+      // Submit to Supabase FIRST — do not show results until backend confirms
       const liveUser = await getLiveUser();
       const resolvedId = liveUser?.id ?? user?.id;
-      if (resolvedId) {
-        try {
-          await submitDiagnostic(supabase, {
-            userId: resolvedId,
-            vaultType: 'sc',
-            diagnosticType: 'lifting-mover',
-            resultPayload: { moverType: slug },
-          });
-        } catch (err) {
-          if (__DEV__) console.warn('[sc-quiz] submitDiagnostic error:', err);
-        }
+      if (!resolvedId) {
+        Alert.alert('Session Error', 'Could not identify your account. Please sign in again.');
+        return;
+      }
+
+      try {
+        await submitDiagnostic(supabase, {
+          userId: resolvedId,
+          vaultType: 'sc',
+          diagnosticType: 'lifting-mover',
+          resultPayload: { moverType: slug },
+        });
+
+        // Supabase succeeded — now safe to cache locally and show results
+        AsyncStorage.setItem(STORAGE_KEY, slug);
         queryClient.invalidateQueries({ queryKey: ['gate-state', resolvedId] });
+        setResult(LIFTING_MOVER_TYPES[slug]);
+        setScreen('results');
+      } catch (err: any) {
+        console.error('[sc-quiz] submitDiagnostic FAILED:', err?.message ?? err);
+        Alert.alert(
+          'Save Error',
+          'Your results could not be saved. Please check your connection and try again.',
+        );
       }
     } else {
       setCurrentQ(currentQ + 1);

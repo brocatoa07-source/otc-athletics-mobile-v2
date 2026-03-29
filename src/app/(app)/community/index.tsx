@@ -22,13 +22,6 @@ const SECTIONS = [
     desc: 'Rankings for streaks, exit velo, bat speed & more',
     accentColor: '#f59e0b',
   },
-  {
-    key: 'live_archive',
-    icon: 'videocam' as const,
-    label: 'Live Session Archive',
-    desc: 'Seminar replays, Q&As, and build calls',
-    accentColor: '#8b5cf6',
-  },
 ];
 
 export default function CommunityIndex() {
@@ -38,9 +31,8 @@ export default function CommunityIndex() {
     queryKey: ['community-announcement-count'],
     queryFn: async () => {
       const { count } = await supabase
-        .from('community_posts')
-        .select('*', { count: 'exact', head: true })
-        .eq('section', 'announcements');
+        .from('announcements')
+        .select('*', { count: 'exact', head: true });
       return count ?? 0;
     },
   });

@@ -9,6 +9,7 @@ import { useQuery, useQueryClient } from '@tanstack/react-query';
 import { Colors } from '@/constants/colors';
 import { useConversations, type EnrichedConversation } from '@/hooks/useConversations';
 import { useAuth } from '@/hooks/useAuth';
+import { useTier } from '@/hooks/useTier';
 import { supabase } from '@/lib/supabase';
 
 /** Single query that fetches unread counts for all conversations at once. */
@@ -77,7 +78,37 @@ function ConversationRow({
 export default function MessagesIndexScreen() {
   const { conversations, isLoading } = useConversations();
   const { isCoach, user } = useAuth();
+  const { canMessage } = useTier();
   const qc = useQueryClient();
+
+  // Gate: if athlete cannot message, show upgrade CTA
+  if (!canMessage && !isCoach) {
+    return (
+      <SafeAreaView style={styles.safe}>
+        <View style={styles.header}>
+          <TouchableOpacity onPress={() => router.back()} style={styles.backBtn}>
+            <Ionicons name="chevron-back" size={24} color={Colors.textPrimary} />
+          </TouchableOpacity>
+          <Text style={styles.headerTitle}>Messages</Text>
+          <View style={{ width: 28 }} />
+        </View>
+        <View style={styles.center}>
+          <Ionicons name="lock-closed-outline" size={48} color={Colors.textMuted} />
+          <Text style={styles.emptyTitle}>Messaging Locked</Text>
+          <Text style={styles.emptySub}>
+            Upgrade to Double or higher to message your coach directly.
+          </Text>
+          <TouchableOpacity
+            style={{ marginTop: 12, paddingHorizontal: 20, paddingVertical: 12, backgroundColor: Colors.primary, borderRadius: 10 }}
+            onPress={() => router.push('/(app)/upgrade' as any)}
+            activeOpacity={0.85}
+          >
+            <Text style={{ fontSize: 14, fontWeight: '800', color: '#fff' }}>View Plans</Text>
+          </TouchableOpacity>
+        </View>
+      </SafeAreaView>
+    );
+  }
 
   const conversationIds = conversations.map((c) => c.id);
   const { data: unreadCounts = {} } = useUnreadCounts(conversationIds, user?.id);

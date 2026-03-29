@@ -14,27 +14,23 @@ import { useGating, type GateState } from '@/hooks/useGating';
  * MY PATH cards and additional tiles come later.
  * ──────────────────────────────────────────────── */
 
-const COMING_SOON_TILES = [
+const SERVICE_TILES = [
   {
-    icon: 'add-circle-outline' as const,
-    title: 'Add-Ons',
-    subtitle: 'Coming soon',
+    icon: 'rocket-outline' as const,
+    title: 'Performance Services',
+    subtitle: 'Structured training programs',
     accent: 'hitting' as const,
-    route: '/(app)/training/placeholder?section=add-ons',
+    route: '/(app)/training/performance-services',
   },
+];
+
+const COMING_SOON_TILES = [
   {
     icon: 'school-outline' as const,
     title: 'College Recruiting',
     subtitle: 'Coming soon',
     accent: 'mental' as const,
     route: '/(app)/training/placeholder?section=recruiting',
-  },
-  {
-    icon: 'clipboard-outline' as const,
-    title: 'Programs',
-    subtitle: 'Coming soon',
-    accent: 'lifting' as const,
-    route: '/(app)/training/placeholder?section=programs',
   },
 ];
 
@@ -131,6 +127,25 @@ export default function TrainingHub() {
               />
             );
           })}
+        </IconGrid>
+
+        {/* ─── Performance Services ─────────────────── */}
+        <View style={styles.hubHeader}>
+          <Text style={styles.hubLabel}>Performance Services</Text>
+          <Text style={styles.hubSub}>Structured training programs</Text>
+        </View>
+
+        <IconGrid>
+          {SERVICE_TILES.map((tile) => (
+            <IconTile
+              key={tile.title}
+              icon={tile.icon}
+              title={tile.title}
+              subtitle={tile.subtitle}
+              accent={tile.accent}
+              onPress={() => router.push(tile.route as any)}
+            />
+          ))}
         </IconGrid>
 
         {/* ─── Coming Soon Sections ──────────────── */}

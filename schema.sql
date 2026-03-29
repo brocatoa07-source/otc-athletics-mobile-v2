@@ -263,7 +263,8 @@ CREATE TABLE IF NOT EXISTS diagnostic_submissions (
   vault_type      TEXT        NOT NULL CHECK (vault_type IN ('mental','hitting','sc')),
   diagnostic_type TEXT        NOT NULL CHECK (diagnostic_type IN (
                               'archetype','identity','habits',
-                              'mover-type','mechanical','lifting-mover')),
+                              'mover-type','mechanical','lifting-mover',
+                              'timing-contact','approach-performance')),
   result_payload  JSONB       NOT NULL DEFAULT '{}'::jsonb,
   submitted_at    TIMESTAMPTZ NOT NULL DEFAULT now(),
   updated_at      TIMESTAMPTZ NOT NULL DEFAULT now(),
@@ -1249,3 +1250,170 @@ DROP TRIGGER IF EXISTS on_auth_user_created ON auth.users;
 CREATE TRIGGER on_auth_user_created
   AFTER INSERT ON auth.users
   FOR EACH ROW EXECUTE FUNCTION handle_new_user();
+
+
+-- ============================================================================
+-- 9. ENGAGEMENT SYSTEM TABLES
+-- ============================================================================
+
+-- ── leaderboards ─────────────────────────────────────────────────────────────
+CREATE TABLE IF NOT EXISTS leaderboards (
+  id                UUID        PRIMARY KEY DEFAULT gen_random_uuid(),
+  user_id           UUID        NOT NULL REFERENCES users(id) ON DELETE CASCADE UNIQUE,
+  full_name         TEXT        NOT NULL DEFAULT '',
+  streak            INT         NOT NULL DEFAULT 0,
+  xp                INT         NOT NULL DEFAULT 0,
+  consistency_score INT         NOT NULL DEFAULT 0,
+  updated_at        TIMESTAMPTZ NOT NULL DEFAULT now()
+);
+
+ALTER TABLE leaderboards ENABLE ROW LEVEL SECURITY;
+
+CREATE POLICY "Users can read all leaderboard entries"
+  ON leaderboards FOR SELECT
+  TO authenticated
+  USING (true);
+
+CREATE POLICY "Users can upsert own leaderboard entry"
+  ON leaderboards FOR INSERT
+  TO authenticated
+  WITH CHECK (user_id = auth.uid());
+
+CREATE POLICY "Users can update own leaderboard entry"
+  ON leaderboards FOR UPDATE
+  TO authenticated
+  USING (user_id = auth.uid());
+
+-- ── athlete_badges ───────────────────────────────────────────────────────────
+CREATE TABLE IF NOT EXISTS athlete_badges (
+  id          UUID        PRIMARY KEY DEFAULT gen_random_uuid(),
+  user_id     UUID        NOT NULL REFERENCES users(id) ON DELETE CASCADE,
+  badge_id    TEXT        NOT NULL,
+  earned_at   TIMESTAMPTZ NOT NULL DEFAULT now(),
+  UNIQUE (user_id, badge_id)
+);
+
+ALTER TABLE athlete_badges ENABLE ROW LEVEL SECURITY;
+
+CREATE POLICY "Users can read own badges"
+  ON athlete_badges FOR SELECT
+  TO authenticated
+  USING (user_id = auth.uid());
+
+CREATE POLICY "Users can insert own badges"
+  ON athlete_badges FOR INSERT
+  TO authenticated
+  WITH CHECK (user_id = auth.uid());
+
+-- ── weekly_challenges ────────────────────────────────────────────────────────
+CREATE TABLE IF NOT EXISTS weekly_challenges (
+  id                  UUID        PRIMARY KEY DEFAULT gen_random_uuid(),
+  user_id             UUID        NOT NULL REFERENCES users(id) ON DELETE CASCADE,
+  week_start          DATE        NOT NULL,
+  challenge_id        TEXT        NOT NULL,
+  hitting_sessions    INT         NOT NULL DEFAULT 0,
+  strength_workouts   INT         NOT NULL DEFAULT 0,
+  mental_sessions     INT         NOT NULL DEFAULT 0,
+  completed           BOOLEAN     NOT NULL DEFAULT false,
+  created_at          TIMESTAMPTZ NOT NULL DEFAULT now(),
+  updated_at          TIMESTAMPTZ NOT NULL DEFAULT now(),
+  UNIQUE (user_id, week_start)
+);
+
+ALTER TABLE weekly_challenges ENABLE ROW LEVEL SECURITY;
+
+CREATE POLICY "Users can read own challenges"
+  ON weekly_challenges FOR SELECT
+  TO authenticated
+  USING (user_id = auth.uid());
+
+CREATE POLICY "Users can upsert own challenges"
+  ON weekly_challenges FOR INSERT
+  TO authenticated
+  WITH CHECK (user_id = auth.uid());
+
+CREATE POLICY "Users can update own challenges"
+  ON weekly_challenges FOR UPDATE
+  TO authenticated
+  USING (user_id = auth.uid());
+
+-- ── personal_records ─────────────────────────────────────────────────────────
+CREATE TABLE IF NOT EXISTS personal_records (
+  id            UUID        PRIMARY KEY DEFAULT gen_random_uuid(),
+  user_id       UUID        NOT NULL REFERENCES users(id) ON DELETE CASCADE,
+  metric_type   TEXT        NOT NULL,
+  best_value    NUMERIC     NOT NULL,
+  achieved_at   TIMESTAMPTZ NOT NULL DEFAULT now(),
+  UNIQUE (user_id, metric_type)
+);
+
+ALTER TABLE personal_records ENABLE ROW LEVEL SECURITY;
+
+CREATE POLICY "Users can read own PRs"
+  ON personal_records FOR SELECT
+  TO authenticated
+  USING (user_id = auth.uid());
+
+CREATE POLICY "Users can upsert own PRs"
+  ON personal_records FOR INSERT
+  TO authenticated
+  WITH CHECK (user_id = auth.uid());
+
+CREATE POLICY "Users can update own PRs"
+  ON personal_records FOR UPDATE
+  TO authenticated
+  USING (user_id = auth.uid());
+
+-- ── 10. SKILL PROGRESS TABLES ────────────────────────────────────────────────
+
+-- ── skill_scores ─────────────────────────────────────────────────────────────
+-- Rolling average score per skill per athlete.
+CREATE TABLE IF NOT EXISTS skill_scores (
+  id          UUID        PRIMARY KEY DEFAULT gen_random_uuid(),
+  user_id     UUID        NOT NULL REFERENCES users(id) ON DELETE CASCADE,
+  skill_key   TEXT        NOT NULL,
+  score       NUMERIC     NOT NULL DEFAULT 0,
+  updated_at  TIMESTAMPTZ NOT NULL DEFAULT now(),
+  UNIQUE (user_id, skill_key)
+);
+
+ALTER TABLE skill_scores ENABLE ROW LEVEL SECURITY;
+
+CREATE POLICY "Users can read own skill scores"
+  ON skill_scores FOR SELECT
+  TO authenticated
+  USING (user_id = auth.uid());
+
+CREATE POLICY "Users can upsert own skill scores"
+  ON skill_scores FOR INSERT
+  TO authenticated
+  WITH CHECK (user_id = auth.uid());
+
+CREATE POLICY "Users can update own skill scores"
+  ON skill_scores FOR UPDATE
+  TO authenticated
+  USING (user_id = auth.uid());
+
+-- ── skill_logs ───────────────────────────────────────────────────────────────
+-- Individual performance challenge log entries.
+CREATE TABLE IF NOT EXISTS skill_logs (
+  id          UUID        PRIMARY KEY DEFAULT gen_random_uuid(),
+  user_id     UUID        NOT NULL REFERENCES users(id) ON DELETE CASCADE,
+  skill_key   TEXT        NOT NULL,
+  log_type    TEXT        NOT NULL,
+  value       NUMERIC     NOT NULL,
+  metadata    JSONB       NOT NULL DEFAULT '{}'::jsonb,
+  created_at  TIMESTAMPTZ NOT NULL DEFAULT now()
+);
+
+ALTER TABLE skill_logs ENABLE ROW LEVEL SECURITY;
+
+CREATE POLICY "Users can read own skill logs"
+  ON skill_logs FOR SELECT
+  TO authenticated
+  USING (user_id = auth.uid());
+
+CREATE POLICY "Users can insert own skill logs"
+  ON skill_logs FOR INSERT
+  TO authenticated
+  WITH CHECK (user_id = auth.uid());

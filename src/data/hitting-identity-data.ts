@@ -200,54 +200,58 @@ export const MOVEMENT_PROFILES: Record<HittingMovementType, MovementProfileData>
     type: 'springy',
     label: 'Springy',
     description:
-      'Springy hitters tend to move with elastic energy, rhythm, rebound, and a lighter more reactive feel. They often do best when they stay athletic, loose, and organized rather than overly restricted or forced into a heavy grounded move.',
+      'Springy hitters look light, quick, and elastic. They create speed through stretch-shortening, rhythm, and whip rather than brute force. They do best staying athletic, loose, and organized rather than overly restricted.',
     strengths: [
-      'Create rhythm',
-      'Move athletically',
-      'Generate quickness and rebound',
-      'Create bat speed through timing and elastic movement',
+      'Elite bat speed potential',
+      'Great adjustability and quick reactions',
+      'Can create late whip',
+      'Dangerous on inner-half pitches',
+      'More athletic and dynamic movement',
     ],
     struggles: [
-      'Getting too jumpy',
-      'Rushing',
-      'Drifting',
-      'Losing stability when timing is off',
+      'More timing-sensitive',
+      'Can get too loose or rushed',
+      'Can leak early',
+      'May struggle with braking if not strong enough',
+      'Can over-rotate or chase loft',
     ],
     workOns: [
-      'Rhythm and tempo control',
-      'Balance in the gather',
-      'Controlled forward movement',
-      'Staying athletic without leaking',
+      'Strength, deceleration, and control',
+      'Rhythm and tempo management',
+      'Controlled forward movement without leaking',
+      'Staying athletic without getting too aggressive',
     ],
     cues: [
       'Stay loose and athletic',
       'Let the move rebound',
-      'Create rhythm before launch',
       'Whip the barrel, don\'t push it',
+      'Create rhythm before launch',
     ],
-    mlbExamples: ['Cody Bellinger', 'Mookie Betts'],
+    mlbExamples: ['Mookie Betts', 'Ronald Acuña Jr.', 'Fernando Tatis Jr.', 'Elly De La Cruz', 'José Ramírez'],
     color: '#a855f7',
   },
   grounded: {
     type: 'grounded',
     label: 'Grounded',
     description:
-      'Grounded hitters tend to organize force through pressure into the ground, a lower center of gravity, and a stronger stable base. They often do best when they feel powerful, connected to the ground, and able to turn force through the hips and legs.',
+      'Grounded hitters create power through ground force, stability, leverage, and force application rather than elasticity. They do best feeling powerful, connected to the ground, and able to turn force through the hips and legs.',
     strengths: [
-      'Create stability',
-      'Use the ground well',
-      'Stay strong through contact',
-      'Generate force through pressure and rotation',
+      'Strong base for power',
+      'Consistent force production',
+      'Better stability through contact',
+      'Good leverage and body control',
+      'Can produce huge exit velocity',
     ],
     struggles: [
-      'Getting too stuck',
-      'Becoming too heavy or slow',
-      'Losing adjustability',
-      'Over-controlling movement',
+      'Less naturally adjustable',
+      'Can get stuck or slow',
+      'Harder to create late whip',
+      'May struggle if forced to move too much',
+      'Can become rigid and lose athleticism',
     ],
     workOns: [
-      'Clean pressure shift',
-      'Turning from the hips',
+      'Elasticity, looseness, and bat speed',
+      'Clean pressure shift into the turn',
       'Staying connected without freezing',
       'Keeping power without becoming rigid',
     ],
@@ -257,7 +261,7 @@ export const MOVEMENT_PROFILES: Record<HittingMovementType, MovementProfileData>
       'Turn from the hips, not the shoulders',
       'Stay heavy through contact',
     ],
-    mlbExamples: ['Freddie Freeman', 'Paul Goldschmidt'],
+    mlbExamples: ['Aaron Judge', 'Pete Alonso', 'Yordan Alvarez', 'Freddie Freeman', 'Paul Goldschmidt'],
     color: '#3b82f6',
   },
 };
@@ -265,25 +269,27 @@ export const MOVEMENT_PROFILES: Record<HittingMovementType, MovementProfileData>
 export const BAT_PATH_PROFILES: Record<HittingBatPathType, BatPathProfileData> = {
   horizontal: {
     type: 'horizontal',
-    label: 'Horizontal',
+    label: 'Flat Path',
     description:
-      'Horizontal hitters tend to work with a flatter, more sweeping path through the zone. They often see the ball longer, track lateral movement well, and create strong line-drive contact across the field.',
+      'Flat path hitters keep the barrel in the zone longer with a more level swing plane. They see the ball longer, track lateral movement well, and create strong line-drive contact across the field.',
     strengths: [
-      'Stay through the middle of the field',
-      'Cover the zone',
-      'Create consistent line drives',
-      'Stay on the ball longer',
+      'Better contact consistency',
+      'Longer margin for timing error',
+      'Better plate coverage',
+      'Easier to use the whole field',
+      'Usually better two-strike profile',
     ],
     struggles: [
-      'Producing enough lift',
-      'Hitting too many ground balls when timing is off',
-      'Lacking damage if they do not get the right ball flight',
+      'Lower natural loft',
+      'Lower HR ceiling unless elite bat speed or strength',
+      'Can become too flat and produce weak contact',
+      'May struggle to create carry if attack angle is too shallow',
     ],
     workOns: [
       'Maintaining barrel direction',
-      'Creating flush contact',
+      'Creating flush contact with intent',
       'Finding the right ball flight without over-lifting',
-      'Driving the ball with intent',
+      'Driving the ball with damage when possible',
     ],
     cues: [
       'Stay through the middle of the field',
@@ -291,25 +297,27 @@ export const BAT_PATH_PROFILES: Record<HittingBatPathType, BatPathProfileData> =
       'Win the path through contact',
       'Stay behind the ball longer',
     ],
-    mlbExamples: ['Freddie Freeman', 'Yandy Díaz'],
+    mlbExamples: ['Luis Arraez', 'Jeff McNeil', 'DJ LeMahieu', 'Ichiro Suzuki', 'Michael Brantley'],
     color: '#22c55e',
   },
   vertical: {
     type: 'vertical',
-    label: 'Vertical',
+    label: 'Vertical Path',
     description:
-      'Vertical hitters tend to attack the ball on a more direct upward plane with a stronger lift-oriented intent. They often create power, carry, and backspin when timing and pitch selection are right.',
+      'Vertical path hitters enter the zone from below more aggressively, creating more loft and lift. They create power, carry, and backspin when timing and pitch selection are right.',
     strengths: [
-      'Drive the ball in the air',
-      'Create backspin',
-      'Produce power and extra-base contact',
-      'Attack aggressively',
+      'Bigger power ceiling',
+      'Easier to create loft and carry',
+      'More damage on mistakes',
+      'Better natural home run shape',
+      'Strong pull-side slug potential',
     ],
     struggles: [
-      'Missing under the ball',
-      'Too much loft',
-      'Swing-and-miss when timing is off',
-      'Getting beat in certain windows if barrel entry is inconsistent',
+      'More swing-and-miss risk',
+      'Smaller timing window',
+      'Can get under balls too often',
+      'Can struggle with top-of-zone velocity',
+      'May become too pull-side dependent',
     ],
     workOns: [
       'Timing and decision making',
@@ -323,7 +331,7 @@ export const BAT_PATH_PROFILES: Record<HittingBatPathType, BatPathProfileData> =
       'Create lift through contact',
       'Finish high and aggressive',
     ],
-    mlbExamples: ['Aaron Judge', 'Eugenio Suárez'],
+    mlbExamples: ['Shohei Ohtani', 'Kyle Schwarber', 'Matt Olson', 'Giancarlo Stanton', 'Austin Riley'],
     color: '#ef4444',
   },
 };
@@ -331,23 +339,159 @@ export const BAT_PATH_PROFILES: Record<HittingBatPathType, BatPathProfileData> =
 /* ─── Combined profile labels ────────────────────── */
 
 export const COMBINED_PROFILE_LABELS: Record<HittingIdentityProfile, string> = {
-  springy_horizontal: 'Springy Horizontal Hitter',
-  springy_vertical: 'Springy Vertical Hitter',
-  grounded_horizontal: 'Grounded Horizontal Hitter',
-  grounded_vertical: 'Grounded Vertical Hitter',
+  springy_horizontal: 'Springy Flat Path Hitter',
+  springy_vertical: 'Springy Vertical Path Hitter',
+  grounded_horizontal: 'Grounded Flat Path Hitter',
+  grounded_vertical: 'Grounded Vertical Path Hitter',
 };
 
 /* ─── Combined profile summary descriptions ─────── */
 
 export const COMBINED_PROFILE_SUMMARIES: Record<HittingIdentityProfile, string> = {
   springy_horizontal:
-    'You move best with elastic rhythm and tend to work with a sweeping, line-drive-oriented path through the zone.',
+    'Elastic lower half with a flatter, more adjustable barrel path. Elite adjustability and high contact potential with athletic rhythm.',
   springy_vertical:
-    'You move best with elastic rhythm and tend to attack the ball on a more direct, lift-oriented path.',
+    'Elastic mover with loft-oriented barrel entry and explosive bat speed. Dangerous mix of whip and lift with huge power ceiling.',
   grounded_horizontal:
-    'You move best with ground pressure and stability, and tend to work with a sweeping, line-drive-oriented path through the zone.',
+    'Stable, force-based mover with a flatter barrel path and long zone time. Very consistent contact with a professional at-bat profile.',
   grounded_vertical:
-    'You move best with ground pressure and stability, and tend to attack the ball on a more direct, lift-oriented path.',
+    'Force-based mover with a steeper, loft-oriented barrel path built for damage. Elite power ceiling with huge exit velocity potential.',
+};
+
+/** Rich coaching content for each combined profile */
+export interface CombinedProfileContent {
+  summary: string;
+  whenRight: string[];
+  strengths: string[];
+  watchOuts: string[];
+  developmentFocus: string[];
+  mlbComps: string[];
+}
+
+export const COMBINED_PROFILE_COACHING: Record<HittingIdentityProfile, CombinedProfileContent> = {
+  springy_horizontal: {
+    summary:
+      'You move best with quick rhythm, bounce, and looseness. Your barrel works with a flatter entry into the zone, creating a bat-to-ball oriented swing with athletic adjustability. You handle velocity well and can use the whole field.',
+    whenRight: [
+      'The move feels loose and athletic',
+      'Timing looks effortless',
+      'The barrel stays through the middle of the field',
+      'Contact produces strong line drives',
+    ],
+    strengths: [
+      'Elite adjustability',
+      'High contact potential',
+      'Handles velocity well',
+      'Can use the whole field',
+      'Strong hit tool profile',
+    ],
+    watchOuts: [
+      'Lower natural power ceiling',
+      'Damage relies on bat speed and timing',
+      'Can become too contact-oriented',
+      'May lack loft unless intentionally trained',
+    ],
+    developmentFocus: [
+      'Adding damage and loft when needed',
+      'Strength and deceleration work',
+      'Barrel direction through center',
+      'Controlling forward move',
+    ],
+    mlbComps: ['Trea Turner', 'Ichiro Suzuki', 'Luis Arraez'],
+  },
+  springy_vertical: {
+    summary:
+      'You move with an explosive lower half and fast hip speed. Your barrel works upward with loft-oriented intent, creating a dangerous mix of whip and lift. When timing is locked in, the combination of rhythm and loft creates serious damage.',
+    whenRight: [
+      'The move feels explosive and snappy',
+      'The barrel enters early and drives through',
+      'Contact creates carry and backspin',
+      'You attack pitches with full intent',
+    ],
+    strengths: [
+      'Huge bat speed upside',
+      'High power ceiling',
+      'Athletic and adjustable',
+      'Can create damage to all fields',
+      'Dangerous on mistakes',
+    ],
+    watchOuts: [
+      'Timing-sensitive approach',
+      'More swing-and-miss risk than flat path',
+      'Can get too rotational',
+      'Can chase lift and lose barrel accuracy',
+      'May struggle with low offspeed if leaking early',
+    ],
+    developmentFocus: [
+      'Timing and pitch selection discipline',
+      'Contact consistency under the barrel',
+      'Controlling the vertical attack angle',
+      'Deceleration and braking strength',
+    ],
+    mlbComps: ['Mookie Betts', 'Ronald Acuña Jr.', 'José Ramírez'],
+  },
+  grounded_horizontal: {
+    summary:
+      'You move with a stable base, minimal bounce, and strong ground force. Your barrel works with a flatter, professional path through the zone — more control than chaos. You are built for consistent, directional hard contact.',
+    whenRight: [
+      'The swing feels controlled and powerful',
+      'You stay strong and balanced through contact',
+      'The barrel works through the middle of the field',
+      'Hard contact is consistent and repeatable',
+    ],
+    strengths: [
+      'Very consistent contact',
+      'Strong plate coverage',
+      'Good opposite-field ability',
+      'Longer time in zone',
+      'Lower swing-and-miss tendencies',
+    ],
+    watchOuts: [
+      'Lower natural HR ceiling',
+      'Can struggle to create loft',
+      'Damage depends on strength and precision',
+      'May struggle with elite inside velocity',
+      'Can become too flat or contact-oriented if underpowered',
+    ],
+    developmentFocus: [
+      'Adding loft and damage potential',
+      'Elasticity and bat speed work',
+      'Keeping power without becoming rigid',
+      'Staying connected through rotation',
+    ],
+    mlbComps: ['Alex Bregman', 'DJ LeMahieu', 'Michael Brantley'],
+  },
+  grounded_vertical: {
+    summary:
+      'You move with strong ground pressure, minimal extra movement, and a steep barrel entry built for damage. You create powerful rotational launch from a stable base. When timed up, mistakes get punished hard.',
+    whenRight: [
+      'The swing feels heavy and explosive',
+      'You drive through the ball with authority',
+      'Contact creates carry and damage',
+      'The attack is direct and committed',
+    ],
+    strengths: [
+      'Elite power ceiling',
+      'Huge exit velocity potential',
+      'Natural loft',
+      'Strong pull-side damage',
+      'Mistakes get punished hard',
+    ],
+    watchOuts: [
+      'Higher strikeout risk',
+      'Smaller margin for timing error',
+      'Less adjustability than flat path hitters',
+      'Can get too uphill',
+      'Harder to manage top-of-zone velocity',
+    ],
+    developmentFocus: [
+      'Timing without forcing positions',
+      'Contact consistency and adjustability',
+      'Matching pitch plane',
+      'Controlling attack without over-lifting',
+    ],
+    mlbComps: ['Aaron Judge', 'Pete Alonso', 'Matt Olson'],
+  },
 };
 
 /* ─── Scoring ────────────────────────────────────── */

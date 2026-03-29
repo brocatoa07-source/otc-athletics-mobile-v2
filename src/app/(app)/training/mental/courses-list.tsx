@@ -32,7 +32,8 @@ export default function CoursesListScreen() {
   }, []);
 
   const coreCourses = COURSE_LIST.filter((c) => !c.placeholder);
-  const advancedCourses = COURSE_LIST.filter((c) => c.placeholder);
+  // Hide placeholder courses for beta — they have no real content
+  const advancedCourses: typeof COURSE_LIST = [];
 
   return (
     <SafeAreaView style={styles.safe}>
@@ -45,13 +46,13 @@ export default function CoursesListScreen() {
           <Text style={styles.headerTitle}>Courses</Text>
         </View>
         <View style={styles.countBadge}>
-          <Text style={styles.countText}>{COURSE_LIST.length} courses</Text>
+          <Text style={styles.countText}>{coreCourses.length} courses</Text>
         </View>
       </View>
 
       <ScrollView contentContainerStyle={styles.content} showsVerticalScrollIndicator={false}>
         <Text style={styles.intro}>
-          6 core mental skill courses plus 5 advanced modules. Complete the core sequence to unlock advanced courses.
+          6 core mental skill courses. Each course covers a fundamental mental skill through two training phases: Shadow and Mastery.
         </Text>
 
         {/* ── Core Courses (1–6) ─────────────────────── */}

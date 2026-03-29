@@ -7,7 +7,7 @@
 
 // ── Enums / Unions ──────────────────────────────────────────────────────────
 
-export type UserRole = 'ATHLETE' | 'COACH';
+export type UserRole = 'ATHLETE' | 'COACH' | 'PARENT';
 
 export type AthleteTier = 'WALK' | 'SINGLE' | 'DOUBLE' | 'TRIPLE' | 'HOME_RUN';
 

@@ -2,6 +2,7 @@ import { Redirect, Tabs, router } from 'expo-router';
 import { View, ActivityIndicator } from 'react-native';
 import { Ionicons } from '@expo/vector-icons';
 import { useAuthStore } from '@/store/auth.store';
+import { useTier } from '@/hooks/useTier';
 import { colors } from '@/theme';
 
 export default function AppLayout() {
@@ -10,9 +11,11 @@ export default function AppLayout() {
   const athlete = useAuthStore((s) => s.athlete);
   const coach = useAuthStore((s) => s.coach);
   const isHydrated = useAuthStore((s) => s.isHydrated);
-  // Derive isCoach from dbUser.role (set atomically from DB) rather than
-  // !!coach (set later by fetchRoleRow) to prevent wrong-dashboard flash.
+
   const isCoach = dbUser?.role === 'COACH';
+  const isParent = dbUser?.role === 'PARENT';
+  const isAthlete = dbUser?.role === 'ATHLETE';
+  const { canMessage } = useTier();
 
   // Still loading stored session + profile
   if (!isHydrated) {
@@ -27,8 +30,8 @@ export default function AppLayout() {
   if (!session) return <Redirect href="/(auth)/login" />;
 
   // Authenticated but role-specific data not loaded yet
-  // (dbUser is set before fetchRoleRow completes — wait for athlete/coach too)
-  if (!dbUser || (!athlete && !coach)) {
+  // Parents have no athlete/coach row — allow them through once dbUser is set
+  if (!dbUser || (isAthlete && !athlete) || (isCoach && !coach)) {
     return (
       <View style={{ flex: 1, backgroundColor: colors.bg, alignItems: 'center', justifyContent: 'center' }}>
         <ActivityIndicator color={colors.white} />
@@ -54,11 +57,6 @@ export default function AppLayout() {
       }}
       screenListeners={({ route, navigation }) => ({
         tabPress: (e) => {
-          // When the user taps the already-active tab, reset its Stack to
-          // the root index screen. Without this, cross-tab pushes (e.g.
-          // Dashboard → /(app)/training/mental) leave the Stack with only
-          // the deep route, and popToTop does nothing because there's no
-          // root screen underneath.
           if (navigation.isFocused()) {
             e.preventDefault();
             router.navigate(`/(app)/${route.name}` as any);
@@ -66,12 +64,7 @@ export default function AppLayout() {
         },
       })}
     >
-      {/*
-       * Coach tab declared FIRST. Expo Router v6 uses the first
-       * visible tab (href !== null) as the initial route.
-       * For coaches, coach is visible and dashboard is hidden.
-       * For athletes, coach is hidden so dashboard (next) becomes initial.
-       */}
+      {/* ── Coach Home (coaches only) ── */}
       <Tabs.Screen
         name="coach"
         options={{
@@ -83,12 +76,12 @@ export default function AppLayout() {
         }}
       />
 
-      {/* ── Athlete Home (hidden for coaches) ── */}
+      {/* ── Athlete / Parent Home ── */}
       <Tabs.Screen
         name="dashboard"
         options={{
           title: 'Home',
-          href: isCoach ? null : undefined,
+          href: (isAthlete || isParent) ? undefined : null,
           tabBarIcon: ({ color, size }) => (
             <Ionicons name="home" size={size} color={color} />
           ),
@@ -100,29 +93,30 @@ export default function AppLayout() {
         name="training"
         options={{
           title: 'Lab',
-          href: isCoach ? null : undefined,
+          href: isAthlete ? undefined : null,
           tabBarIcon: ({ color, size }) => (
             <Ionicons name="flask" size={size} color={color} />
           ),
         }}
       />
 
-      {/* ── Community (both roles) ── */}
+      {/* ── Community (all roles — parents see announcements here) ── */}
       <Tabs.Screen
         name="community"
         options={{
-          title: 'Community',
+          title: isParent ? 'Updates' : 'Community',
           tabBarIcon: ({ color, size }) => (
-            <Ionicons name="people" size={size} color={color} />
+            <Ionicons name={isParent ? 'megaphone' : 'people'} size={size} color={color} />
           ),
         }}
       />
 
-      {/* ── Messages ── */}
+      {/* ── Messages (coaches + eligible athletes only, NOT parents) ── */}
       <Tabs.Screen
         name="messages"
         options={{
           title: 'Messages',
+          href: (canMessage && !isParent) ? undefined : null,
           tabBarIcon: ({ color, size }) => (
             <Ionicons name="chatbubbles" size={size} color={color} />
           ),
@@ -135,6 +129,7 @@ export default function AppLayout() {
       <Tabs.Screen name="progress" options={{ href: null }} />
       <Tabs.Screen name="upgrade" options={{ href: null }} />
       <Tabs.Screen name="announcements" options={{ href: null }} />
+      <Tabs.Screen name="playbook" options={{ href: null }} />
     </Tabs>
   );
 }
