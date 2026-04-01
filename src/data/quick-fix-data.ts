@@ -33,15 +33,10 @@ export const QUICK_FIXES: Record<string, QuickFix> = {
     label: 'Stuck',
     drills: ['Happy Gilmore Drill', "Hook'em Drill", 'Bat on Shoulder Drill Series'],
   },
-  'losing-posture': {
-    key: 'losing-posture',
-    label: 'Losing Posture',
-    drills: ["Freddie's Drill", 'Mo Vaughn Drill', 'PVC Pipe Swings'],
-  },
   'pulling-off': {
     key: 'pulling-off',
-    label: 'Pulling Off',
-    drills: ['Trout Step Drill', 'Finish Over Tee', 'Bat Throws'],
+    label: 'Pulling Off / Losing Posture',
+    drills: ["Freddie's Drill", 'Mo Vaughn Drill', 'PVC Pipe Swings', 'Trout Step Drill', 'Finish Over Tee', 'Bat Throws'],
   },
   casting: {
     key: 'casting',
@@ -67,7 +62,7 @@ export const ISSUE_TO_QUICKFIX: Record<MechanicalIssue, string> = {
   weight_shift: 'lunging',
   early_rotation: 'stuck',
   disconnection: 'casting',
-  swing_plane: 'losing-posture',
+  swing_plane: 'pulling-off',
   barrel_path: 'barrel-path',
 };
 
@@ -84,8 +79,7 @@ export const QUICKFIX_TO_FOCUS: Record<string, string[]> = {
   late: ['Timing'],
   lunging: ['Forward Move'],
   stuck: ['Forward Move', 'Connection'],
-  'losing-posture': ['Posture'],
-  'pulling-off': ['Direction'],
+  'pulling-off': ['Posture', 'Direction'],
   casting: ['Barrel Turn'],
   'rolling-over': ['Extension'],
   'barrel-path': ['Barrel Turn'],

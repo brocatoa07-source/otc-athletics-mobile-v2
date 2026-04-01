@@ -14,7 +14,6 @@ export type TroubleshootingSlug =
   | 'late'
   | 'lunging'
   | 'stuck'
-  | 'losing-posture'
   | 'casting'
   | 'pulling-off'
   | 'rolling-over'
@@ -97,25 +96,6 @@ export const TROUBLESHOOTING_ISSUES: Record<TroubleshootingSlug, Troubleshooting
     color: '#f97316',
   },
 
-  'losing-posture': {
-    slug: 'losing-posture',
-    label: 'Losing Posture',
-    diagnosticIssue: 'swing_plane',
-    drillPoolKey: 'losing-posture',
-    description:
-      'Your barrel isn\'t matching the pitch plane. You\'re either too steep or too flat, leading to pop-ups and weak grounders.',
-    cue: 'Match the pitch plane — stay on it longer.',
-    symptoms: [
-      'Pop-ups on pitches you should drive',
-      'Chopping down at the ball',
-      'Standing up or pulling off during the swing',
-    ],
-    why: 'Your posture is breaking down during the swing — your head and spine angle change, which pulls the barrel off the pitch plane. You can\'t stay through the ball if your body is moving away from it.',
-    whatItLeadsTo:
-      'Pop-ups, weak grounders, inconsistent launch angles, and an inability to drive the ball with authority.',
-    areas: ['Posture & Direction', 'Barrel Turn'],
-    color: '#0891b2',
-  },
 
   casting: {
     slug: 'casting',
@@ -139,22 +119,24 @@ export const TROUBLESHOOTING_ISSUES: Record<TroubleshootingSlug, Troubleshooting
 
   'pulling-off': {
     slug: 'pulling-off',
-    label: 'Pulling Off',
+    label: 'Pulling Off / Losing Posture',
     diagnosticIssue: 'disconnection',
     drillPoolKey: 'pulling-off',
     description:
-      'Your front side opens too early, pulling your barrel off the ball\'s path. Your head and eyes leave the ball before contact.',
-    cue: 'Stay closed — see the ball hit the barrel.',
+      'Your front side opens too early, pulling your barrel off the ball\'s path. Posture breaks down — you stand up, lose side bend, and spin off instead of staying through the ball.',
+    cue: 'Stay through the ball. North-south, not east-west.',
     symptoms: [
       'Flying open with the front shoulder',
       'Hitting everything to the pull side',
+      'Standing up or pulling off during the swing',
       'Missing or fouling outside pitches',
+      'Pop-ups on pitches you should drive',
     ],
-    why: 'Your front shoulder and hip are opening before the barrel reaches the hitting zone. This pulls your eye line and barrel path off the ball. You\'re swinging where the ball was, not where it is.',
+    why: 'Your front shoulder and hip open before the barrel reaches the hitting zone. Posture breaks down with it — your head, spine angle, and side bend all change. The barrel works around the ball instead of through it.',
     whatItLeadsTo:
-      'Inability to use the whole field, weak pop-ups on outside pitches, and inconsistent contact even on good swings.',
-    areas: ['Connection', 'Posture & Direction'],
-    color: '#ec4899',
+      'Inability to use the whole field, weak pop-ups, pulled ground balls, sliced fouls, and inconsistent contact.',
+    areas: ['Posture & Direction', 'Connection', 'Barrel Turn'],
+    color: '#0891b2',
   },
 
   'rolling-over': {

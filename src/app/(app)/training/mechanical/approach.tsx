@@ -371,7 +371,7 @@ export default function ApproachScreen() {
               'Hunt your pitch',
               'Win the count',
               'Don\'t miss your pitch',
-              'Yes yes yes no',
+              'Have a plan before you step in',
               'Damage on your pitch',
               'Shrink the zone when ahead',
               'Widen the zone with 2 strikes',

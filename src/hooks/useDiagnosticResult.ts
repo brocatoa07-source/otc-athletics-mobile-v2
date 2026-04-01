@@ -9,6 +9,8 @@
  *
  * If Supabase has no row or the payload is malformed, result is null.
  * AsyncStorage alone cannot produce a non-null result.
+ *
+ * NOTE: Hitting diagnostics (mover-type, mechanical) have been removed.
  */
 
 import { useCallback } from 'react';
@@ -16,19 +18,15 @@ import { useQuery } from '@tanstack/react-query';
 import AsyncStorage from '@react-native-async-storage/async-storage';
 import { supabase } from '@/lib/supabase';
 import { useAuthStore } from '@/store/auth.store';
-import type { VaultType, DiagnosticKey } from '@/lib/gating/vaultConfig';
-import { hydrateHittingIdentity, hydrateMechanicalResult, hydrateLiftingMover } from '@/lib/gating/hydrateResults';
-import { HITTING_IDENTITY_STORAGE_KEY } from '@/data/hitting-identity-data';
-import type { HittingIdentityDiagnosticResult } from '@/data/hitting-identity-data';
-import type { MechanicalDiagnosticResult } from '@/data/hitting-mechanical-diagnostic-data';
+import type { VaultType } from '@/lib/gating/vaultConfig';
+import { hydrateLiftingMover } from '@/lib/gating/hydrateResults';
 import type { LiftingMoverType } from '@/data/lifting-mover-type-data';
+import { CACHE_KEYS } from '@/lib/gating/diagnosticConstants';
 
 // ── Result type map ─────────────────────────────────────────────────────────
 
 /** Maps each diagnostic to its hydrated result type */
 export type DiagnosticResultMap = {
-  'mover-type': HittingIdentityDiagnosticResult;
-  'mechanical': MechanicalDiagnosticResult;
   'lifting-mover': LiftingMoverType;
 };
 
@@ -41,10 +39,6 @@ function hydratePayload<K extends SupportedDiagnostic>(
   payload: Record<string, unknown>,
 ): DiagnosticResultMap[K] | null {
   switch (diagnosticType) {
-    case 'mover-type':
-      return hydrateHittingIdentity(payload) as DiagnosticResultMap[K] | null;
-    case 'mechanical':
-      return hydrateMechanicalResult(payload) as DiagnosticResultMap[K] | null;
     case 'lifting-mover':
       return hydrateLiftingMover(payload) as DiagnosticResultMap[K] | null;
     default:
@@ -54,16 +48,14 @@ function hydratePayload<K extends SupportedDiagnostic>(
 
 // ── AsyncStorage cache keys ─────────────────────────────────────────────────
 
-const CACHE_KEYS: Record<SupportedDiagnostic, string> = {
-  'mover-type': HITTING_IDENTITY_STORAGE_KEY,
-  'mechanical': 'otc:mechanical-diagnostic',
-  'lifting-mover': 'otc:lifting-mover-type',
+const DIAGNOSTIC_CACHE_KEYS: Record<SupportedDiagnostic, string> = {
+  'lifting-mover': CACHE_KEYS.liftingMoverType,
 };
 
 /** Best-effort cache write. Failures are silently ignored. */
 function cacheResult(diagnosticType: SupportedDiagnostic, result: unknown): void {
   try {
-    const key = CACHE_KEYS[diagnosticType];
+    const key = DIAGNOSTIC_CACHE_KEYS[diagnosticType];
     if (diagnosticType === 'lifting-mover') {
       // Lifting mover stores raw slug string, not JSON
       AsyncStorage.setItem(key, result as string);
@@ -87,8 +79,8 @@ export interface UseDiagnosticResultReturn<T> {
 /**
  * Load a diagnostic result from Supabase, hydrate it, and optionally cache.
  *
- * @param vaultType - 'hitting' | 'mental' | 'sc'
- * @param diagnosticType - 'mover-type' | 'mechanical' | 'lifting-mover'
+ * @param vaultType - 'sc'
+ * @param diagnosticType - 'lifting-mover'
  */
 export function useDiagnosticResult<K extends SupportedDiagnostic>(
   vaultType: VaultType,

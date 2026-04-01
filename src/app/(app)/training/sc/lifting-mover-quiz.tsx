@@ -4,22 +4,22 @@ import {
 import { SafeAreaView } from 'react-native-safe-area-context';
 import { router } from 'expo-router';
 import { useState } from 'react';
-import AsyncStorage from '@react-native-async-storage/async-storage';
 import { Ionicons } from '@expo/vector-icons';
 import { useQueryClient } from '@tanstack/react-query';
 import { colors, radius } from '@/theme';
 import { supabase } from '@/lib/supabase';
 import { useAuthStore } from '@/store/auth.store';
 import { getLiveUser } from '@/utils/getLiveUser';
-import { submitDiagnostic } from '@/lib/gating/diagnosticService';
+import { completeDiagnosticFlow } from '@/lib/gating/completeDiagnosticFlow';
+import { VAULT, DIAGNOSTIC, CACHE_KEYS } from '@/lib/gating/diagnosticConstants';
 import {
   LIFTING_MOVER_QUESTIONS,
   LIFTING_MOVER_TYPES,
   scoreLiftingMoverQuiz,
   type LiftingMoverTypeData,
 } from '@/data/lifting-mover-type-data';
+import { answersToSignals } from '@/features/strength/config/assessmentSignalMap';
 
-const STORAGE_KEY = 'otc:lifting-mover-type';
 const ACCENT = '#1DB954';
 
 type Screen = 'intro' | 'quiz' | 'results';
@@ -40,6 +40,9 @@ export default function LiftingMoverQuizScreen() {
 
     if (next.length >= LIFTING_MOVER_QUESTIONS.length) {
       const slug = scoreLiftingMoverQuiz(next);
+      const signals = answersToSignals(next);
+
+      console.log('[lifting-quiz] Scored:', slug, '— signals:', signals.length);
 
       // Submit to Supabase FIRST — do not show results until backend confirms
       const liveUser = await getLiveUser();
@@ -49,26 +52,24 @@ export default function LiftingMoverQuizScreen() {
         return;
       }
 
-      try {
-        await submitDiagnostic(supabase, {
-          userId: resolvedId,
-          vaultType: 'sc',
-          diagnosticType: 'lifting-mover',
-          resultPayload: { moverType: slug },
-        });
+      const flowResult = await completeDiagnosticFlow({
+        supabase,
+        queryClient,
+        userId: resolvedId,
+        vaultType: VAULT.SC,
+        diagnosticType: DIAGNOSTIC.LIFTING_MOVER,
+        resultPayload: { moverType: slug, signals, answers: next },
+        cacheEntry: { key: CACHE_KEYS.liftingMoverType, value: slug },
+      });
 
-        // Supabase succeeded — now safe to cache locally and show results
-        AsyncStorage.setItem(STORAGE_KEY, slug);
-        queryClient.invalidateQueries({ queryKey: ['gate-state', resolvedId] });
-        setResult(LIFTING_MOVER_TYPES[slug]);
-        setScreen('results');
-      } catch (err: any) {
-        console.error('[sc-quiz] submitDiagnostic FAILED:', err?.message ?? err);
-        Alert.alert(
-          'Save Error',
-          'Your results could not be saved. Please check your connection and try again.',
-        );
+      if (!flowResult.success) {
+        const label = flowResult.error === 'submit_failed' ? 'Save Failed' : 'Error';
+        Alert.alert(label, flowResult.errorMessage ?? 'Please try again.');
+        return;
       }
+
+      setResult(LIFTING_MOVER_TYPES[slug]);
+      setScreen('results');
     } else {
       setCurrentQ(currentQ + 1);
     }
@@ -82,7 +83,7 @@ export default function LiftingMoverQuizScreen() {
   }
 
   function retake() {
-    AsyncStorage.removeItem(STORAGE_KEY);
+    // Cache cleared on next submit via completeDiagnosticFlow
     startQuiz();
   }
 

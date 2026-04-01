@@ -12,47 +12,16 @@ import { SafeAreaView } from 'react-native-safe-area-context';
 import { router } from 'expo-router';
 import { Ionicons } from '@expo/vector-icons';
 import { useQueryClient } from '@tanstack/react-query';
-import AsyncStorage from '@react-native-async-storage/async-storage';
 import { colors, accents, radius } from '@/theme';
 import { DIAGNOSTIC_META, DIAGNOSTIC_ORDER } from '@/data/mental-diagnostics-data';
 import type { DiagnosticType } from '@/data/mental-diagnostics-data';
 import { useGating } from '@/hooks/useGating';
 import { supabase } from '@/lib/supabase';
 import { getLiveUser } from '@/utils/getLiveUser';
-import {
-  scoreArchetype,
-  scoreIdentity,
-  scoreHabits,
-  buildMentalProfilePayload,
-  type ArchetypeResult,
-} from '@/utils/mentalDiagnosticScoring';
-import type { MentalStruggle } from '@/data/mental-struggles-data';
+import { generateDiagnosticResult } from '@/lib/gating/generateDiagnosticResult';
+import { VAULT, QUERY_KEYS } from '@/lib/gating/diagnosticConstants';
 
 const ACCENT = accents.mental;
-
-/**
- * Bridge: map new archetype results to legacy MentalDiagnosticResult
- * so daily-work.tsx (which reads 'otc:mental-struggles') still works.
- */
-const ARCHETYPE_TO_STRUGGLE: Record<string, MentalStruggle> = {
-  reactor:     'emotional_frustration',
-  overthinker: 'overthinking',
-  avoider:     'fear_of_failure',
-  performer:   'pregame_nerves',
-  doubter:     'confidence_drop',
-  driver:      'burnout',
-};
-
-function deriveLegacyStruggles(archetype: ArchetypeResult): {
-  primary: MentalStruggle;
-  secondary: MentalStruggle;
-} {
-  const primary = ARCHETYPE_TO_STRUGGLE[archetype.primary] ?? 'overthinking';
-  const secondary = archetype.secondary
-    ? (ARCHETYPE_TO_STRUGGLE[archetype.secondary] ?? 'focus_loss')
-    : 'focus_loss';
-  return { primary, secondary };
-}
 
 // ── Step card ─────────────────────────────────────────────────────────────────
 
@@ -211,84 +180,31 @@ export default function DiagnosticsEntryScreen() {
                   return;
                 }
 
-                // Fetch all 3 diagnostic submissions to get stored answers
-                const { data: submissions, error: fetchErr } = await supabase
-                  .from('diagnostic_submissions')
-                  .select('diagnostic_type, result_payload')
-                  .eq('user_id', liveUser.id)
-                  .eq('vault_type', 'mental');
+                console.log('[entry] Generating mental profile for', liveUser.id.slice(0, 8));
 
-                if (fetchErr || !submissions) {
-                  throw new Error(fetchErr?.message ?? 'Could not fetch diagnostics');
+                const result = await generateDiagnosticResult({
+                  supabase,
+                  userId: liveUser.id,
+                  vaultType: VAULT.MENTAL,
+                });
+
+                if (!result.success) {
+                  throw new Error(result.error ?? 'Profile generation failed');
                 }
 
-                const byType: Record<string, any> = {};
-                for (const s of submissions) {
-                  byType[s.diagnostic_type] = s.result_payload;
-                }
-
-                // Re-score from stored answers (or use stored scored results)
-                const archetypePayload = byType['archetype'];
-                const identityPayload = byType['identity'];
-                const habitsPayload = byType['habits'];
-
-                if (!archetypePayload || !identityPayload || !habitsPayload) {
-                  throw new Error('Missing diagnostic data. Please retake diagnostics.');
-                }
-
-                const archetypeResult = archetypePayload.answers
-                  ? scoreArchetype(archetypePayload.answers)
-                  : archetypePayload.scored;
-                const identityResult = identityPayload.answers
-                  ? scoreIdentity(identityPayload.answers)
-                  : identityPayload.scored;
-                const habitsResult = habitsPayload.answers
-                  ? scoreHabits(habitsPayload.answers)
-                  : habitsPayload.scored;
-
-                const profilePayload = buildMentalProfilePayload(
-                  archetypeResult,
-                  identityResult,
-                  habitsResult,
-                );
-
-                // Upsert to mental_profiles
-                const { error: upsertErr } = await supabase
-                  .from('mental_profiles')
-                  .upsert(
-                    {
-                      user_id: liveUser.id,
-                      ...profilePayload,
-                      updated_at: new Date().toISOString(),
-                    },
-                    { onConflict: 'user_id' },
-                  );
-
-                if (upsertErr) {
-                  throw new Error(upsertErr.message);
-                }
-
-                // Cache ISS/HSS scores locally for smart Daily Work generation
-                if (profilePayload.iss != null || profilePayload.hss != null) {
-                  AsyncStorage.setItem('otc:mental-profile-scores', JSON.stringify({
-                    iss: profilePayload.iss ?? null,
-                    hss: profilePayload.hss ?? null,
-                  }));
-                }
-
-                // Bridge: write legacy struggles data so daily-work.tsx can generate plans
-                const legacyStruggles = deriveLegacyStruggles(archetypeResult);
-                await AsyncStorage.setItem('otc:mental-struggles', JSON.stringify(legacyStruggles));
-
-                // Clear stale daily work cache so it regenerates with new profile
-                await AsyncStorage.removeItem('otc:mental-daily-work');
-
-                // Invalidate profile query so MentalProfileCard picks up new data
-                queryClient.invalidateQueries({ queryKey: ['mental-profile', liveUser.id] });
+                // Invalidate all related queries
+                queryClient.invalidateQueries({ queryKey: QUERY_KEYS.mentalProfile(liveUser.id) });
+                queryClient.invalidateQueries({ queryKey: QUERY_KEYS.mentalSubmissions(liveUser.id) });
+                queryClient.invalidateQueries({ queryKey: QUERY_KEYS.gateState(liveUser.id) });
+                console.log('[entry] Profile generated, queries invalidated');
 
                 router.push('/(app)/training/mental' as any);
               } catch (err: any) {
-                Alert.alert('Profile Error', err?.message ?? 'Could not generate profile.');
+                console.error('[entry] Profile generation FAILED:', err?.message ?? err);
+                Alert.alert(
+                  'Profile Generation Failed',
+                  err?.message ?? 'Could not generate your mental profile. Please try again.',
+                );
               } finally {
                 setGenerating(false);
               }

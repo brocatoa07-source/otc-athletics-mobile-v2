@@ -4,6 +4,8 @@
  * Each vault lists the diagnostics that must be completed to unlock it.
  * Vault unlock state is DERIVED from diagnostic_submissions records —
  * a vault is unlocked when ALL its required diagnostics have a submission row.
+ *
+ * NOTE: Hitting vault has NO diagnostics. It is problem-first.
  */
 
 export type VaultType = 'mental' | 'hitting' | 'sc';
@@ -12,13 +14,14 @@ export type VaultType = 'mental' | 'hitting' | 'sc';
  * Canonical diagnostic key type.
  * Every diagnostic_submissions.diagnostic_type value MUST be one of these.
  * If you add a new diagnostic, add it here first.
+ *
+ * NOTE: Hitting diagnostics (mover-type, mechanical) have been removed.
+ * Hitting vault is now problem-first with no diagnostic gating.
  */
 export type DiagnosticKey =
   | 'archetype'
   | 'identity'
   | 'habits'
-  | 'mover-type'
-  | 'mechanical'
   | 'lifting-mover';
 
 /** Mental-only subset of DiagnosticKey. Used by mental quiz screens and scoring. */
@@ -31,8 +34,6 @@ export const CANONICAL_PAIRS: readonly { vault: VaultType; diagnostic: Diagnosti
   { vault: 'mental', diagnostic: 'archetype' },
   { vault: 'mental', diagnostic: 'identity' },
   { vault: 'mental', diagnostic: 'habits' },
-  { vault: 'hitting', diagnostic: 'mover-type' },
-  { vault: 'hitting', diagnostic: 'mechanical' },
   { vault: 'sc', diagnostic: 'lifting-mover' },
 ] as const;
 
@@ -77,8 +78,7 @@ export const VAULT_CONFIGS: Record<VaultType, VaultConfig> = {
   hitting: {
     vaultType: 'hitting',
     label: 'Hitting Vault',
-    // No diagnostics required — vault is open. Troubleshooting is the main feature.
-    // "Where Should I Start?" guide replaces diagnostics.
+    // No diagnostics — vault is problem-first. Troubleshooting is the main feature.
     requirements: [],
   },
   sc: {
@@ -99,21 +99,10 @@ export const VAULT_TYPES: VaultType[] = ['mental', 'hitting', 'sc'];
 
 /**
  * Optional (bonus) diagnostics that appear in checklists but do NOT gate vault unlock.
- * These are tracked for completion UI but never block access.
+ * NOTE: Hitting vault no longer has any diagnostics (optional or required).
  */
 export const OPTIONAL_DIAGNOSTICS: Record<VaultType, DiagnosticRequirement[]> = {
   mental: [],
-  hitting: [
-    {
-      diagnosticType: 'mover-type',
-      label: 'Swing Type & Power Style',
-      description: 'Optional — understand your movement pattern',
-    },
-    {
-      diagnosticType: 'mechanical',
-      label: 'Swing Problem',
-      description: 'Optional — identify mechanical focus areas',
-    },
-  ],
+  hitting: [],
   sc: [],
 };

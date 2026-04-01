@@ -23,10 +23,6 @@ import { colors, radius } from '@/theme';
 import { useAuthStore } from '@/store/auth.store';
 import { useDiagnosticResult } from '@/hooks/useDiagnosticResult';
 import { useMentalProfile } from '@/hooks/useMentalProfile';
-import {
-  COMBINED_PROFILE_LABELS,
-  COMBINED_PROFILE_SUMMARIES,
-} from '@/data/hitting-identity-data';
 import { ARCHETYPE_INFO } from '@/data/mental-diagnostics-data';
 import {
   loadStrengthProfile,
@@ -35,18 +31,7 @@ import {
 } from '@/data/strength-profile';
 import { LIFTING_MOVER_TYPES } from '@/data/lifting-mover-type-data';
 
-// ── Focus mapping (same as ProfileFocusCard for consistency) ────────────────
-
-const HITTING_SKILL_LABELS: Record<string, string> = {
-  foundations: 'Foundations', timing: 'Timing', 'forward-move': 'Forward Move',
-  posture: 'Posture', direction: 'Direction', 'barrel-turn': 'Barrel Turn',
-  connection: 'Connection', extension: 'Extension',
-};
-
-const MECH_TO_SKILL: Record<string, string> = {
-  timing: 'timing', weight_shift: 'forward-move', early_rotation: 'connection',
-  disconnection: 'barrel-turn', swing_plane: 'posture', barrel_path: 'barrel-turn',
-};
+// ── Focus mapping ────────────────────────────────────────────────────────────
 
 const MENTAL_SKILL_LABELS: Record<string, string> = {
   awareness: 'Awareness', confidence: 'Confidence', focus: 'Focus',
@@ -64,10 +49,6 @@ export default function AthleteIdentityScreen() {
   const displayName = (user?.user_metadata?.full_name as string | undefined) ?? 'Athlete';
   const initials = displayName.split(' ').map((n: string) => n[0]).join('').toUpperCase().slice(0, 2);
 
-  // ── Hitting (Supabase-backed) ──
-  const { result: identityResult } = useDiagnosticResult('hitting', 'mover-type');
-  const { result: mechResult } = useDiagnosticResult('hitting', 'mechanical');
-
   // ── Mental (Supabase-backed) ──
   const { profile: mentalProfile } = useMentalProfile();
 
@@ -79,17 +60,6 @@ export default function AthleteIdentityScreen() {
   }, []));
 
   // ── Derive display data ──
-
-  // Hitting
-  const hittingName = identityResult
-    ? COMBINED_PROFILE_LABELS[identityResult.combinedProfile]
-    : null;
-  const hittingDesc = identityResult
-    ? COMBINED_PROFILE_SUMMARIES[identityResult.combinedProfile]
-    : null;
-  const hittingEmphasis = mechResult
-    ? HITTING_SKILL_LABELS[MECH_TO_SKILL[mechResult.primary] ?? '']
-    : null;
 
   // Mental
   const archKey = mentalProfile?.primary_archetype as keyof typeof ARCHETYPE_INFO | undefined;
@@ -111,7 +81,7 @@ export default function AthleteIdentityScreen() {
     ? DEFICIENCY_META[strengthProfile.deficiency]?.label
     : (liftingData?.trainingFocus[0] ?? null);
 
-  const hasAnyProfile = !!hittingName || !!mentalInfo || !!strengthName;
+  const hasAnyProfile = !!mentalInfo || !!strengthName;
 
   return (
     <SafeAreaView style={styles.safe}>
@@ -144,20 +114,6 @@ export default function AthleteIdentityScreen() {
               <Text style={styles.emptyBtnText}>Go to Lab</Text>
             </TouchableOpacity>
           </View>
-        )}
-
-        {/* ── Hitting Identity ──────────────────── */}
-        {hittingName && (
-          <IdentitySection
-            vaultLabel="HITTING IDENTITY"
-            accent="#E10600"
-            icon="baseball-outline"
-            profileName={hittingName}
-            description={hittingDesc}
-            emphasis={hittingEmphasis}
-            ctaLabel="Open Hitting Vault"
-            onCta={() => router.push('/(app)/training/mechanical' as any)}
-          />
         )}
 
         {/* ── Mental Identity ──────────────────── */}

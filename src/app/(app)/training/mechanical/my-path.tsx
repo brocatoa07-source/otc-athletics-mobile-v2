@@ -118,8 +118,8 @@ export default function MyPathScreen() {
     });
   }, []);
 
-  const hasIdentity = gate.hitting.moverDone && identityResult;
-  const hasMechanical = gate.hitting.mechanicalDone && diagnostic;
+  const hasIdentity = false as const; // Hitting diagnostics removed
+  const hasMechanical = false as const; // Hitting diagnostics removed
 
   // ── No diagnostics — show CTA ──────────────────────
   if (!hasIdentity && !hasMechanical) {
@@ -136,15 +136,15 @@ export default function MyPathScreen() {
         </View>
         <View style={styles.center}>
           <Ionicons name="map-outline" size={48} color={colors.textMuted} />
-          <Text style={styles.emptyTitle}>Complete Your Diagnostics</Text>
+          <Text style={styles.emptyTitle}>Find Your Focus</Text>
           <Text style={styles.emptySub}>
-            Take the Swing Identity quiz and Mechanical Diagnostic to unlock your personalized development path.
+            Use the troubleshooting system to identify what to work on. Pick a problem, lock in for 7 days, and build your development path.
           </Text>
           <TouchableOpacity
             style={styles.ctaBtn}
-            onPress={() => router.push('/(app)/training/mechanical/diagnostics' as any)}
+            onPress={() => router.push('/(app)/training/mechanical/troubleshoot' as any)}
           >
-            <Text style={styles.ctaBtnText}>Go to Diagnostics</Text>
+            <Text style={styles.ctaBtnText}>Troubleshoot My Swing</Text>
             <Ionicons name="arrow-forward" size={16} color={colors.bg} />
           </TouchableOpacity>
         </View>
@@ -153,9 +153,9 @@ export default function MyPathScreen() {
   }
 
   // Derived data
-  const focusAreas = hasMechanical ? getFocusAreas(diagnostic.primary, diagnostic.secondary) : [];
+  const focusAreas = hasMechanical && diagnostic ? getFocusAreas(diagnostic.primary, diagnostic.secondary) : [];
   // New identity system doesn't map to old MoverType slugs — pass null until drill metadata is migrated
-  const recommended = hasMechanical
+  const recommended = (hasMechanical && diagnostic)
     ? getRecommendedDrills(diagnostic.primary, diagnostic.secondary, athlete?.age ?? null)
     : [];
 
@@ -175,103 +175,7 @@ export default function MyPathScreen() {
         contentContainerStyle={styles.content}
         showsVerticalScrollIndicator={false}
       >
-        {/* ── 1. Hitting Identity ───────────────────── */}
-        {hasIdentity && (
-          <>
-            <Text style={styles.sectionLabel}>HITTING IDENTITY</Text>
-            <View style={[styles.card, { borderColor: MOVEMENT_PROFILES[identityResult.movementType].color + '30' }]}>
-              <View style={styles.moverHeader}>
-                <View style={[styles.moverDot, { backgroundColor: MOVEMENT_PROFILES[identityResult.movementType].color }]} />
-                <Text style={[styles.moverName, { color: MOVEMENT_PROFILES[identityResult.movementType].color }]}>
-                  {COMBINED_PROFILE_LABELS[identityResult.combinedProfile]}
-                </Text>
-              </View>
-              <Text style={styles.moverTagline}>
-                {COMBINED_PROFILE_SUMMARIES[identityResult.combinedProfile]}
-              </Text>
-
-              {/* Movement Pattern */}
-              <View style={styles.moverDetail}>
-                <Text style={[styles.detailLabel, { color: MOVEMENT_PROFILES[identityResult.movementType].color }]}>
-                  MOVEMENT · {MOVEMENT_PROFILES[identityResult.movementType].label.toUpperCase()}
-                </Text>
-                {identityResult.movementExamples.map((comp: string) => (
-                  <Text key={comp} style={styles.detailItem}>{comp}</Text>
-                ))}
-              </View>
-
-              {/* Bat Path */}
-              <View style={styles.moverDetail}>
-                <Text style={[styles.detailLabel, { color: BAT_PATH_PROFILES[identityResult.batPathType].color }]}>
-                  BAT PATH · {BAT_PATH_PROFILES[identityResult.batPathType].label.toUpperCase()}
-                </Text>
-                {identityResult.batPathExamples.map((comp: string) => (
-                  <Text key={comp} style={styles.detailItem}>{comp}</Text>
-                ))}
-              </View>
-
-              <View style={[styles.cueBadge, { borderColor: MOVEMENT_PROFILES[identityResult.movementType].color + '40' }]}>
-                <Text style={[styles.cueLabel, { color: MOVEMENT_PROFILES[identityResult.movementType].color }]}>KEY CUES</Text>
-                {identityResult.movementCues.slice(0, 2).map((cue: string) => (
-                  <Text key={cue} style={styles.cueText}>"{cue}"</Text>
-                ))}
-                {identityResult.batPathCues.slice(0, 2).map((cue: string) => (
-                  <Text key={cue} style={styles.cueText}>"{cue}"</Text>
-                ))}
-              </View>
-
-              <TouchableOpacity
-                style={[styles.linkBtn, { backgroundColor: MOVEMENT_PROFILES[identityResult.movementType].color + '15' }]}
-                onPress={() => router.push('/(app)/training/mechanical/mover-type-quiz' as any)}
-              >
-                <Text style={[styles.linkBtnText, { color: MOVEMENT_PROFILES[identityResult.movementType].color }]}>
-                  View Identity Details
-                </Text>
-                <Ionicons name="chevron-forward" size={14} color={MOVEMENT_PROFILES[identityResult.movementType].color} />
-              </TouchableOpacity>
-            </View>
-          </>
-        )}
-
-        {/* ── 2. Current Focus ─────────────────────── */}
-        {hasMechanical && (
-          <>
-            <Text style={styles.sectionLabel}>YOUR CURRENT FOCUS</Text>
-            <View style={styles.card}>
-              {/* Primary */}
-              <View style={styles.issueRow}>
-                <View style={[styles.issueDot, { backgroundColor: MECHANICAL_ISSUES[diagnostic.primary].color }]} />
-                <View style={{ flex: 1 }}>
-                  <Text style={styles.issueRank}>Primary Issue</Text>
-                  <Text style={styles.issueTitle}>
-                    {ISSUE_DISPLAY[diagnostic.primary]}
-                  </Text>
-                  <Text style={styles.issueDesc}>
-                    {MECHANICAL_ISSUES[diagnostic.primary].description}
-                  </Text>
-                </View>
-              </View>
-
-              <View style={styles.divider} />
-
-              {/* Secondary */}
-              <View style={styles.issueRow}>
-                <View style={[styles.issueDot, { backgroundColor: MECHANICAL_ISSUES[diagnostic.secondary].color }]} />
-                <View style={{ flex: 1 }}>
-                  <Text style={styles.issueRank}>Secondary Issue</Text>
-                  <Text style={styles.issueTitle}>
-                    {ISSUE_DISPLAY[diagnostic.secondary]}
-                  </Text>
-                  <Text style={styles.issueDesc}>
-                    {MECHANICAL_ISSUES[diagnostic.secondary].description}
-                  </Text>
-                </View>
-              </View>
-            </View>
-          </>
-        )}
-
-        {/* ── 3. Focus Areas ──────────────────────── */}
+        {/* ── 1. Focus Areas ──────────────────────── */}
         {focusAreas.length > 0 && (
           <>
             <Text style={styles.sectionLabel}>FOCUS AREAS</Text>

@@ -32,7 +32,7 @@ export default function SectionScreen() {
   }
 
   const isPlaceholder = section.isPlaceholder;
-  const hasDiagnostic = gate.hitting.mechanicalDone;
+  const hasDiagnostic = false; // Hitting diagnostics removed
   const drills = section.drills;
 
   return (

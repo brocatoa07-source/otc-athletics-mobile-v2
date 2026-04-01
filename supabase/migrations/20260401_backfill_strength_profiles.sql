@@ -1,0 +1,50 @@
+-- ============================================================================
+-- Backfill Plan: Generate strength_profiles for existing lifting-mover submissions
+--
+-- CONTEXT:
+-- Before Phase 3, the lifting quiz stored only { moverType: 'static' | 'spring' | 'hybrid' }
+-- in diagnostic_submissions.result_payload. No signals array was included.
+-- The generateStrengthProfile() function has a backward-compat bridge
+-- (inferSignalsFromMoverType) that infers signals from the old moverType slug.
+--
+-- BACKFILL STRATEGY:
+-- 1. Find all users with a lifting-mover submission but NO strength_profiles row
+-- 2. For each, trigger profile generation via the app's generateDiagnosticResult()
+--    (which will use inferSignalsFromMoverType for old payloads)
+-- 3. This can be done client-side on next app open, or via a one-time server script
+--
+-- CLIENT-SIDE APPROACH (recommended for this app architecture):
+-- On app startup or SC vault entry, check if:
+--   - diagnostic_submissions has a row for (user_id, 'sc', 'lifting-mover')
+--   - strength_profiles has NO row for user_id
+-- If true, trigger generateDiagnosticResult({ vaultType: 'sc' })
+-- This uses the existing legacy bridge to infer signals and generate the profile.
+--
+-- CRITERIA FOR REMOVING inferSignalsFromMoverType BRIDGE:
+-- The bridge can be safely removed when ALL of these are true:
+-- 1. All active users have a strength_profiles row (verified via query below)
+-- 2. No new submissions lack a 'signals' key in result_payload
+-- 3. At least 30 days have passed since Phase 3 deployment
+--
+-- VERIFICATION QUERIES:
+-- ============================================================================
+
+-- Count users with lifting-mover submission but no strength profile
+-- (these need backfill)
+-- SELECT COUNT(*) FROM diagnostic_submissions ds
+-- LEFT JOIN strength_profiles sp ON ds.user_id = sp.user_id
+-- WHERE ds.vault_type = 'sc'
+--   AND ds.diagnostic_type = 'lifting-mover'
+--   AND sp.id IS NULL;
+
+-- Count users with old-format payloads (no signals key)
+-- (these rely on the legacy bridge)
+-- SELECT COUNT(*) FROM diagnostic_submissions
+-- WHERE vault_type = 'sc'
+--   AND diagnostic_type = 'lifting-mover'
+--   AND result_payload->>'signals' IS NULL;
+
+-- When both counts are 0, the bridge can be removed.
+
+-- No server-side SQL backfill needed — the app handles it on next open.
+-- This file documents the plan and verification queries.

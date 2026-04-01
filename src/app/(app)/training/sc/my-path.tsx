@@ -27,12 +27,16 @@ import {
   type StrengthProgress,
 } from '@/data/strength-program-engine';
 import { OTCS_PHASE_META } from '@/data/otcs-types';
+import { useStrengthProfile } from '@/hooks/useStrengthProfile';
+import { MY_PATH_LANES } from '@/features/strength/config/myPathMapping';
+import type { MyPathStartPoint } from '@/features/strength/types/strengthProfile';
 
 const ACCENT = '#1DB954';
 
 export default function SCMyPathScreen() {
   const { hasFullLifting, isCoach } = useTier();
   const { result: moverType } = useDiagnosticResult('sc', 'lifting-mover');
+  const { profile: generatedProfile } = useStrengthProfile();
   const [profile, setProfile] = useState<StrengthProfile | null>(null);
   const [program, setProgram] = useState<OtcsGeneratedProgram | null>(null);
   const [progress, setProgress] = useState<StrengthProgress | null>(null);
@@ -55,7 +59,18 @@ export default function SCMyPathScreen() {
 
   async function handleRegenerate() {
     setRegenerating(true);
-    const newProgram = await regenerateFromProfile();
+    // Pass generated strength profile biases to program generation
+    const biases = generatedProfile ? {
+      prep_bias: generatedProfile.prep_bias as string[] | undefined,
+      plyo_bias: generatedProfile.plyo_bias as string[] | undefined,
+      sprint_bias: generatedProfile.sprint_bias as string[] | undefined,
+      strength_bias: generatedProfile.strength_bias as string[] | undefined,
+      accessory_bias: generatedProfile.accessory_bias as string[] | undefined,
+      conditioning_bias: generatedProfile.conditioning_bias as string[] | undefined,
+      recovery_bias: generatedProfile.recovery_bias as string[] | undefined,
+      avoid_overemphasis: generatedProfile.avoid_overemphasis as string[] | undefined,
+    } : undefined;
+    const newProgram = await regenerateFromProfile(biases);
     if (newProgram) {
       setProgram(newProgram);
       const prog = await loadStrengthProgress();
@@ -295,6 +310,40 @@ export default function SCMyPathScreen() {
             </View>
           </View>
         </View>
+
+        {/* ── Strength Profile Lane ────────────── */}
+        {generatedProfile?.my_path_start_point && (() => {
+          const lane = MY_PATH_LANES[generatedProfile.my_path_start_point as MyPathStartPoint];
+          if (!lane) return null;
+          return (
+            <>
+              <Text style={styles.sectionLabel}>YOUR DEVELOPMENT LANE</Text>
+              <View style={[styles.card, { borderColor: '#8b5cf6' + '25' }]}>
+                <Text style={[styles.profileName, { color: '#8b5cf6' }]}>{lane.title}</Text>
+                <Text style={styles.tendencyText}>{lane.description}</Text>
+                <View style={styles.divider} />
+                {lane.steps.map((step, i) => (
+                  <View key={i} style={{ flexDirection: 'row', alignItems: 'center', gap: 8, paddingVertical: 3 }}>
+                    <View style={{ width: 20, height: 20, borderRadius: 10, backgroundColor: i === 0 ? '#8b5cf6' : colors.border, alignItems: 'center', justifyContent: 'center' }}>
+                      <Text style={{ fontSize: 10, fontWeight: '900', color: i === 0 ? '#fff' : colors.textMuted }}>{i + 1}</Text>
+                    </View>
+                    <Text style={[styles.metaText, i === 0 && { fontWeight: '800', color: colors.textPrimary }]}>{step}</Text>
+                  </View>
+                ))}
+                {generatedProfile.secondary_need && (
+                  <View style={[styles.metaRow, { marginTop: 6 }]}>
+                    <View style={styles.metaItem}>
+                      <Ionicons name="flag-outline" size={14} color="#8b5cf6" />
+                      <Text style={[styles.metaText, { color: '#8b5cf6' }]}>
+                        Focus: {(generatedProfile.secondary_need as string).replace('_', ' ')}
+                      </Text>
+                    </View>
+                  </View>
+                )}
+              </View>
+            </>
+          );
+        })()}
 
         {/* ── Progress ────────────────────────── */}
         <Text style={styles.sectionLabel}>PROGRESS</Text>

@@ -2,10 +2,10 @@
  * AthleteIdentityCard — Compact dashboard card showing the athlete's core profiles.
  *
  * Sources:
- *   Hitting: useDiagnosticResult('hitting', 'mover-type') → combinedProfile label
  *   Mental:  useMentalProfile() → primary_archetype from mental_profiles
  *   Strength: useDiagnosticResult('sc', 'lifting-mover') → LIFTING_MOVER_TYPES lookup
  *
+ * NOTE: Hitting identity removed — hitting vault is problem-first (no diagnostic).
  * Hidden entirely if no profile data exists.
  */
 
@@ -15,18 +15,12 @@ import { router } from 'expo-router';
 import { colors, radius } from '@/theme';
 import { useDiagnosticResult } from '@/hooks/useDiagnosticResult';
 import { useMentalProfile } from '@/hooks/useMentalProfile';
-import { COMBINED_PROFILE_LABELS } from '@/data/hitting-identity-data';
 import { ARCHETYPE_INFO } from '@/data/mental-diagnostics-data';
 import { LIFTING_MOVER_TYPES } from '@/data/lifting-mover-type-data';
 
 export function AthleteIdentityCard() {
-  const { result: identityResult } = useDiagnosticResult('hitting', 'mover-type');
   const { profile: mentalProfile } = useMentalProfile();
   const { result: liftingMover } = useDiagnosticResult('sc', 'lifting-mover');
-
-  const hittingLabel = identityResult
-    ? COMBINED_PROFILE_LABELS[identityResult.combinedProfile]
-    : null;
 
   const mentalLabel = mentalProfile?.primary_archetype
     ? ARCHETYPE_INFO[mentalProfile.primary_archetype as keyof typeof ARCHETYPE_INFO]?.name
@@ -37,7 +31,7 @@ export function AthleteIdentityCard() {
     : null;
 
   // Hide entirely if no profile data
-  if (!hittingLabel && !mentalLabel && !strengthLabel) return null;
+  if (!mentalLabel && !strengthLabel) return null;
 
   return (
     <TouchableOpacity
@@ -52,12 +46,6 @@ export function AthleteIdentityCard() {
       </View>
 
       <View style={styles.profiles}>
-        {hittingLabel && (
-          <View style={styles.profileRow}>
-            <View style={[styles.dot, { backgroundColor: '#E10600' }]} />
-            <Text style={styles.profileText} numberOfLines={1}>{hittingLabel}</Text>
-          </View>
-        )}
         {mentalLabel && (
           <View style={styles.profileRow}>
             <View style={[styles.dot, { backgroundColor: '#A78BFA' }]} />

@@ -21,7 +21,7 @@ import {
   getCurrentDayOfBlock, getDaysRemaining, isTodayCheckedIn,
   type ActiveBlock, type TopicStats,
 } from '@/data/troubleshooting-engine';
-import { getTopicContent, ENVIRONMENT_LABELS } from '@/data/troubleshooting-content';
+import { getTopicContent, ENVIRONMENT_LABELS, BALL_FLIGHT_FEEDBACK, POSTURE_PHILOSOPHY } from '@/data/troubleshooting-content';
 import { getDrillsForTopic, getDrillById, DRILL_TYPE_META } from '@/data/tagged-drills';
 import { getTodaysDrillId } from '@/data/troubleshooting-engine';
 
@@ -156,6 +156,19 @@ export default function TopicDetailScreen() {
               ))}
             </View>
 
+            {/* What The Hitter Needs To Learn (contact topics) */}
+            {content.whatToLearn && content.whatToLearn.length > 0 && (
+              <View style={styles.card}>
+                <Text style={[styles.sectionLabel, { color: category.color }]}>WHAT YOU NEED TO LEARN</Text>
+                {content.whatToLearn.map((item, i) => (
+                  <View key={i} style={styles.reasonRow}>
+                    <View style={[styles.reasonDot, { backgroundColor: category.color }]} />
+                    <Text style={styles.reasonText}>{item}</Text>
+                  </View>
+                ))}
+              </View>
+            )}
+
             {/* Good / Bad Examples */}
             <View style={styles.card}>
               <Text style={[styles.sectionLabel, { color: '#ef4444' }]}>WHAT IT SHOULD NOT LOOK LIKE</Text>
@@ -233,6 +246,116 @@ export default function TopicDetailScreen() {
               })}
             </View>
           </>
+        )}
+
+        {/* ═══════ DRILL PROGRESSION (Foundation → Skill → Transfer) ═══════ */}
+        {content?.drillProgression && content.drillProgression.length > 0 && (
+          <View style={styles.card}>
+            <Text style={[styles.sectionLabel, { color: category.color }]}>DRILL PROGRESSION</Text>
+            {content.drillProgression.map((group) => {
+              const stageColors: Record<string, string> = {
+                'foundation': '#3b82f6',
+                'skill-building': '#22c55e',
+                'transfer': '#f59e0b',
+              };
+              const stageColor = stageColors[group.stage] ?? category.color;
+              return (
+                <View key={group.stage} style={styles.progressionGroup}>
+                  <View style={[styles.progressionBadge, { backgroundColor: stageColor + '15' }]}>
+                    <Text style={[styles.progressionBadgeText, { color: stageColor }]}>{group.label}</Text>
+                  </View>
+                  {group.drills.map((drill, di) => (
+                    <View key={di} style={styles.progressionDrillRow}>
+                      <View style={[styles.progressionDot, { backgroundColor: stageColor }]} />
+                      <Text style={styles.progressionDrillText}>{drill}</Text>
+                    </View>
+                  ))}
+                </View>
+              );
+            })}
+          </View>
+        )}
+
+        {/* ═══════ CUES (empty section for future content) ═══════ */}
+        {content?.cues !== undefined && (
+          <View style={styles.card}>
+            <Text style={[styles.sectionLabel, { color: category.color }]}>CUES</Text>
+            {content.cues.length > 0 ? (
+              content.cues.map((cue, i) => (
+                <View key={i} style={styles.cueRow}>
+                  <Ionicons name="mic-outline" size={12} color={category.color} />
+                  <Text style={[styles.cueText, { color: category.color }]}>{cue}</Text>
+                </View>
+              ))
+            ) : (
+              <Text style={styles.emptyPlaceholder}>Coming soon</Text>
+            )}
+          </View>
+        )}
+
+        {/* ═══════ OUTCOME CHALLENGES (empty section for future content) ═══════ */}
+        {content?.outcomeChallenges !== undefined && (
+          <View style={styles.card}>
+            <Text style={[styles.sectionLabel, { color: category.color }]}>OUTCOME CHALLENGES</Text>
+            {content.outcomeChallenges.length > 0 ? (
+              content.outcomeChallenges.map((challenge, i) => (
+                <View key={i} style={styles.reasonRow}>
+                  <Ionicons name="trophy-outline" size={12} color={category.color} />
+                  <Text style={styles.reasonText}>{challenge}</Text>
+                </View>
+              ))
+            ) : (
+              <Text style={styles.emptyPlaceholder}>Coming soon</Text>
+            )}
+          </View>
+        )}
+
+        {/* ═══════ FEELS (empty section for future content) ═══════ */}
+        {content?.feels !== undefined && (
+          <View style={styles.card}>
+            <Text style={[styles.sectionLabel, { color: category.color }]}>FEELS</Text>
+            {content.feels.length > 0 ? (
+              content.feels.map((feel, i) => (
+                <View key={i} style={styles.reasonRow}>
+                  <Ionicons name="hand-left-outline" size={12} color={category.color} />
+                  <Text style={styles.reasonText}>{feel}</Text>
+                </View>
+              ))
+            ) : (
+              <Text style={styles.emptyPlaceholder}>Coming soon</Text>
+            )}
+          </View>
+        )}
+
+        {/* ═══════ BALL FLIGHT FEEDBACK (posture topics) ═══════ */}
+        {topic.categoryId === 'posture' && (
+          <View style={styles.card}>
+            <Text style={[styles.sectionLabel, { color: category.color }]}>WHAT THE BALL TELLS YOU</Text>
+            <Text style={styles.bodyText}>Ball flight is feedback. Good hitters learn from result patterns instead of guessing every swing.</Text>
+            {BALL_FLIGHT_FEEDBACK.map((signal) => {
+              const qualityColors: Record<string, string> = { bad: '#ef4444', improving: '#f59e0b', good: '#22c55e', elite: '#8b5cf6' };
+              const qColor = qualityColors[signal.quality] ?? colors.textMuted;
+              return (
+                <View key={signal.result} style={styles.ballFlightRow}>
+                  <View style={[styles.ballFlightDot, { backgroundColor: qColor }]} />
+                  <View style={{ flex: 1 }}>
+                    <Text style={[styles.ballFlightResult, { color: qColor }]}>{signal.result}</Text>
+                    <Text style={styles.ballFlightMeaning}>{signal.meaning}</Text>
+                  </View>
+                </View>
+              );
+            })}
+          </View>
+        )}
+
+        {/* ═══════ KEY TAKEAWAY (posture topics) ═══════ */}
+        {topic.categoryId === 'posture' && (
+          <View style={[styles.takeawayCard, { borderColor: category.color + '30' }]}>
+            <Ionicons name="bulb" size={18} color={category.color} />
+            <Text style={[styles.takeawayText, { color: category.color }]}>
+              {POSTURE_PHILOSOPHY.keyTakeaway}
+            </Text>
+          </View>
         )}
 
         {/* Playbook prompt for repeat users */}
@@ -548,4 +671,29 @@ const styles = StyleSheet.create({
   todayDrillDesc: { fontSize: 12, color: colors.textSecondary, marginTop: 2 },
   todayDrillCue: { flexDirection: 'row', alignItems: 'center', gap: 6, marginTop: 4 },
   todayDrillCueText: { fontSize: 12, fontWeight: '700', fontStyle: 'italic' },
+
+  // Drill progression (Foundation / Skill Building / Transfer)
+  progressionGroup: { gap: 6, paddingTop: 8, borderTopWidth: 1, borderTopColor: colors.border },
+  progressionBadge: { alignSelf: 'flex-start', paddingHorizontal: 10, paddingVertical: 3, borderRadius: 6 },
+  progressionBadgeText: { fontSize: 11, fontWeight: '900' },
+  progressionDrillRow: { flexDirection: 'row', alignItems: 'center', gap: 8, paddingLeft: 4 },
+  progressionDot: { width: 6, height: 6, borderRadius: 3, flexShrink: 0 },
+  progressionDrillText: { fontSize: 13, fontWeight: '700', color: colors.textPrimary },
+
+  // Empty placeholder for future content
+  emptyPlaceholder: { fontSize: 12, color: colors.textMuted, fontStyle: 'italic' },
+
+  // Ball flight feedback
+  ballFlightRow: { flexDirection: 'row', alignItems: 'flex-start', gap: 8, paddingVertical: 4 },
+  ballFlightDot: { width: 8, height: 8, borderRadius: 4, marginTop: 4, flexShrink: 0 },
+  ballFlightResult: { fontSize: 12, fontWeight: '800' },
+  ballFlightMeaning: { fontSize: 11, color: colors.textMuted, lineHeight: 16 },
+
+  // Key takeaway
+  takeawayCard: {
+    flexDirection: 'row', alignItems: 'flex-start', gap: 10,
+    padding: 14, backgroundColor: colors.surface, borderWidth: 1,
+    borderRadius: radius.lg,
+  },
+  takeawayText: { flex: 1, fontSize: 14, fontWeight: '900', lineHeight: 20 },
 });

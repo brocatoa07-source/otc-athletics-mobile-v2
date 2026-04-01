@@ -79,9 +79,6 @@ interface FocusItem {
 }
 
 export function ProfileFocusCard() {
-  // ── Hitting ──
-  const { result: mechResult } = useDiagnosticResult('hitting', 'mechanical');
-
   // ── Mental ──
   const { profile: mentalProfile } = useMentalProfile();
 
@@ -91,34 +88,8 @@ export function ProfileFocusCard() {
     loadStrengthProfile().then(setStrengthProfile);
   }, []));
 
-  // ── Derive hitting focus ──
+  // ── Hitting diagnostics removed — no hitting focus items ──
   const hittingItems: FocusItem[] = [];
-  if (mechResult) {
-    const primaryKey = MECH_ISSUE_TO_SKILL[mechResult.primary];
-    if (primaryKey) {
-      const meta = HITTING_SKILL_META[primaryKey];
-      hittingItems.push({
-        key: primaryKey,
-        label: meta.label,
-        icon: meta.icon,
-        color: '#E10600',
-        route: `/(app)/training/mechanical/${primaryKey}`,
-      });
-    }
-    if (mechResult.secondary && mechResult.secondary !== mechResult.primary) {
-      const secondaryKey = MECH_ISSUE_TO_SKILL[mechResult.secondary];
-      if (secondaryKey && secondaryKey !== hittingItems[0]?.key) {
-        const meta = HITTING_SKILL_META[secondaryKey];
-        hittingItems.push({
-          key: secondaryKey,
-          label: meta.label,
-          icon: meta.icon,
-          color: '#E10600',
-          route: `/(app)/training/mechanical/${secondaryKey}`,
-        });
-      }
-    }
-  }
 
   // ── Derive mental focus ──
   const mentalItems: FocusItem[] = [];

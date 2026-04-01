@@ -141,7 +141,7 @@ export default function TroubleshootingScreen() {
     });
   }, []);
 
-  const hasDiagnostic = gate.hitting.mechanicalDone && diagnostic;
+  const hasDiagnostic = false; // Hitting diagnostics removed
 
   // ── No diagnostic — CTA ────────────────────────────
   if (!hasDiagnostic) {
@@ -158,15 +158,15 @@ export default function TroubleshootingScreen() {
         </View>
         <View style={styles.center}>
           <Ionicons name="build-outline" size={48} color={colors.textMuted} />
-          <Text style={styles.emptyTitle}>Complete Your Swing Diagnostic</Text>
+          <Text style={styles.emptyTitle}>Troubleshoot My Swing</Text>
           <Text style={styles.emptySub}>
-            Troubleshooting is personalized from your diagnostic results. Take the 10-question assessment to unlock your fix plan.
+            Pick a problem. Lock in for 7 days. Work the drills. Track your progress. No diagnostic needed.
           </Text>
           <TouchableOpacity
             style={styles.ctaBtn}
-            onPress={() => router.push('/(app)/training/mechanical/mechanical-diagnostic-quiz' as any)}
+            onPress={() => router.push('/(app)/training/mechanical/troubleshoot' as any)}
           >
-            <Text style={styles.ctaBtnText}>Take Swing Diagnostic</Text>
+            <Text style={styles.ctaBtnText}>Start Troubleshooting</Text>
             <Ionicons name="arrow-forward" size={16} color={colors.bg} />
           </TouchableOpacity>
         </View>
@@ -174,7 +174,8 @@ export default function TroubleshootingScreen() {
     );
   }
 
-  // ── Diagnostic complete — full screen ──────────────
+  // ── Diagnostic complete — full screen (unreachable — hitting diagnostics removed) ──
+  if (!diagnostic) return null;
   const { primary: primaryIssues, secondary: secondaryIssues } =
     getTroubleshootingIssuesForDiagnostic(diagnostic.primary, diagnostic.secondary);
   const allIssues = [...primaryIssues, ...secondaryIssues];

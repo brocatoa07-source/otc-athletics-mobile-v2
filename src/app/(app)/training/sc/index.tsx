@@ -12,12 +12,20 @@ import {
 import { SafeAreaView } from 'react-native-safe-area-context';
 import { router } from 'expo-router';
 import { Ionicons } from '@expo/vector-icons';
+import { useEffect, useRef } from 'react';
 import { colors, radius } from '@/theme';
 import { useTier } from '@/hooks/useTier';
 import { useGating } from '@/hooks/useGating';
 import { useDiagnosticResult } from '@/hooks/useDiagnosticResult';
+import { generateDiagnosticResult } from '@/lib/gating/generateDiagnosticResult';
+import { supabase } from '@/lib/supabase';
+import { useAuthStore } from '@/store/auth.store';
+import { useStrengthProfile } from '@/hooks/useStrengthProfile';
 import { LIFTING_MOVER_TYPES } from '@/data/lifting-mover-type-data';
+import { DAILY_WORK_RECIPES } from '@/features/strength/config/dailyWorkMapping';
+import { MY_PATH_LANES } from '@/features/strength/config/myPathMapping';
 import { ExpandableProfileCard } from '@/components/training/ExpandableProfileCard';
+import type { DailyWorkFocus, MyPathStartPoint } from '@/features/strength/types/strengthProfile';
 
 const ACCENT = '#1DB954';
 
@@ -54,7 +62,7 @@ const BUILD_ITEMS: BuildItem[] = [
   { key: 'philosophy', label: 'Why We Train This Way', sub: 'Training philosophy & system', icon: 'bulb-outline', color: '#f59e0b', route: '/(app)/training/sc/philosophy' },
 ];
 
-// ── Resolve focus items from mover type ─────────────────────────────────────
+// ── Resolve focus items from strength profile ───────────────────────────────
 
 interface FocusItem {
   name: string;
@@ -62,24 +70,24 @@ interface FocusItem {
   route: string;
 }
 
-function resolveFocusItems(moverType: string): FocusItem[] {
+const FOCUS_COLORS = [ACCENT, '#3b82f6', '#f59e0b'];
+
+function resolveFocusFromProfile(priorities: string[]): FocusItem[] {
+  return priorities.slice(0, 3).map((p, i) => ({
+    name: p,
+    color: FOCUS_COLORS[i] ?? ACCENT,
+    route: '/(app)/training/sc/workout',
+  }));
+}
+
+function resolveFocusFromMover(moverType: string): FocusItem[] {
   const mt = LIFTING_MOVER_TYPES[moverType as keyof typeof LIFTING_MOVER_TYPES];
   if (!mt) return [];
-
-  const items: FocusItem[] = [];
-
-  // First training emphasis item
-  if (mt.trainingEmphasis[0]) {
-    items.push({ name: mt.trainingEmphasis[0], color: ACCENT, route: '/(app)/training/sc/workout' });
-  }
-  if (mt.trainingEmphasis[1]) {
-    items.push({ name: mt.trainingEmphasis[1], color: '#3b82f6', route: '/(app)/training/sc/exercises?category=exercises' });
-  }
-  if (mt.trainingEmphasis[2]) {
-    items.push({ name: mt.trainingEmphasis[2], color: '#f59e0b', route: '/(app)/training/sc/exercises?category=power' });
-  }
-
-  return items.slice(0, 3);
+  return mt.trainingEmphasis.slice(0, 3).map((name, i) => ({
+    name,
+    color: FOCUS_COLORS[i] ?? ACCENT,
+    route: '/(app)/training/sc/workout',
+  }));
 }
 
 // ── Component ───────────────────────────────────────────────────────────────
@@ -88,11 +96,42 @@ export default function StrengthHome() {
   const { isWalk, hasLimitedLifting, hasFullLifting } = useTier();
   const { gate } = useGating();
   const { result: moverType } = useDiagnosticResult('sc', 'lifting-mover');
+  const { profile: strengthProfile } = useStrengthProfile();
 
   const moverDone = gate.sc.moverDone;
+  const user = useAuthStore((s) => s.user);
+  const backfillRan = useRef(false);
 
+  // Backfill: if user has lifting-mover submission but no strength_profiles row,
+  // trigger profile generation (uses legacy bridge for old payloads)
+  useEffect(() => {
+    if (moverDone && !strengthProfile && user?.id && !backfillRan.current) {
+      backfillRan.current = true;
+      console.log('[sc-home] Backfilling strength profile for', user.id.slice(0, 8));
+      generateDiagnosticResult({ supabase, userId: user.id, vaultType: 'sc' })
+        .then((r) => {
+          if (r.success) console.log('[sc-home] Backfill OK');
+          else console.warn('[sc-home] Backfill failed:', r.error);
+        });
+    }
+  }, [moverDone, strengthProfile, user?.id]);
+
+  // Prefer strength_profiles for display; fall back to raw mover type
   const moverData = moverType ? LIFTING_MOVER_TYPES[moverType] : null;
-  const focusItems = moverType ? resolveFocusItems(moverType) : [];
+  const dailyWorkRecipe = strengthProfile?.daily_work_focus
+    ? DAILY_WORK_RECIPES[strengthProfile.daily_work_focus as DailyWorkFocus]
+    : null;
+  const myPathLane = strengthProfile?.my_path_start_point
+    ? MY_PATH_LANES[strengthProfile.my_path_start_point as MyPathStartPoint]
+    : null;
+
+  // Focus items from profile priorities (preferred) or mover emphasis (fallback)
+  const focusItems = strengthProfile?.top_training_priorities
+    ? resolveFocusFromProfile(strengthProfile.top_training_priorities as string[])
+    : moverType
+      ? resolveFocusFromMover(moverType)
+      : [];
+
   const dayIndex = Math.floor(Date.now() / 86_400_000);
   const todayCue = DAILY_CUES[dayIndex % DAILY_CUES.length];
 
@@ -204,13 +243,33 @@ export default function StrengthHome() {
                 <Ionicons name="flash" size={18} color={ACCENT} />
               </View>
               <View style={{ flex: 1 }}>
-                <Text style={styles.focusLabel}>TODAY'S STRENGTH FOCUS</Text>
+                <Text style={styles.focusLabel}>
+                  {dailyWorkRecipe ? dailyWorkRecipe.label.toUpperCase() : 'TODAY\'S STRENGTH FOCUS'}
+                </Text>
                 <Text style={styles.focusArchetype}>{moverData.name}</Text>
+                {strengthProfile?.secondary_need && (
+                  <Text style={styles.focusSub}>
+                    Focus: {strengthProfile.secondary_need.replace('_', ' ')}
+                  </Text>
+                )}
               </View>
             </View>
 
-            {/* Focus items */}
-            {focusItems.map((item, idx) => (
+            {/* Daily Work recipe buckets */}
+            {dailyWorkRecipe && (
+              <View style={styles.recipeWrap}>
+                <Text style={[styles.recipeLabel, { color: ACCENT }]}>DAILY WORK</Text>
+                {dailyWorkRecipe.buckets.slice(0, 4).map((bucket: string) => (
+                  <View key={bucket} style={styles.toolRow}>
+                    <View style={[styles.toolDot, { backgroundColor: ACCENT }]} />
+                    <Text style={styles.toolName}>{bucket.replace(/_/g, ' ')}</Text>
+                  </View>
+                ))}
+              </View>
+            )}
+
+            {/* Top training priorities */}
+            {focusItems.map((item: FocusItem, idx: number) => (
               <TouchableOpacity
                 key={idx}
                 style={styles.toolRow}
@@ -222,6 +281,22 @@ export default function StrengthHome() {
                 <Ionicons name="chevron-forward" size={14} color={colors.textMuted} />
               </TouchableOpacity>
             ))}
+
+            {/* My Path lane */}
+            {myPathLane && (
+              <TouchableOpacity
+                style={[styles.pathRow, { borderColor: '#8b5cf6' + '30' }]}
+                onPress={() => router.push('/(app)/training/sc/my-path' as any)}
+                activeOpacity={0.8}
+              >
+                <Ionicons name="map-outline" size={14} color="#8b5cf6" />
+                <View style={{ flex: 1 }}>
+                  <Text style={[styles.pathTitle, { color: '#8b5cf6' }]}>{myPathLane.title}</Text>
+                  <Text style={styles.pathStep}>{myPathLane.steps[0]}</Text>
+                </View>
+                <Ionicons name="chevron-forward" size={14} color={colors.textMuted} />
+              </TouchableOpacity>
+            )}
 
             {/* CTA */}
             <TouchableOpacity
@@ -375,6 +450,19 @@ const styles = StyleSheet.create({
     paddingVertical: 12, borderRadius: radius.md,
   },
   ctaBtnText: { fontSize: 14, fontWeight: '900', color: '#fff' },
+
+  /* ── Daily Work recipe ──────────────── */
+  recipeWrap: { gap: 4, paddingTop: 6, borderTopWidth: 1, borderTopColor: colors.border },
+  recipeLabel: { fontSize: 9, fontWeight: '900', letterSpacing: 1.2 },
+
+  /* ── My Path lane ───────────────────── */
+  pathRow: {
+    flexDirection: 'row', alignItems: 'center', gap: 10,
+    padding: 10, backgroundColor: colors.surface, borderWidth: 1,
+    borderRadius: radius.md,
+  },
+  pathTitle: { fontSize: 12, fontWeight: '900' },
+  pathStep: { fontSize: 11, color: colors.textMuted, marginTop: 1 },
 
   /* ── Quick Compete ──────────────────── */
   sectionLabel: { fontSize: 10, fontWeight: '900', letterSpacing: 1.5, color: colors.textMuted, marginTop: 4 },

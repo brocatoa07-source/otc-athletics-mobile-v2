@@ -14,7 +14,8 @@ import { Ionicons } from '@expo/vector-icons';
 import { useQueryClient } from '@tanstack/react-query';
 import { supabase } from '@/lib/supabase';
 import { getLiveUser } from '@/utils/getLiveUser';
-import { submitDiagnostic } from '@/lib/gating/diagnosticService';
+import { completeDiagnosticFlow } from '@/lib/gating/completeDiagnosticFlow';
+import { VAULT } from '@/lib/gating/diagnosticConstants';
 import { colors, accents, radius } from '@/theme';
 import {
   QUESTIONS_BY_TYPE,
@@ -61,11 +62,12 @@ export default function DiagnosticQuizScreen() {
         const orderedValues = questions.map((q) => finalAnswers[q.id] ?? 3);
         const result = scoreByType(diagType, orderedValues);
 
-        // 2. Record diagnostic submission (single source of truth for gating)
-        //    Store full scored result so profile generation can read it back
-        await submitDiagnostic(supabase, {
+        // 2. Submit via centralized flow (handles submit + generation + invalidation)
+        const flowResult = await completeDiagnosticFlow({
+          supabase,
+          queryClient,
           userId: resolvedId,
-          vaultType: 'mental',
+          vaultType: VAULT.MENTAL,
           diagnosticType: diagType,
           resultPayload: {
             answersCount: Object.keys(finalAnswers).length,
@@ -74,7 +76,14 @@ export default function DiagnosticQuizScreen() {
           },
         });
 
-        queryClient.invalidateQueries({ queryKey: ['gate-state', resolvedId] });
+        if (!flowResult.success) {
+          const label = flowResult.error === 'submit_failed' ? 'Save Failed'
+            : flowResult.error === 'generation_failed' ? 'Profile Generation Failed'
+            : 'Error';
+          Alert.alert(label, flowResult.errorMessage ?? 'Please try again.');
+          setSubmitting(false);
+          return;
+        }
 
         router.replace({
           pathname: '/(app)/training/mental/diagnostics/results' as any,

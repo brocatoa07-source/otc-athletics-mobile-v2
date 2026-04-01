@@ -525,13 +525,6 @@ export const HITTING_VAULT_SECTIONS: VaultSection[] = [
         progression: 'flips',
       },
       {
-        name: 'Yes/No Drill',
-        fixes: 'Can\'t take bad pitches, swings at everything.',
-        howTo: 'Coach tosses balls in and out of the zone. Swing at strikes ("yes"), take balls ("no"). Train the decision.',
-        focus: 'Yes yes yes no. Hunt your pitch.',
-        progression: 'flips',
-      },
-      {
         name: 'Delay Load Drill',
         fixes: 'Commits too early, can\'t adjust to offspeed.',
         howTo: 'Delay your load slightly. Wait longer before triggering. Practice staying patient without losing readiness.',

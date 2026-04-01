@@ -3,6 +3,8 @@
  *
  * Single source of truth: the `diagnostic_submissions` table.
  * A vault is unlocked when ALL its required diagnostics have a submission row.
+ *
+ * NOTE: Hitting vault has NO diagnostics — it is always unlocked (empty requirements).
  */
 
 import { SupabaseClient } from '@supabase/supabase-js';
@@ -24,7 +26,6 @@ export interface GateState {
     total: number;
   };
   sc: { moverDone: boolean };
-  hitting: { moverDone: boolean; mechanicalDone: boolean };
 }
 
 const MENTAL_TOTAL = VAULT_CONFIGS.mental.requirements.length;
@@ -37,7 +38,6 @@ export const LOCKED_GATE_STATE: GateState = {
   mentalDiagnosticsComplete: false,
   mental: { archetypeDone: false, identityDone: false, habitsDone: false, completedCount: 0, total: MENTAL_TOTAL },
   sc: { moverDone: false },
-  hitting: { moverDone: false, mechanicalDone: false },
 };
 
 function isVaultUnlocked(
@@ -83,11 +83,9 @@ export async function getGateState(
     const mentalCompletedCount = [archetypeDone, identityDone, habitsDone].filter(Boolean).length;
 
     const mentalUnlocked = isVaultUnlocked('mental', submissions);
-    const hittingUnlocked = isVaultUnlocked('hitting', submissions);
+    const hittingUnlocked = isVaultUnlocked('hitting', submissions); // Always true (no requirements)
     const scUnlocked = isVaultUnlocked('sc', submissions);
 
-    const hittingMoverDone = isDiagnosticDone('hitting', 'mover-type', submissions);
-    const hittingMechanicalDone = isDiagnosticDone('hitting', 'mechanical', submissions);
     const scMoverDone = isDiagnosticDone('sc', 'lifting-mover', submissions);
 
     return {
@@ -104,7 +102,6 @@ export async function getGateState(
         total: MENTAL_TOTAL,
       },
       sc: { moverDone: scMoverDone },
-      hitting: { moverDone: hittingMoverDone, mechanicalDone: hittingMechanicalDone },
     };
   } catch (err) {
     console.error('[gating] getGateState failed — returning locked state:', err);

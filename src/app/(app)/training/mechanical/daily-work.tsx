@@ -117,7 +117,7 @@ export default function DailyWorkScreen() {
     loadOrGenerate();
   }, [loadOrGenerate]);
 
-  const hasDiagnostic = gate.hitting.mechanicalDone;
+  const hasDiagnostic = false; // Hitting diagnostics removed
 
   const handleToggle = async (itemId: string) => {
     if (!plan) return;

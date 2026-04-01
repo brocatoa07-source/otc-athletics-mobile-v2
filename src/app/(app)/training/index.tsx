@@ -175,11 +175,6 @@ export default function TrainingHub() {
 function LockedMyPathBanner({ gate }: { gate: GateState }) {
   const remaining: { label: string; done: boolean; route: string }[] = [
     {
-      label: 'Hitting: Mover Type Quiz',
-      done: gate.hitting.moverDone,
-      route: '/(app)/training/mechanical/diagnostics',
-    },
-    {
       label: `Mental: ${gate.mental.completedCount}/3 Diagnostics`,
       done: gate.mentalUnlocked,
       route: '/(app)/training/mental/diagnostics/entry',

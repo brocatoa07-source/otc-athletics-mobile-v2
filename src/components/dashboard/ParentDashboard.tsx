@@ -22,8 +22,7 @@ import { colors, radius } from '@/theme';
 import { useAuthStore } from '@/store/auth.store';
 import { supabase } from '@/lib/supabase';
 import { clearUserLocalState } from '@/lib/user-storage';
-import { hydrateHittingIdentity, hydrateLiftingMover } from '@/lib/gating/hydrateResults';
-import { COMBINED_PROFILE_COACHING, COMBINED_PROFILE_LABELS, MOVEMENT_PROFILES } from '@/data/hitting-identity-data';
+import { hydrateLiftingMover } from '@/lib/gating/hydrateResults';
 import { LIFTING_MOVER_TYPES } from '@/data/lifting-mover-type-data';
 import { ARCHETYPE_INFO, type ArchetypeKey } from '@/data/mental-diagnostics-data';
 
@@ -261,11 +260,8 @@ export function ParentDashboard() {
 
   // ── Hydrate profile cards from diagnostic result_payloads ──
 
-  // Hitting
-  const hittingDiag = diagnostics.find((d: any) => d.diagnostic_type === 'mover-type' && d.vault_type === 'hitting');
-  const hittingProfile = hittingDiag?.result_payload ? hydrateHittingIdentity(hittingDiag.result_payload) : null;
-  const hittingCoaching = hittingProfile ? COMBINED_PROFILE_COACHING[hittingProfile.combinedProfile] : null;
-  const hittingMv = hittingProfile ? MOVEMENT_PROFILES[hittingProfile.movementType] : null;
+  // Hitting — diagnostics removed (problem-first system)
+  const hittingProfile = null;
 
   // Mental — ArchetypeResult has { scores, primary, secondary }, field is "primary" not "archetype"
   const mentalDiag = diagnostics.find((d: any) => d.diagnostic_type === 'archetype' && d.vault_type === 'mental');
@@ -385,31 +381,6 @@ export function ParentDashboard() {
         </View>
 
         {/* ═══════ 2. PROFILE CARDS ═══════ */}
-
-        {/* Hitting Profile */}
-        {hittingProfile && hittingCoaching && hittingMv && (
-          <View style={[styles.card, { borderColor: '#E1060025' }]}>
-            <Text style={[styles.sectionLabel, { color: '#E10600' }]}>HITTING PROFILE</Text>
-            <Text style={styles.profileTitle}>
-              {COMBINED_PROFILE_LABELS[hittingProfile.combinedProfile] ?? 'Hitter Profile'}
-            </Text>
-            <Text style={styles.profileSub}>
-              {hittingMv.label} · {hittingProfile.batPathType === 'horizontal' ? 'Flat Path' : 'Vertical Path'}
-            </Text>
-            <View style={styles.profileSection}>
-              <Text style={[styles.profileSectionLabel, { color: '#22c55e' }]}>STRENGTHS</Text>
-              {(hittingCoaching.strengths ?? []).slice(0, 3).map((s: string, i: number) => (
-                <Text key={i} style={styles.profileItem}>• {s}</Text>
-              ))}
-            </View>
-            <View style={styles.profileSection}>
-              <Text style={[styles.profileSectionLabel, { color: '#f59e0b' }]}>WATCH-OUTS</Text>
-              {(hittingCoaching.watchOuts ?? []).slice(0, 2).map((s: string, i: number) => (
-                <Text key={i} style={styles.profileItem}>• {s}</Text>
-              ))}
-            </View>
-          </View>
-        )}
 
         {/* Mental Profile */}
         {mentalArchetype && (

@@ -8,11 +8,18 @@
  *   4. Apply week progression (Intro → Volume → Peak → Deload)
  *   5. Apply position modifiers
  *   6. Apply deficiency overrides
+ *   7. Apply strength profile overrides (bias injections, swaps, suppressions)
  *
  * Produces meaningfully different programs for different athletes.
  */
 
 import AsyncStorage from '@react-native-async-storage/async-storage';
+import {
+  applyProfileOverrides,
+  collectBiasTags,
+  type GeneratedBlock,
+} from '@/features/strength/services/applyProfileOverrides';
+import { validateSessionCoherence } from '@/features/strength/services/validateSessionCoherence';
 import {
   type OtcsArchetype,
   type OtcsPosition,
@@ -288,6 +295,12 @@ function generateBlock(
 
 /* ─── Day Generation ─────────────────────────────── */
 
+/** Optional strength profile data for profile-driven overrides */
+interface ProfileOverrideData {
+  biasTags: string[];
+  avoidTags: string[];
+}
+
 function generateDay(
   day: OtcsDay,
   weekType: OtcsWeekType,
@@ -295,10 +308,12 @@ function generateDay(
   position: OtcsPosition,
   deficiency: OtcsDeficiency,
   seasonPhase: OtcsSeasonPhase,
+  profileOverride?: ProfileOverrideData,
+  templatePhase?: string,
 ): OtcsGeneratedDay {
   const blockConfig = SEASON_BLOCK_CONFIG[seasonPhase];
 
-  const blocks = day.blocks
+  let blocks = day.blocks
     .filter((block) => !blockConfig.dropBlocks.includes(block.key))
     .map((block) => {
       const genBlock = generateBlock(block, weekType, seasonPhase, blockConfig.maxExercisesPerBlock);
@@ -334,6 +349,35 @@ function generateDay(
       return genBlock;
     });
 
+  // Step 7: Apply strength profile overrides (inject, swap, suppress)
+  if (profileOverride && profileOverride.biasTags.length > 0) {
+    const overrideResult = applyProfileOverrides(
+      blocks as GeneratedBlock[],
+      { biasTags: profileOverride.biasTags, avoidTags: profileOverride.avoidTags },
+      blockConfig.maxExercisesPerBlock ?? 6,
+    );
+    blocks = overrideResult.blocks as typeof blocks;
+
+    if (__DEV__ && overrideResult.log.length > 0) {
+      console.log(`[program-engine] Profile overrides for ${day.key}:`,
+        overrideResult.log.join(' | '));
+    }
+
+    // Step 8: Session coherence validation (final cleanup)
+    const coherence = validateSessionCoherence(
+      blocks as GeneratedBlock[],
+      templatePhase ?? 'gpp',
+      profileOverride.avoidTags,
+      blockConfig.maxExercisesPerBlock ?? 6,
+    );
+    blocks = coherence.blocks as typeof blocks;
+
+    if (__DEV__ && coherence.warnings.length > 0) {
+      console.log(`[program-engine] Coherence for ${day.key}:`,
+        coherence.warnings.join(' | '));
+    }
+  }
+
   return {
     key: day.key,
     dayNumber: day.dayNumber,
@@ -355,6 +399,8 @@ function generateWeek(
   position: OtcsPosition,
   deficiency: OtcsDeficiency,
   seasonPhase: OtcsSeasonPhase,
+  profileOverride?: ProfileOverrideData,
+  templatePhase?: string,
 ): OtcsGeneratedWeek {
   const weekType = MONTH_WEEK_ORDER[weekIndex];
 
@@ -364,7 +410,7 @@ function generateWeek(
     weekType,
     weekLabel: WEEK_LABELS[weekType],
     days: days.map((day) =>
-      generateDay(day, weekType, monthNumber, position, deficiency, seasonPhase),
+      generateDay(day, weekType, monthNumber, position, deficiency, seasonPhase, profileOverride, templatePhase),
     ),
   };
 }
@@ -377,7 +423,20 @@ function generateWeek(
  *   - seasonPhase → volume/block modifiers
  *   - position → exercise substitutions
  *   - deficiency → exercise overrides
+ *   - strengthProfile → profile-driven bias overrides
  * ═══════════════════════════════════════════════════ */
+
+/** Optional generated strength profile for profile-driven overrides */
+export interface StrengthProfileOverride {
+  prep_bias?: string[];
+  plyo_bias?: string[];
+  sprint_bias?: string[];
+  strength_bias?: string[];
+  accessory_bias?: string[];
+  conditioning_bias?: string[];
+  recovery_bias?: string[];
+  avoid_overemphasis?: string[];
+}
 
 export function generateProgram(profile: {
   archetype: OtcsArchetype;
@@ -385,9 +444,24 @@ export function generateProgram(profile: {
   deficiency: OtcsDeficiency;
   daysPerWeek?: OtcsDaysPerWeek;
   seasonPhase?: OtcsSeasonPhase;
+  strengthProfile?: StrengthProfileOverride;
 }): OtcsGeneratedProgram {
   const daysPerWeek: OtcsDaysPerWeek = profile.daysPerWeek ?? 3;
   const seasonPhase: OtcsSeasonPhase = profile.seasonPhase ?? 'OFFSEASON';
+
+  // Build profile override data if strength profile is provided
+  const profileOverride: ProfileOverrideData | undefined = profile.strengthProfile
+    ? {
+        biasTags: collectBiasTags(profile.strengthProfile),
+        avoidTags: profile.strengthProfile.avoid_overemphasis ?? [],
+      }
+    : undefined;
+
+  if (__DEV__ && profileOverride) {
+    console.log('[program-engine] Generating with profile overrides:',
+      profileOverride.biasTags.length, 'bias tags,',
+      profileOverride.avoidTags.length, 'avoid tags');
+  }
 
   const months: OtcsGeneratedMonth[] = [];
   let globalWeek = 0;
@@ -403,7 +477,7 @@ export function generateProgram(profile: {
     for (let w = 0; w < 4; w++) {
       globalWeek++;
       weeks.push(
-        generateWeek(selectedDays, w, globalWeek, m, profile.position, profile.deficiency, seasonPhase),
+        generateWeek(selectedDays, w, globalWeek, m, profile.position, profile.deficiency, seasonPhase, profileOverride, template.phase),
       );
     }
 
@@ -557,7 +631,10 @@ export async function initStrengthProgress(): Promise<StrengthProgress> {
  * Loads the stored profile, generates a fresh program, saves it, and resets progress.
  * Returns the new program, or null if no valid profile exists.
  */
-export async function regenerateFromProfile(): Promise<OtcsGeneratedProgram | null> {
+export async function regenerateFromProfile(
+  /** Optional generated strength profile biases from Supabase */
+  strengthProfileBiases?: StrengthProfileOverride,
+): Promise<OtcsGeneratedProgram | null> {
   try {
     const { loadStrengthProfile } = await import('./strength-profile');
     const profile = await loadStrengthProfile();
@@ -569,10 +646,14 @@ export async function regenerateFromProfile(): Promise<OtcsGeneratedProgram | nu
     if (__DEV__) {
       console.log('[strength-engine] regenerateFromProfile — generating from profile:',
         { archetype: profile.archetype, position: profile.position, deficiency: profile.deficiency,
-          daysPerWeek: profile.daysPerWeek, seasonPhase: profile.seasonPhase });
+          daysPerWeek: profile.daysPerWeek, seasonPhase: profile.seasonPhase,
+          hasStrengthProfile: !!strengthProfileBiases });
     }
 
-    const program = generateProgram(profile);
+    const program = generateProgram({
+      ...profile,
+      strengthProfile: strengthProfileBiases,
+    });
     await saveGeneratedProgram(program);
     await initStrengthProgress();
 
