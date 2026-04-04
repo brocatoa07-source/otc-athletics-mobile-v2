@@ -14,6 +14,7 @@ const PILL_CONFIG: Record<PaidTier, { label: string; color: string }> = {
   DOUBLE: { label: 'DOUBLE', color: Colors.primary },
   TRIPLE: { label: 'TRIPLE', color: Colors.warning },
   HOME_RUN: { label: 'HOME RUN', color: '#a855f7' },
+  GRAND_SLAM: { label: 'GRAND SLAM', color: '#e11d48' },
 };
 
 export function TierPill({ requiredTier, variant = 'light' }: TierPillProps) {

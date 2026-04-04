@@ -413,4 +413,88 @@ export const MENTAL_VAULT_SECTIONS: MentalVaultSection[] = [
       },
     ],
   },
+
+  // ── 10. Journals ──────────────────────────────────────────
+  {
+    key: 'journals',
+    label: 'Journals',
+    description: 'Write to process, reflect, and grow.',
+    icon: 'book-outline',
+    color: '#3b82f6',
+    freeCount: 2,
+    tools: [
+      {
+        name: 'Daily Reflection Journal',
+        fixes: 'Not processing the day mentally.',
+        howTo: 'At the end of each day, write: 1 win, 1 thing to improve, 1 thing you\'re grateful for. Keep it short. Consistency beats depth.',
+        focus: 'Process before you sleep.',
+      },
+      {
+        name: 'Competition Journal',
+        fixes: 'Not learning from games.',
+        howTo: 'After every game, write: What went well? What would I do differently? What\'s my one focus for next game? No emotion — just honest data.',
+        focus: 'Learn from every game.',
+      },
+      {
+        name: 'Confidence Evidence Log',
+        fixes: 'Forgetting proof that you are good.',
+        howTo: 'Write 3 pieces of evidence that prove you are capable. Pull from practice, games, effort, preparation. Read it before competition.',
+        focus: 'Stack evidence.',
+      },
+      {
+        name: 'Self-Talk Audit Journal',
+        fixes: 'Unaware of negative internal dialogue.',
+        howTo: 'For one day, notice every negative thought during training. Write it down. Next to it, write what a great coach would say instead.',
+        focus: 'Catch it. Swap it.',
+      },
+      {
+        name: 'Goal Clarity Journal',
+        fixes: 'Training without direction.',
+        howTo: 'Write your 1 big goal. Then write 3 things you must do this week to move toward it. Review weekly. Adjust monthly.',
+        focus: 'Clarity drives action.',
+      },
+    ],
+  },
+
+  // ── 11. Guided Meditations ────────────────────────────────
+  {
+    key: 'meditations',
+    label: 'Guided Meditations',
+    description: 'Calm the mind, sharpen the focus.',
+    icon: 'leaf-outline',
+    color: '#a855f7',
+    freeCount: 1,
+    tools: [
+      {
+        name: 'Pre-Game Calm (3 min)',
+        fixes: 'Racing thoughts before competition.',
+        howTo: 'Close your eyes. Breathe in for 4, hold for 4, out for 6. Visualize yourself competing with calm confidence. Repeat for 3 minutes.',
+        focus: 'Calm is a weapon.',
+      },
+      {
+        name: 'Focus Reset (2 min)',
+        fixes: 'Scattered attention, mind wandering.',
+        howTo: 'Pick one point to focus on. Breathe slowly. When your mind drifts, gently bring it back. No judgment. 2 minutes of single-point focus.',
+        focus: 'Train your attention.',
+      },
+      {
+        name: 'Post-Game Recovery (5 min)',
+        fixes: 'Carrying the game home with you.',
+        howTo: 'Sit quietly. Breathe. Replay 1 good moment. Let go of 1 bad moment. Say "I gave what I had." Release the game. Come back tomorrow fresh.',
+        focus: 'Release and recover.',
+      },
+      {
+        name: 'Confidence Visualization (4 min)',
+        fixes: 'Low confidence before big moments.',
+        howTo: 'Close your eyes. See yourself succeeding — the swing, the throw, the play. Feel it in your body. Hear the sounds. Make it real. Open your eyes ready.',
+        focus: 'See it. Feel it. Be it.',
+      },
+      {
+        name: 'Sleep Wind-Down (5 min)',
+        fixes: 'Can\'t turn off the brain at night.',
+        howTo: 'Lie down. Breathe in for 4, out for 8. Scan your body from toes to head. Release every muscle. Let thoughts pass like clouds. Nothing to do. Just breathe.',
+        focus: 'Rest is training.',
+      },
+    ],
+  },
 ];

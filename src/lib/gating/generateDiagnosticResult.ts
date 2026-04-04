@@ -15,6 +15,7 @@
 import { SupabaseClient } from '@supabase/supabase-js';
 import AsyncStorage from '@react-native-async-storage/async-storage';
 import { VAULT, DIAGNOSTIC, CACHE_KEYS } from './diagnosticConstants';
+import { logDiagnosticEvent, startTimer } from './diagnosticEvents';
 import {
   scoreArchetype,
   scoreIdentity,
@@ -74,7 +75,7 @@ export async function generateDiagnosticResult(
 ): Promise<GenerateResultReturn> {
   const { supabase, userId, vaultType } = params;
 
-  console.log('[generateDiagnosticResult] START', { userId: userId.slice(0, 8), vaultType });
+  logDiagnosticEvent({ event: 'profile_generation_started', vault: vaultType, userId: userId.slice(0, 8) });
 
   try {
     if (vaultType === VAULT.MENTAL) {
@@ -86,13 +87,9 @@ export async function generateDiagnosticResult(
     }
 
     // Hitting has no diagnostics
-    console.log('[generateDiagnosticResult] No generation needed for vault:', vaultType);
     return { success: true };
   } catch (err: any) {
-    console.error('[generateDiagnosticResult] FAILED', {
-      vaultType,
-      error: err?.message ?? err,
-    });
+    logDiagnosticEvent({ event: 'profile_generation_failed', vault: vaultType, error: err?.message ?? String(err) });
     return { success: false, error: err?.message ?? 'Unknown error during result generation' };
   }
 }
@@ -103,8 +100,10 @@ async function generateMentalProfile(
   supabase: SupabaseClient,
   userId: string,
 ): Promise<GenerateResultReturn> {
+  const elapsed = startTimer();
+  logDiagnosticEvent({ event: 'profile_generation_started', vault: 'mental', userId: userId.slice(0, 8) });
+
   // 1. Fetch all 3 mental diagnostic submissions
-  console.log('[generateMentalProfile] Fetching submissions...');
   const { data: submissions, error: fetchErr } = await supabase
     .from('diagnostic_submissions')
     .select('diagnostic_type, result_payload')
@@ -113,12 +112,9 @@ async function generateMentalProfile(
 
   if (fetchErr || !submissions) {
     const msg = fetchErr?.message ?? 'Could not fetch mental diagnostic submissions';
-    console.error('[generateMentalProfile] Fetch FAILED:', msg);
+    logDiagnosticEvent({ event: 'profile_generation_failed', vault: 'mental', error: msg, durationMs: elapsed() });
     return { success: false, error: msg };
   }
-
-  console.log('[generateMentalProfile] Submissions found:', submissions.length,
-    submissions.map(s => s.diagnostic_type));
 
   // 2. Extract payloads by type
   const byType: Record<string, any> = {};
@@ -137,12 +133,11 @@ async function generateMentalProfile(
       !habitsPayload && 'habits',
     ].filter(Boolean);
     const msg = `Missing diagnostic data: ${missing.join(', ')}. Please retake missing diagnostics.`;
-    console.error('[generateMentalProfile] Missing data:', missing);
+    logDiagnosticEvent({ event: 'profile_generation_failed', vault: 'mental', error: msg, durationMs: elapsed() });
     return { success: false, error: msg };
   }
 
   // 3. Score from stored answers (or use pre-scored results)
-  console.log('[generateMentalProfile] Scoring...');
   const archetypeResult = archetypePayload.answers
     ? scoreArchetype(archetypePayload.answers)
     : archetypePayload.scored;
@@ -154,7 +149,7 @@ async function generateMentalProfile(
     : habitsPayload.scored;
 
   if (!archetypeResult || !identityResult || !habitsResult) {
-    console.error('[generateMentalProfile] Scoring returned null — payload malformed');
+    logDiagnosticEvent({ event: 'profile_generation_failed', vault: 'mental', error: 'Scoring returned null', durationMs: elapsed() });
     return { success: false, error: 'Diagnostic data is corrupted. Please retake diagnostics.' };
   }
 
@@ -165,11 +160,6 @@ async function generateMentalProfile(
     habitsResult,
   );
 
-  console.log('[generateMentalProfile] Profile payload built:', {
-    archetype: archetypeResult.primary,
-    iss: profilePayload.iss,
-    hss: profilePayload.hss,
-  });
 
   // 5. Upsert to mental_profiles
   const { error: upsertErr } = await supabase
@@ -184,11 +174,11 @@ async function generateMentalProfile(
     );
 
   if (upsertErr) {
-    console.error('[generateMentalProfile] Upsert FAILED:', upsertErr.message);
+    logDiagnosticEvent({ event: 'profile_generation_failed', vault: 'mental', error: upsertErr.message, durationMs: elapsed() });
     return { success: false, error: `Failed to save mental profile: ${upsertErr.message}` };
   }
 
-  console.log('[generateMentalProfile] Profile saved to mental_profiles');
+  logDiagnosticEvent({ event: 'profile_generation_succeeded', vault: 'mental', durationMs: elapsed(), metadata: { archetype: archetypeResult.primary } });
 
   // 6. Cache scores locally (best-effort)
   try {
@@ -201,9 +191,9 @@ async function generateMentalProfile(
     const legacyStruggles = deriveLegacyStruggles(archetypeResult);
     await AsyncStorage.setItem(CACHE_KEYS.mentalStruggles, JSON.stringify(legacyStruggles));
     await AsyncStorage.removeItem(CACHE_KEYS.mentalDailyWork);
-    console.log('[generateMentalProfile] Local caches updated');
+    // Cache OK
   } catch {
-    console.warn('[generateMentalProfile] Local cache update failed (non-critical)');
+    // Cache write is best-effort
   }
 
   return { success: true };
@@ -255,19 +245,40 @@ async function generateStrengthProfile(
     };
   }
 
-  // 4. Upsert to strength_profiles
+  // 4. Upsert to strength_profiles (one profile per user, retakes overwrite)
+  // Destructure to ensure no 'id' leaks into the payload
+  const { user_id, version, primary_archetype, archetype_confidence, secondary_need,
+    force_bias, control_bias, mobility_score, stability_control_score, strength_score,
+    elasticity_score, speed_rotation_score, static_score, spring_score, hybrid_score,
+    top_training_priorities, avoid_overemphasis, daily_work_focus, my_path_start_point,
+    prep_bias, plyo_bias, sprint_bias, strength_bias, accessory_bias, conditioning_bias,
+    recovery_bias, programming_notes, recommended_block_swaps, raw_need_scores,
+    raw_archetype_scores, generated_from_submission_id,
+  } = buildResult.payload;
+
   const { error: upsertErr } = await supabase
     .from('strength_profiles')
     .upsert(
       {
-        ...buildResult.payload,
+        user_id, version, primary_archetype, archetype_confidence, secondary_need,
+        force_bias, control_bias, mobility_score, stability_control_score, strength_score,
+        elasticity_score, speed_rotation_score, static_score, spring_score, hybrid_score,
+        top_training_priorities, avoid_overemphasis, daily_work_focus, my_path_start_point,
+        prep_bias, plyo_bias, sprint_bias, strength_bias, accessory_bias, conditioning_bias,
+        recovery_bias, programming_notes, recommended_block_swaps, raw_need_scores,
+        raw_archetype_scores, generated_from_submission_id,
         generated_at: new Date().toISOString(),
         updated_at: new Date().toISOString(),
       },
-      { onConflict: 'user_id' },
+      { onConflict: 'user_id', ignoreDuplicates: false },
     );
 
   if (upsertErr) {
+    // If table doesn't exist yet, log warning but don't crash the flow
+    if (upsertErr.message?.includes('schema cache') || upsertErr.code === '42P01') {
+      console.warn('[generateStrengthProfile] strength_profiles table not found — run migration 20260331_create_strength_profiles.sql');
+      return { success: false, error: 'Strength profiles table not created yet. Please apply the database migration.' };
+    }
     console.error('[generateStrengthProfile] Upsert FAILED:', upsertErr.message);
     return { success: false, error: `Failed to save strength profile: ${upsertErr.message}` };
   }

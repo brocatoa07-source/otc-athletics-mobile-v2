@@ -1,11 +1,35 @@
 import { Ionicons } from '@expo/vector-icons';
 
+// ── Structured Tool (new format for detail screens) ─────────────────────────
+
+export interface StructuredTool {
+  id: string;
+  name: string;
+  tagline: string;
+  whatIs: string;
+  whyItWorks: string;
+  howToUse: string[];
+  bestTime: string;
+  cue?: string;
+  difficulty: 'Easy' | 'Medium' | 'Advanced';
+  timeRequired: string;
+  toolType: string;
+  bestUsed: string[];
+  quickTool: boolean;
+}
+
+// ── Category ────────────────────────────────────────────────────────────────
+
 export interface Tool {
   icon: keyof typeof Ionicons.glyphMap;
   title: string;
   desc: string;
   color: string;
   items: string[];
+  /** If set, tapping the category routes here instead of expanding items inline */
+  route?: string;
+  /** Structured tool data for categories with detail screens */
+  structuredItems?: StructuredTool[];
 }
 
 export const TOOLS: Tool[] = [
@@ -29,6 +53,118 @@ export const TOOLS: Tool[] = [
       'Close Eyes, Count Backward from 50: Slow count with breathing. Resets focus.',
       'Quick Body Scan: Mentally scan head to toe. Relax where you\'re holding tension. Resets emotional regulation.',
     ],
+    structuredItems: [
+      {
+        id: '478-breathing', name: '4-7-8 Breathing', tagline: 'The fastest way to slow everything down.',
+        whatIs: 'A breathing pattern that forces your nervous system out of fight-or-flight. Inhale 4 seconds, hold 7, exhale 8. The extended exhale is what makes it work.',
+        whyItWorks: 'When your exhale is longer than your inhale, it activates the vagus nerve, which directly lowers heart rate and blood pressure. The 7-second hold builds CO2 tolerance, which reduces the physical panic response — the chest tightness, shallow breathing, and racing heart that show up before big moments.',
+        howToUse: ['Inhale through your nose — 4 seconds.', 'Hold — 7 seconds. Stay still.', 'Exhale through your mouth — 8 seconds. Slow and controlled.', 'Repeat 3 cycles. Under 90 seconds.'],
+        bestTime: 'On-deck circle when your heart rate spikes. In the bullpen before entering a game. In bed the night before a showcase. Between innings after a high-stress play.',
+        cue: 'Slow breath, slow heart, clear mind.',
+        difficulty: 'Easy', timeRequired: '2 min', toolType: 'Breathing', bestUsed: ['Pregame', 'In-Game', 'Anxiety', 'Pressure'], quickTool: false,
+      },
+      {
+        id: 'box-breathing', name: 'Box Breathing (4-4-4-4)', tagline: 'Find neutral. Not calm. Not amped. Neutral.',
+        whatIs: 'Four equal phases — inhale 4, hold 4, exhale 4, hold 4. Symmetrical. Rhythmic. Repeatable.',
+        whyItWorks: '4-7-8 brings you down. Box breathing brings you to center. The symmetry regulates your autonomic nervous system without pushing you toward drowsy. The counting occupies working memory, which interrupts mental chatter.',
+        howToUse: ['Inhale — 4 seconds.', 'Hold — 4 seconds.', 'Exhale — 4 seconds.', 'Hold empty — 4 seconds.', 'Repeat 3-4 cycles.'],
+        bestTime: 'On the mound after issuing a walk. Between pitches when you feel yourself rushing. In the dugout after a bad at-bat before you go play defense.',
+        cue: 'Four sides. Back to center.',
+        difficulty: 'Easy', timeRequired: '1 min', toolType: 'Breathing', bestUsed: ['In-Game', 'Between Pitches', 'After Mistake', 'Pressure'], quickTool: true,
+      },
+      {
+        id: 'cold-water', name: 'Cold Water on Face or Wrists', tagline: 'A biological off-switch for panic.',
+        whatIs: 'Splash cold water on your face or run it over the insides of your wrists for 15-20 seconds.',
+        whyItWorks: 'Cold water on your face triggers the mammalian dive reflex — an involuntary response that drops your heart rate by up to 25% within seconds. Cold water on your wrists cools blood temperature quickly, which lowers cortisol and physical agitation. Two different mechanisms, same result.',
+        howToUse: ['Get to the water cooler or sink.', 'Splash cold water across your forehead and cheeks. Or run cold water over both inner wrists for 15-20 seconds.', 'One slow breath after.'],
+        bestTime: 'Between innings after an emotional play. After getting pulled from the mound. Between games of a doubleheader when frustration is compounding.',
+        difficulty: 'Easy', timeRequired: '30 sec', toolType: 'Physical', bestUsed: ['Between Innings', 'After Mistake', 'Anxiety'], quickTool: true,
+      },
+      {
+        id: '54321-grounding', name: '5-4-3-2-1 Grounding', tagline: 'Anxiety lives in the future. This drags you back to now.',
+        whatIs: 'A sensory countdown. Name 5 things you see, 4 you feel, 3 you hear, 2 you smell, 1 you taste.',
+        whyItWorks: 'Your brain cannot run anxiety simulations and process real-time sensory data at the same time. This forces your prefrontal cortex to catalog what is actually in front of you, which shuts down the threat-projection loop.',
+        howToUse: ['5 things you see — scoreboard, pitcher\'s glove, baseline chalk.', '4 things you feel — bat tape, cleats in dirt, wind.', '3 things you hear — ball in glove, coach, crowd.', '2 things you smell — cut grass, dirt.', '1 thing you taste — gum, water.'],
+        bestTime: 'On-deck circle when your mind is racing. Before a big defensive inning. Walking to the plate for a critical at-bat.',
+        cue: 'Be where your cleats are.',
+        difficulty: 'Easy', timeRequired: '30 sec', toolType: 'Mental', bestUsed: ['Pregame', 'In-Game', 'Anxiety', 'Pressure'], quickTool: true,
+      },
+      {
+        id: 'barefoot-grass', name: 'Walk Barefoot on Grass', tagline: 'Get out of your head by getting into the ground.',
+        whatIs: 'Take your shoes off. Walk on grass for 5-10 minutes. Pay attention to the feeling under your feet.',
+        whyItWorks: 'Direct skin contact with the ground reduces cortisol and lowers systemic inflammation. The sensory input pulls your attention from abstract stress into physical experience. This is a decompression tool, not a game-time tool.',
+        howToUse: ['Find grass — outfield, backyard, warm-up area.', 'Shoes and socks off.', 'Walk slowly. Feel every step.', '5-10 minutes. No phone.'],
+        bestTime: 'After a tough loss. Before bed on tournament weekends. Morning of a big game to start grounded.',
+        difficulty: 'Easy', timeRequired: '5+ min', toolType: 'Physical', bestUsed: ['Pregame', 'After Game', 'Anxiety'], quickTool: false,
+      },
+      {
+        id: 'brain-dump', name: '2-Minute Brain Dump', tagline: 'Your brain is full. Empty it.',
+        whatIs: 'Set a timer for 2 minutes. Write every thought in your head — no filter, no structure. Stop when the timer ends. Do not reread it.',
+        whyItWorks: 'Your working memory holds about 4 things at once. Stress tries to force 15 in simultaneously. Writing moves those items from working memory onto paper, freeing up bandwidth for focus and performance.',
+        howToUse: ['Phone notes or scrap paper.', 'Set a 2-minute timer.', 'Write everything. No editing.', 'Timer goes off — stop. Close it. Do not reread.', 'One breath. Move on.'],
+        bestTime: '30 minutes before first pitch when your mind is cluttered. After a bad bullpen. The night before a showcase.',
+        difficulty: 'Easy', timeRequired: '2 min', toolType: 'Journaling', bestUsed: ['Pregame', 'Anxiety', 'Slump'], quickTool: false,
+      },
+      {
+        id: 'hum-song', name: 'Hum Your Favorite Song', tagline: 'Vibration resets your nervous system faster than thinking does.',
+        whatIs: 'Pick a song you know well. Hum it softly for 30-60 seconds. Feel the vibration in your chest.',
+        whyItWorks: 'Humming stimulates the vagus nerve through throat and chest vibrations — a different pathway than breathing exercises. It also forces a long exhale (you cannot hum while inhaling). The familiar melody redirects your brain from the stress loop to a known pattern.',
+        howToUse: ['Pick a song with a clear melody.', 'Hum quietly. Feel the vibration.', '30-60 seconds.', 'Your shoulders will drop and jaw will soften.'],
+        bestTime: 'Walking to the bullpen. In the dugout during a long half-inning. During warm-ups when you feel tight.',
+        difficulty: 'Easy', timeRequired: '1 min', toolType: 'Physical', bestUsed: ['Pregame', 'Between Innings', 'Anxiety'], quickTool: true,
+      },
+      {
+        id: 'ice-cube', name: 'Hold an Ice Cube', tagline: 'Force your brain to deal with something real instead of something imagined.',
+        whatIs: 'Hold an ice cube in your hand. Squeeze it. Focus on the cold until the stress loop breaks.',
+        whyItWorks: 'Your brain prioritizes immediate physical sensation over abstract thought. The cold is so intense that your attention system abandons the worry loop and redirects to the physical input. Unlike breathing tools, this requires no technique. The ice does the work.',
+        howToUse: ['Grab an ice cube from the cooler.', 'Hold it in one fist. Squeeze.', 'Focus on the cold, the melting, the pressure.', 'Hold 30-60 seconds or until the spiral stops.', 'Drop it. Shake your hand out.'],
+        bestTime: 'In the dugout when replaying a mistake. Between games of a doubleheader. When anger is building and you need a physical interrupt.',
+        difficulty: 'Easy', timeRequired: '1 min', toolType: 'Physical', bestUsed: ['In-Game', 'After Mistake', 'Anxiety'], quickTool: true,
+      },
+      {
+        id: 'smile-10', name: 'Smile for 10 Seconds', tagline: 'Your face talks to your brain. Use that.',
+        whatIs: 'Smile — teeth showing, full expression — and hold it for 10 seconds. Even if you do not mean it.',
+        whyItWorks: 'The muscles involved in smiling send a direct signal to your brain to release dopamine and serotonin. Your brain does not check whether the smile is genuine. This is the facial feedback effect — your face is a remote control for your brain chemistry.',
+        howToUse: ['Smile. Full. Teeth showing.', 'Hold for a slow count of 10.', 'Notice the shift — shoulders drop, chest opens, jaw loosens.'],
+        bestTime: 'Walking back to the dugout after a strikeout. Before stepping in for a pressure at-bat. After an error, before the next pitch.',
+        cue: 'Smile. Reset. Compete.',
+        difficulty: 'Easy', timeRequired: '10 sec', toolType: 'Physical', bestUsed: ['In-Game', 'After Mistake', 'Pressure'], quickTool: true,
+      },
+      {
+        id: 'chew-gum', name: 'Chew Gum', tagline: 'The easiest performance tool you will ever use.',
+        whatIs: 'Chew gum during competition.',
+        whyItWorks: 'Rhythmic chewing reduces cortisol by up to 16% and increases cerebral blood flow by 25-40%. The most practical benefit: chewing replaces jaw clenching, which radiates tension into your neck, shoulders, and hands — tightening your swing and stiffening your arm.',
+        howToUse: ['Keep gum in your bag.', 'Start chewing before the game or when stress rises.', 'Steady, relaxed rhythm — not aggressive.', 'Let it run in the background.'],
+        bestTime: 'Entire game as a baseline calming mechanism. Especially if you clench your jaw under stress.',
+        difficulty: 'Easy', timeRequired: '5 sec', toolType: 'Physical', bestUsed: ['In-Game', 'Full Game', 'Pressure'], quickTool: true,
+      },
+      {
+        id: 'clench-release', name: 'Clench and Release', tagline: 'Teach your body what letting go actually feels like.',
+        whatIs: 'Clench both fists as hard as you can for 5 seconds. Then release completely. The contrast is the tool.',
+        whyItWorks: 'When you create maximum tension then release it, your muscles relax below their resting baseline. Your nervous system reads the release as a safety signal. Stress causes unconscious gripping — this makes it deliberate, then forces the opposite.',
+        howToUse: ['Make two tight fists. Squeeze everything.', 'Hold 5 seconds. Maximum effort.', 'Open hands completely. Let them hang limp.', 'Shake out once.'],
+        bestTime: 'On-deck circle if your hands feel tight. On the mound when your grip is strangling the ball. Before any at-bat where you feel yourself gripping.',
+        cue: 'Grip it. Drop it. Play loose.',
+        difficulty: 'Easy', timeRequired: '10 sec', toolType: 'Physical', bestUsed: ['In-Game', 'On-Deck', 'Between Pitches', 'Pressure'], quickTool: true,
+      },
+      {
+        id: 'count-back-50', name: 'Eyes Closed, Count Back from 50', tagline: 'Give your brain a job so it stops inventing problems.',
+        whatIs: 'Close your eyes. Count backward from 50 to 1. One number per breath.',
+        whyItWorks: 'Anxiety fills empty cognitive space. Backward counting demands just enough concentration to occupy your working memory without adding stress. By the time you reach 1, your breathing has slowed, your chatter has starved, and your focus is back.',
+        howToUse: ['Close your eyes or soften your gaze.', 'Count backward from 50. One number per exhale.', 'If you lose your place, pick a nearby number and continue.', 'At 1, open your eyes. One breath. Move on.'],
+        bestTime: 'In bed the night before a big game. During a rain delay. Between tournament games when mental fatigue is stacking.',
+        difficulty: 'Easy', timeRequired: '2 min', toolType: 'Mental', bestUsed: ['Pregame', 'Before Bed', 'Anxiety'], quickTool: false,
+      },
+      {
+        id: 'body-scan', name: 'Quick Body Scan', tagline: 'Find the tension before it finds your mechanics.',
+        whatIs: 'A 30-second scan from head to toe. Check each region for tension. Release what you find.',
+        whyItWorks: 'Stress stores itself in your jaw, traps, hands, stomach, and quads without you noticing. That tension changes your swing path, stiffens your arm slot, slows your first step. A body scan makes unconscious tension conscious so you can release it.',
+        howToUse: ['Jaw — clenching? Unclench.', 'Shoulders — hiked? Drop them.', 'Hands — gripping? Open and shake.', 'Stomach — tight? One breath into your belly.', 'Legs — locked? Soft bend, one bounce.'],
+        bestTime: 'Before your first at-bat. Before taking the mound. Between innings. Anytime something feels off but you cannot name it.',
+        cue: 'Scan it. Find it. Release it.',
+        difficulty: 'Easy', timeRequired: '30 sec', toolType: 'Physical', bestUsed: ['Pregame', 'In-Game', 'Between Innings'], quickTool: true,
+      },
+    ],
   },
   {
     icon: 'flash-outline',
@@ -36,88 +172,160 @@ export const TOOLS: Tool[] = [
     desc: 'Pressure is a privilege. Turn it from a threat into fuel with these tools.',
     color: '#e11d48',
     items: [
-      'Power Pose for 2 Min: Stand tall, hands on hips. Boosts testosterone, reduces cortisol.',
-      'Say "I\'m excited" not "I\'m nervous": Same body feeling — you choose the meaning.',
-      'Clap & Say "Let\'s go!": Replaces hesitation with action and positive energy.',
-      'Shrink Focus: "1 play, 1 rep, 1 moment." Pressure builds from overthinking outcomes.',
-      'Double Inhale + Long Exhale: Quick inhale twice through nose, long slow exhale. Rapid stress reset.',
-      'Choose a Trigger Word: "Dominate." "Now." "Relax." Switches your brain to performance mode.',
-      'Physical Anchor: Tug jersey, tap chest, snap a band. Stops mental spirals.',
-      'Focus on Your Toes: Wiggle them in your shoes. Brings you back to the present.',
-      '3-2-1 Method: Count down then act. Cuts hesitation and overthinking.',
-      '"Pressure is a privilege": Reframe it as something earned, not feared.',
-      'Squeeze Fists 5 Sec, Release: Physical and mental tension release.',
-      'Eye Trick: Focus on one small spot for 15 seconds with calm breathing.',
-      'Personal Affirmation: "I\'ve done this a thousand times." "I\'m built for this."',
-      'Shift to Gratitude: Think of one thing you\'re grateful for right now. Dopamine boost.',
-      'Whisper: "Breathe. Lock in." Calm and direct instruction.',
-      'Write It Down, Rip It Up: Write what\'s stressing you for 30 sec — then tear it up. Symbolic release.',
-      'Flip the Script: "What\'s the opportunity here?" Shifts mindset from threat to challenge.',
-      'Eye Level Horizon Gaze: Look to the outfield for 5-10 sec. Widens visual field and calms tunnel vision.',
+      'Power Pose for 2 Min', 'Reframe: Excited Not Nervous', 'Shrink Focus', 'Trigger Word',
+      'Physical Anchor', '3-2-1 Method', 'Flip the Script', 'Horizon Gaze',
+    ],
+    structuredItems: [
+      { id: 'power-pose', name: 'Power Pose', tagline: 'Change your chemistry in 2 minutes.', whatIs: 'Stand tall, hands on hips or arms wide, for 2 minutes before competition. Expansive posture, not performance posture.', whyItWorks: 'Expansive postures increase testosterone (dominance hormone) and decrease cortisol (stress hormone). Your body sends a signal to your brain that says "I am in control here." You are not faking confidence — you are manufacturing it through posture.', howToUse: ['Find a private spot — bathroom, tunnel, behind the dugout.', 'Stand tall. Hands on hips or arms wide.', 'Hold for 2 minutes. Breathe normally.', 'Walk to the field from that posture.'], bestTime: 'Before the game. Before a big inning. Before your first at-bat.', difficulty: 'Easy', timeRequired: '2 min', toolType: 'Physical', bestUsed: ['Pregame', 'Pressure', 'Before At-Bat'], quickTool: false },
+      { id: 'excited-not-nervous', name: 'Reframe: Excited Not Nervous', tagline: 'Same feeling. Different label. Different outcome.', whatIs: 'When you feel nerves, say "I\'m excited" instead of "I\'m nervous." Out loud if possible.', whyItWorks: 'Excitement and anxiety produce nearly identical physiological responses — elevated heart rate, adrenaline, heightened senses. The difference is the label your brain assigns. Research shows that reappraising anxiety as excitement improves performance because it keeps you in an approach state rather than avoidance.', howToUse: ['Notice the nerves in your body.', 'Say out loud or internally: "I\'m excited."', 'Mean it. Your body is getting ready to perform.', 'Step in with that energy.'], bestTime: 'On-deck circle. Walking to the mound. Before any moment that makes your heart race.', cue: 'I\'m not nervous. I\'m ready.', difficulty: 'Easy', timeRequired: '5 sec', toolType: 'Mental', bestUsed: ['In-Game', 'Pressure', 'Before At-Bat'], quickTool: true },
+      { id: 'shrink-focus', name: 'Shrink Focus', tagline: 'The moment only has power if you let it be bigger than one pitch.', whatIs: 'When the moment feels too big, shrink your focus to the smallest possible unit: one pitch, one play, one breath.', whyItWorks: 'Pressure comes from outcome thinking — "if I don\'t get a hit we lose." Shrinking focus to the immediate action removes the weight of outcomes and returns your brain to execution mode. Elite performers do not think big in big moments. They think small.', howToUse: ['Catch yourself thinking about outcomes or consequences.', 'Shrink: "One pitch. That is all that exists."', 'Execute that one thing.', 'Repeat for the next one.'], bestTime: 'Late-inning at-bats. Bases loaded. Full count. Any moment that feels bigger than it needs to.', cue: 'One pitch. Right here.', difficulty: 'Easy', timeRequired: '5 sec', toolType: 'Mental', bestUsed: ['In-Game', 'Pressure', 'Between Pitches'], quickTool: true },
+      { id: 'trigger-word', name: 'Trigger Word', tagline: 'One word to switch your brain into compete mode.', whatIs: 'Choose a single word that activates your competitive state. Say it before every pitch or play.', whyItWorks: 'A trigger word creates a conditioned response. Over time, your brain associates the word with a specific mental state. It becomes a verbal switch that bypasses conscious thought and drops you directly into performance mode. The word must be personal — what works for you will not work for someone else.', howToUse: ['Choose one word. Examples: "Attack." "Now." "Dominate." "Hunt."', 'Say it before every pitch — hitting or pitching.', 'Same word, same timing, every time.', 'The repetition is what builds the association.'], bestTime: 'Between every pitch. Before stepping into the box. Before delivering a pitch.', difficulty: 'Easy', timeRequired: '5 sec', toolType: 'Mental', bestUsed: ['In-Game', 'Between Pitches', 'Pressure'], quickTool: true },
+      { id: 'physical-anchor', name: 'Physical Anchor', tagline: 'Give your body a kill switch for mental spirals.', whatIs: 'A deliberate physical gesture — tug your jersey, tap your chest, snap a wristband — that interrupts a thought pattern and resets your state.', whyItWorks: 'Physical movement interrupts cognitive loops because it engages your motor cortex, which competes for the same neural resources your worry loop is using. The gesture also becomes a conditioned reset cue over time — your brain learns that the tap means "stop and refocus."', howToUse: ['Choose one gesture. Keep it simple and quick.', 'When you notice a spiral, do the gesture immediately.', 'Pair it with one breath and one cue word.', 'Example: Tap chest → breath → "Compete."'], bestTime: 'After a bad call. After giving up a hit. When doubt starts talking. Any moment a mental spiral begins.', difficulty: 'Easy', timeRequired: '5 sec', toolType: 'Physical', bestUsed: ['In-Game', 'After Mistake', 'Pressure'], quickTool: true },
+      { id: '321-method', name: '3-2-1 Method', tagline: 'Count down and act. Kill hesitation before it kills your performance.', whatIs: 'When you are hesitating, count "3-2-1" and then act. No more thinking. Just move.', whyItWorks: 'Hesitation is fear wearing a thinking disguise. The 3-2-1 countdown gives your brain a defined moment to commit, which prevents the endless analysis loop. It is a decision-forcing function — you are not deciding whether to act, you are deciding when. And the answer is always 1.', howToUse: ['Notice the hesitation.', 'Count: "3… 2… 1…"', 'At 1, act. No more deliberation.', 'Trust whatever decision you made at 1.'], bestTime: 'When you cannot decide whether to swing. Before jumping into a big moment. Anytime you are overthinking instead of competing.', difficulty: 'Easy', timeRequired: '5 sec', toolType: 'Mental', bestUsed: ['In-Game', 'Pressure', 'Between Pitches'], quickTool: true },
+      { id: 'flip-script', name: 'Flip the Script', tagline: 'Turn the threat into an opportunity in one sentence.', whatIs: 'When a moment feels like a threat ("I might fail"), reframe it as an opportunity ("This is my chance to compete").', whyItWorks: 'Threat appraisal activates defensive neural circuits — your body tightens, your decisions become conservative, and your risk tolerance drops. Opportunity appraisal activates approach circuits — you lean in, loosen up, and play aggressive. The situation has not changed. Your brain\'s interpretation of it has.', howToUse: ['Catch the threat thought. ("Don\'t mess this up.")', 'Flip it. ("This is my moment.")', 'Say the flip out loud or internally.', 'Step in from the opportunity frame.'], bestTime: 'Before clutch at-bats. Before closing innings. Anytime the moment feels like it is happening to you instead of for you.', cue: 'This is my moment.', difficulty: 'Easy', timeRequired: '10 sec', toolType: 'Mental', bestUsed: ['In-Game', 'Pressure', 'Before At-Bat'], quickTool: true },
+      { id: 'horizon-gaze', name: 'Horizon Gaze', tagline: 'Wide eyes, calm mind.', whatIs: 'Look to the outfield or the horizon for 5-10 seconds with a soft, wide gaze. Let your peripheral vision open up.', whyItWorks: 'Under stress, your visual field narrows — tunnel vision. This is a literal physiological response to threat. Deliberately widening your gaze by looking at the horizon activates the panoramic vision system, which is linked to your parasympathetic nervous system. Wide vision = calm state. Narrow vision = threat state. You can override the threat response through your eyes.', howToUse: ['Look toward the outfield fence or sky.', 'Soften your gaze — do not focus on any single object.', 'Let your peripheral vision expand.', 'Hold for 5-10 seconds. Breathe normally.', 'Come back to the task with a wider, calmer state.'], bestTime: 'Between innings. On-deck when nerves are high. On the mound when the inning is spiraling.', difficulty: 'Easy', timeRequired: '10 sec', toolType: 'Physical', bestUsed: ['In-Game', 'Between Innings', 'Pressure'], quickTool: true },
     ],
   },
   {
     icon: 'shield-outline',
     title: 'Fear',
-    desc: 'Fear lives in the future. Kill it by anchoring in the now. These tools break the fear loop.',
+    desc: 'Fear lives in the future. Kill it by anchoring in the now.',
     color: '#8b5cf6',
-    items: [
-      'Step Out & Reset Breathing: 4 sec in, 6 sec out. Stop the spiral.',
-      'Ground Yourself: Feel spikes in the dirt, focus on body contact points. Stay in your body.',
-      'Pick a Focal Point: Bat knob, foul pole, patch of grass. Narrowing vision calms the nervous system.',
-      'Use a Reset Word: "Next." "Compete." "Calm." Interrupts fear-based thoughts.',
-      'Drop Your Shoulders: Fear shows up in the traps. Relax them deliberately.',
-      'Replay Your Last Great Hit: Fear feeds off doubt — fuel yourself with proof.',
-      '"One Pitch at a Time": Shuts down overwhelm and fear of outcomes.',
-      '"I Choose to Attack": Fear is passive. Choosing to attack shifts to control and power.',
-      'Stick to Your Routine: Routines signal familiarity and control in stressful moments.',
-      'Nod Before the Pitch: Physical commitment = mental commitment.',
-      'Visualize Success (3 sec max): See a hard-hit ball, a dotted pitch, a clean play.',
-      'Name It, Tame It: "That\'s fear." Labeling activates your logical brain, reduces amygdala.',
-      'Physiological Sigh: Double inhale + slow exhale. Stanford-backed — drops anxiety fast.',
-      '"This fear means I care. That means I\'m alive." Change the story, change the outcome.',
-      'Focus on Controllables: "What can I control right now? My breath, my routine, my next pitch."',
-      'Anchor to Positive Memory: Recall a big hit. Remind your brain fear doesn\'t mean failure.',
-      '"Be where your cleats are." Fear lives in the future. The present kills it.',
-      'Commit Before You Go: "Yes, I\'m swinging." Fear creeps in when you\'re indecisive.',
-      'Flush It Routine: Brush your jersey, tap your cleats, pick up dirt. Physical cue to detach and move on.',
-      'Focus on the Ball\'s Seams: Redirect attention to details. Puts your brain in performance mode, not fear mode.',
-      'Talk to Your Glove or Bat: "Let\'s go." / "You\'re hot today." Externalizes nerves and refocuses energy.',
-      '"What\'s the worst that can happen?": Strikeout? Error? So what. Naming the fear strips it of power.',
-      'Channel Fear into Focus: "That\'s just energy. Let\'s use it." You choose the meaning.',
-      'Next Pitch Cue: "Next pitch." "Next rep." "0-0 count mentality." Shifts focus to what you control now.',
+    items: ['I Choose to Attack', 'Name It Tame It', 'Commit Before You Go', 'Flush It Routine', 'Focus on Controllables', 'Fear Reframe', 'Anchor to Proof'],
+    structuredItems: [
+      { id: 'choose-attack', name: 'I Choose to Attack', tagline: 'Fear is passive. Attack is a choice.', whatIs: 'When fear tells you to play small, you override it with a deliberate decision to be aggressive. Say it: "I choose to attack."', whyItWorks: 'Fear activates your avoidance system — play safe, protect, survive. The word "choose" activates your executive function, and "attack" activates your approach system. You are overriding a passive reflex with an active decision. Your body follows the instruction your brain gives it.', howToUse: ['Feel the fear rising — tight chest, hesitation, pulling back.', 'Say internally or out loud: "I choose to attack."', 'Step in with aggressive intent. Not reckless — purposeful.', 'Execute from that decision.'], bestTime: 'Before at-bats against tough pitchers. Before big defensive plays. Anytime you catch yourself playing small.', cue: 'I choose to attack.', difficulty: 'Easy', timeRequired: '5 sec', toolType: 'Mental', bestUsed: ['In-Game', 'Pressure', 'Before At-Bat'], quickTool: true },
+      { id: 'name-tame-fear', name: 'Name It, Tame It', tagline: '"That\'s fear." Three words that cut its power in half.', whatIs: 'When fear shows up, label it with one word: "That\'s fear." Do not argue with it, analyze it, or fight it. Just name it.', whyItWorks: 'Naming an emotion shifts brain activity from the amygdala (threat center) to the prefrontal cortex (rational brain). The emotion loses roughly half its intensity. You go from being inside the fear to observing it, which creates a gap between the feeling and your next action.', howToUse: ['Feel fear rising.', 'Say: "That\'s fear."', 'Take one breath.', 'Move to your routine or your next cue.'], bestTime: 'Walking to the plate against a hard thrower. Before a big defensive play. Anytime fear is dictating your behavior.', difficulty: 'Easy', timeRequired: '5 sec', toolType: 'Mental', bestUsed: ['In-Game', 'Pressure', 'Before At-Bat'], quickTool: true },
+      { id: 'commit-before-go', name: 'Commit Before You Go', tagline: 'Fear creeps in when you are indecisive. Decide, then act.', whatIs: 'Before stepping into the moment, make your decision and commit to it. "Yes, I am swinging." "Yes, I am attacking first pitch." Decide before you act.', whyItWorks: 'Indecision is fear\'s favorite environment. When you have not committed, your brain keeps running threat simulations. A clear commitment shuts down the simulation loop and activates execution circuits. You are no longer wondering what to do — you already know.', howToUse: ['Before stepping in, decide what you are doing.', '"I am swinging at my pitch." or "I am competing my fastball."', 'Nod once. Physical commitment reinforces mental commitment.', 'Execute without second-guessing.'], bestTime: 'Before every at-bat. Before every pitch you throw. Before big moments where hesitation costs you.', difficulty: 'Easy', timeRequired: '5 sec', toolType: 'Mental', bestUsed: ['In-Game', 'Between Pitches', 'Pressure'], quickTool: true },
+      { id: 'flush-it', name: 'Flush It Routine', tagline: 'A physical gesture that tells your brain the last play is over.', whatIs: 'A deliberate physical gesture — brush your jersey, tap your cleats, pick up dirt and drop it — that signals to your brain: "That is done. This is new."', whyItWorks: 'Physical gestures create pattern interrupts in the nervous system. The motor cortex activation competes with the rumination loop your amygdala is running. Over time, the gesture becomes a conditioned reset cue — your brain learns the physical action means "let go."', howToUse: ['Choose one gesture. Keep it consistent.', 'After any negative play, perform the gesture immediately.', 'As you do it, say your reset word: "Flush." "Next." "Gone."', 'Step into the next play clean.'], bestTime: 'After errors. After walks. After bad at-bats. After any play where the last moment is trying to follow you into the next one.', cue: 'Flush it. Next pitch.', difficulty: 'Easy', timeRequired: '5 sec', toolType: 'Reset', bestUsed: ['In-Game', 'After Mistake', 'Between Pitches'], quickTool: true },
+      { id: 'controllables', name: 'Focus on Controllables', tagline: 'Fear targets what you cannot control. Redirect to what you can.', whatIs: 'When fear is about outcomes (striking out, losing, making an error), redirect your attention to the things you actually control: your breath, your routine, your effort, your next pitch.', whyItWorks: 'Fear thrives on uncontrollable outcomes. When you redirect attention to controllable inputs, you activate your prefrontal cortex and disengage the fear circuits. The question "What can I control right now?" is a cognitive reframe that immediately shifts you from victim of the moment to owner of it.', howToUse: ['Catch the fear thought. ("What if I strike out?")', 'Ask: "What can I control right now?"', 'Answer: "My breath. My routine. My approach."', 'Execute on the controllable. Release the outcome.'], bestTime: 'During high-leverage at-bats. Before closing innings. During slumps when outcome-fear is loudest.', cue: 'Control what I can. Release the rest.', difficulty: 'Easy', timeRequired: '10 sec', toolType: 'Mental', bestUsed: ['In-Game', 'Pressure', 'Slump'], quickTool: true },
+      { id: 'fear-reframe', name: 'Fear Reframe', tagline: 'Fear means you care. That is a weapon, not a weakness.', whatIs: 'Reinterpret the feeling of fear as evidence that this moment matters to you — and that your body is preparing you to perform.', whyItWorks: 'The physiological response of fear and the physiological response of peak readiness are nearly identical. Reappraisal research shows that athletes who interpret arousal as "my body getting ready" outperform those who interpret it as "something is wrong." The feeling does not change. The story you tell about it does.', howToUse: ['Feel the fear response — heart rate up, palms sweaty, stomach tight.', 'Say: "This means I care. My body is getting ready."', 'Reinterpret the energy as fuel, not danger.', 'Use it. Compete harder because of it, not in spite of it.'], bestTime: 'Before showcase games. Before facing elite pitchers. Big moments that matter to you personally.', cue: 'This fear means I\'m alive. Let\'s go.', difficulty: 'Easy', timeRequired: '10 sec', toolType: 'Mental', bestUsed: ['Pregame', 'Pressure', 'Before At-Bat'], quickTool: true },
+      { id: 'anchor-proof', name: 'Anchor to Proof', tagline: 'Fear feeds on doubt. Feed yourself evidence instead.', whatIs: 'When fear says "you can\'t," recall a specific moment of success. Not a vague feeling — a specific hit, play, or performance. Anchor to the proof.', whyItWorks: 'Fear operates on prediction: "This will go badly." A specific positive memory is a counter-prediction with evidence: "I have done this before." Your brain treats vivid recalled experiences almost identically to real experiences, so replaying success literally activates the same neural patterns as performing successfully.', howToUse: ['Feel doubt or fear creeping in.', 'Recall one specific great moment. See it. Feel it. Hear it.', 'Hold the memory for 3 seconds.', 'Say: "I\'ve been here. I\'ve done this."', 'Step in from that memory, not from the fear.'], bestTime: 'On-deck circle during slumps. Before facing a pitcher who has beaten you before. Anytime doubt is louder than confidence.', difficulty: 'Easy', timeRequired: '10 sec', toolType: 'Visualization', bestUsed: ['In-Game', 'Pressure', 'Slump', 'Before At-Bat'], quickTool: true },
     ],
   },
   {
     icon: 'refresh-outline',
     title: 'At-Bat Reset',
-    desc: 'Your between-pitch reset. Takes less than 20 seconds — becomes automatic over time.',
+    desc: 'Your between-pitch reset. Becomes automatic over time.',
     color: '#3b82f6',
-    items: [
-      '1. Breathe Deep: In through nose (4 sec), out through mouth (6 sec). "Slow breath, slow heart."',
-      '2. Drop Your Shoulders: Relax the tension. "Loose body, loose mind."',
-      '3. Glove/Bat Anchor: Tap your glove, waggle the bat, dig in. Trigger compete mode.',
-      '4. Say Your Power Phrase: "Let\'s go." "Attack." "You\'ve got this."',
-      '5. Lock In a Focal Point: Bat knob, foul pole, back of the plate.',
-      '6. Flip the Fear: Say "I\'m excited." Reframe nerves into energy.',
-      '7. Visualize Success (2 sec max): See a hard-hit ball. Trust muscle memory.',
-      '8. Nod with Intent: "I\'m in. Let\'s compete."',
-      '9. Focus on What You Control: "See it. Feel it. Do it."',
-      '10. Smile or Laugh: Lightens the moment. "I get to play this game."',
+    items: ['Breathe Deep', 'Drop Shoulders', 'Bat Anchor', 'Power Phrase', 'Lock Focal Point'],
+    structuredItems: [
+      { id: 'ab-breathe', name: 'Breathe Deep', tagline: 'Slow breath, slow heart.', whatIs: 'One controlled breath between every pitch. In through nose for 4 seconds, out through mouth for 6.', whyItWorks: 'The extended exhale activates your vagus nerve and drops your heart rate within one breath cycle. This is the foundation of your reset — everything else builds on a regulated nervous system.', howToUse: ['Step out of the box.', 'Inhale 4 seconds through nose.', 'Exhale 6 seconds through mouth.', 'Feel your heart rate drop.'], bestTime: 'Between every pitch. Not just after bad ones.', cue: 'Slow breath, slow heart.', difficulty: 'Easy', timeRequired: '10 sec', toolType: 'Breathing', bestUsed: ['In-Game', 'Between Pitches'], quickTool: true },
+      { id: 'ab-shoulders', name: 'Drop Your Shoulders', tagline: 'Loose body, loose mind.', whatIs: 'Deliberately drop your shoulders one inch after your breath. Fear and tension live in the traps — this releases them.', whyItWorks: 'Shoulder tension radiates into your neck, hands, and swing. Dropping your shoulders sends a relaxation signal through your entire upper body. It is the fastest way to go from tight to loose.', howToUse: ['After your breath, check your shoulders.', 'Drop them one inch. Roll once if needed.', 'Feel the looseness flow down your arms.'], bestTime: 'Part of your between-pitch sequence. Every pitch.', difficulty: 'Easy', timeRequired: '5 sec', toolType: 'Physical', bestUsed: ['In-Game', 'Between Pitches'], quickTool: true },
+      { id: 'ab-anchor', name: 'Bat Anchor', tagline: 'Trigger compete mode with one physical gesture.', whatIs: 'Waggle the bat, adjust your gloves, tap the plate, dig in — a physical gesture that signals to your brain: "I am ready."', whyItWorks: 'A consistent physical trigger before each pitch creates a conditioned response. Over hundreds of repetitions, your brain associates the gesture with readiness. It becomes an automatic on-switch for your competitive state.', howToUse: ['Choose one gesture you already do naturally.', 'Make it deliberate and consistent.', 'Pair it with your cue word.', 'Same gesture, every pitch.'], bestTime: 'Right before you set in the box. Part of your sequence.', difficulty: 'Easy', timeRequired: '5 sec', toolType: 'Routine', bestUsed: ['In-Game', 'Between Pitches'], quickTool: true },
+      { id: 'ab-power-phrase', name: 'Power Phrase', tagline: 'One sentence that puts you in compete mode.', whatIs: 'A short phrase you say before stepping in. "Let\'s go." "Attack." "My turn." Same phrase every time.', whyItWorks: 'Verbal cues activate the motor planning regions of your brain associated with the action described. "Attack" literally primes your brain for aggressive action. Repetition strengthens the association until the phrase automatically triggers the state.', howToUse: ['Choose your phrase. Make it short, aggressive, personal.', 'Say it internally after your breath and anchor.', 'Step in immediately after.'], bestTime: 'Last thing before stepping into the box. Every at-bat.', cue: 'Let\'s go.', difficulty: 'Easy', timeRequired: '5 sec', toolType: 'Mental', bestUsed: ['In-Game', 'Between Pitches', 'Before At-Bat'], quickTool: true },
+      { id: 'ab-focal-point', name: 'Lock Focal Point', tagline: 'Narrow your world to one point. Everything else disappears.', whatIs: 'Pick one small visual target — bat knob, pitcher\'s release point, a patch of dirt — and lock your eyes on it for 2-3 seconds before the pitch comes.', whyItWorks: 'Narrowing your visual focus activates what neuroscientists call the "spotlight" attention system. It filters out peripheral distractions and primes your tracking circuits for the ball. Your mind cannot wander when your eyes are locked.', howToUse: ['Choose a focal point before each pitch.', 'Lock your eyes on it for 2-3 seconds.', 'Transition from the focal point to the pitcher\'s release zone.', 'Track the ball from there.'], bestTime: 'Final step of your between-pitch routine. Right before the pitch.', difficulty: 'Easy', timeRequired: '5 sec', toolType: 'Mental', bestUsed: ['In-Game', 'Between Pitches'], quickTool: true },
     ],
   },
   {
     icon: 'eye-outline',
     title: 'Visualization Protocol',
-    desc: '2-minute pregame visualization. See the pitch, feel the swing, execute the plan.',
+    desc: 'See the pitch, feel the swing, execute the plan.',
     color: '#f59e0b',
+    items: ['Pre-Game Visualization', 'In-Game Quick Visual', 'Confidence Replay', 'Approach Visualization', 'Postgame Mental Film'],
+    structuredItems: [
+      { id: 'pregame-viz', name: 'Pre-Game Visualization', tagline: 'See it before you do it. Your brain does not know the difference.', whatIs: 'A 2-3 minute eyes-closed visualization session before the game. You see yourself in the box, see the pitcher, track pitches, and execute quality at-bats.', whyItWorks: 'Visualization activates the same motor cortex pathways as physical execution. Your brain literally rehearses the movement without your body moving. Research shows athletes who combine physical and mental reps outperform those who only do physical reps.', howToUse: ['Find a quiet spot. Close your eyes.', 'See yourself in the box — the dirt, the pitcher, the field.', 'Run through 3 at-bats. See pitches. Feel swings. Hear contact.', 'Open your eyes. Nod. You have already been there.'], bestTime: 'During warm-ups. In the car before arriving. In the dugout before the lineup is called.', cue: 'I\'ve already been here.', difficulty: 'Easy', timeRequired: '2 min', toolType: 'Visualization', bestUsed: ['Pregame'], quickTool: false },
+      { id: 'quick-visual', name: 'In-Game Quick Visual', tagline: '3 seconds. One image. Back to competing.', whatIs: 'A micro-visualization between pitches or on-deck. See one specific successful outcome for 2-3 seconds, then step in.', whyItWorks: 'Short visualization pulses prime motor patterns without pulling you out of the game. Three seconds is enough to activate the neural pathways associated with success without over-thinking.', howToUse: ['On-deck or between pitches.', 'Close your eyes for 2-3 seconds.', 'See one image: a hard-hit ball, a clean throw, a solid play.', 'Open eyes. Step in.'], bestTime: 'On-deck. Between pitches in a critical at-bat.', difficulty: 'Easy', timeRequired: '5 sec', toolType: 'Visualization', bestUsed: ['In-Game', 'Between Pitches', 'On-Deck'], quickTool: true },
+      { id: 'confidence-replay', name: 'Confidence Replay', tagline: 'Your best moment is always available to you.', whatIs: 'Recall your single best moment in baseball — a specific hit, play, or performance — and relive it in detail for 10-15 seconds.', whyItWorks: 'Vivid recall of a positive experience activates the same reward and motor circuits as the original event. Your brain does not strongly distinguish between a vividly recalled success and a real one. This is a rapid confidence injection.', howToUse: ['Choose your moment. Make it specific.', 'Close your eyes briefly. See it. Feel it. Hear it.', '10-15 seconds. Make it vivid.', 'Open your eyes carrying that energy.'], bestTime: 'During slumps. Before facing a tough pitcher. When doubt is louder than confidence.', difficulty: 'Easy', timeRequired: '30 sec', toolType: 'Visualization', bestUsed: ['Pregame', 'Slump', 'Pressure'], quickTool: true },
+      { id: 'approach-viz', name: 'Approach Visualization', tagline: 'See your plan, not just your swing.', whatIs: 'Visualize your approach for the specific at-bat or inning ahead. What pitch are you hunting? What zone? What is your plan with two strikes?', whyItWorks: 'Most visualization focuses on mechanics. This visualizes decision-making — which is what actually breaks down under pressure. By pre-loading your approach mentally, you reduce in-game decision fatigue and increase the speed of your pitch recognition.', howToUse: ['On-deck, define your approach. "Fastball middle-in, first two pitches."', 'See yourself recognizing that pitch and attacking it.', 'See yourself laying off the pitcher\'s pitch.', 'Step in with the approach already loaded.'], bestTime: 'On-deck circle. Before every at-bat.', difficulty: 'Medium', timeRequired: '30 sec', toolType: 'Visualization', bestUsed: ['In-Game', 'On-Deck', 'Before At-Bat'], quickTool: true },
+      { id: 'postgame-film', name: 'Postgame Mental Film', tagline: 'Review the game in your mind before emotion rewrites it.', whatIs: 'Within 30 minutes of the game ending, close your eyes for 2 minutes and replay the key mental moments — not the physical results, but how you responded emotionally.', whyItWorks: 'Memory is reconstructive. Emotions distort it within hours. A quick mental replay while the game is fresh captures the real patterns — when you stayed composed, when you lost it, when you competed well. This data is more honest than anything you will remember tomorrow.', howToUse: ['Within 30 minutes postgame, find a quiet moment.', 'Replay 3 key moments. Focus on your mental response, not the result.', 'Note: Where was I composed? Where did I lose it?', 'Set one mental focus for next game.'], bestTime: 'Immediately postgame. In the car. Before you talk to anyone about the game.', difficulty: 'Medium', timeRequired: '2 min', toolType: 'Visualization', bestUsed: ['After Game'], quickTool: false },
+    ],
+  },
+  {
+    icon: 'heart-outline',
+    title: 'Confidence',
+    desc: 'Build unshakeable belief through evidence, preparation, and self-talk.',
+    color: '#f97316',
+    items: ['Evidence Log', 'Highlight Reel', 'Power Statement', 'Body Language Check', 'Preparation Ritual'],
+    structuredItems: [
+      { id: 'evidence-log', name: 'Evidence Log', tagline: 'Stack proof that you belong.', whatIs: 'After every game or practice, write 3 specific things you did well. Not "I played good" — specific: "Stayed back on the changeup in the 4th."', whyItWorks: 'Confidence is evidence-based. Your brain builds or destroys confidence based on the data you feed it. Negative events are naturally stickier (negativity bias). The evidence log deliberately feeds your brain positive data to counterbalance the bias.', howToUse: ['After every game or practice.', 'Write 3 specific things you did well.', 'Be detailed. "Took a good walk in the 6th" not "Did okay."', 'Read your recent entries before your next game.'], bestTime: 'Postgame within 30 minutes. Before bed. Read before next game.', difficulty: 'Easy', timeRequired: '2 min', toolType: 'Journaling', bestUsed: ['After Game', 'Slump', 'Confidence'], quickTool: false },
+      { id: 'highlight-reel', name: 'Highlight Reel', tagline: 'Your personal SportsCenter. Play it before every game.', whatIs: 'Visualize your 3 best moments for 60 seconds before competition. Make them vivid — see the swing, hear the crack, feel the energy.', whyItWorks: 'Vivid positive recall activates your reward circuits and primes motor patterns associated with peak performance. It also elevates mood and confidence through dopamine release. You are pre-loading your brain with the feeling of success before the game starts.', howToUse: ['Choose 3 best moments. Keep them specific.', 'Close your eyes. Replay each one for 20 seconds.', 'See it. Hear it. Feel it.', 'Open your eyes carrying that energy into warm-ups.'], bestTime: 'During warm-ups. On the bus. Before first at-bat.', difficulty: 'Easy', timeRequired: '1 min', toolType: 'Visualization', bestUsed: ['Pregame', 'Slump', 'Confidence'], quickTool: true },
+      { id: 'power-statement', name: 'Power Statement', tagline: 'Tell yourself who you are before the game tells you.', whatIs: 'An identity-level statement you say before competition. "I am prepared. I trust my work. I am dangerous."', whyItWorks: 'Your brain matches behavior to identity. A power statement activates the self-concept associated with confidence and competence. Over time, the statement becomes a conditioned trigger — saying it automatically shifts your internal state.', howToUse: ['Write one statement. Present tense. Aggressive. Personal.', 'Say it 3 times before warm-ups.', 'Say it once before your first at-bat.', 'When doubt hits mid-game, repeat it internally.'], bestTime: 'Pre-game. Before first at-bat. During slumps.', cue: 'I am prepared. I am dangerous.', difficulty: 'Easy', timeRequired: '10 sec', toolType: 'Mental', bestUsed: ['Pregame', 'Before At-Bat', 'Slump', 'Confidence'], quickTool: true },
+      { id: 'body-lang-confidence', name: 'Body Language Check', tagline: 'Confidence is a posture before it is a feeling.', whatIs: 'A deliberate posture adjustment: stand tall, chin level, shoulders back, walk with purpose. Do it regardless of how you feel.', whyItWorks: 'Body language is bidirectional. Confident posture generates confident brain chemistry (increased testosterone, decreased cortisol). Your teammates read it. Your opponents read it. And most importantly, your own brain reads it and matches your internal state to your external display.', howToUse: ['Check your posture right now.', 'Tall. Chin level. Shoulders back.', 'Walk like the best player on the field.', 'After every play — good or bad — look the same.'], bestTime: 'Walking to the plate. Walking off after a strikeout. Between innings. All game.', cue: 'Look the same. Always.', difficulty: 'Easy', timeRequired: '5 sec', toolType: 'Physical', bestUsed: ['In-Game', 'After Mistake', 'Confidence'], quickTool: true },
+      { id: 'prep-ritual', name: 'Preparation Ritual', tagline: 'You cannot control the game. You can control your preparation.', whatIs: 'Follow the exact same warm-up, same cues, same routine before every game. No variation. Same music, same stretches, same visualization, same order.', whyItWorks: 'Rituals create a sense of control in an uncontrollable environment. The consistency signals to your brain: "I am prepared. I have done this before. I know what comes next." That predictability produces confidence. Unpredictable preparation produces anxiety.', howToUse: ['Write your pre-game routine. Every step.', 'Follow it identically every game.', 'Do not skip steps when you feel good. Do not add steps when you feel bad.', 'The consistency IS the confidence.'], bestTime: 'Before every game. The routine starts the same time before first pitch every time.', difficulty: 'Medium', timeRequired: '5+ min', toolType: 'Routine', bestUsed: ['Pregame', 'Confidence'], quickTool: false },
+    ],
+  },
+  {
+    icon: 'compass-outline',
+    title: 'Focus',
+    desc: 'Train your attention to stay locked in when it matters most.',
+    color: '#0891b2',
+    items: ['Focal Lock Drill', 'Cue Word System', 'Between-Pitch Routine', 'Distraction Reset', 'One Pitch Focus'],
+    structuredItems: [
+      { id: 'focal-lock', name: 'Focal Lock Drill', tagline: 'Train your attention like a muscle.', whatIs: 'Pick one small object — a seam on the ball, a patch of dirt, the label on a water bottle. Lock your eyes on it for 30 seconds without letting your gaze wander.', whyItWorks: 'Sustained attention is a trainable skill. This drill strengthens the neural circuits responsible for voluntary focus. Over time, your ability to lock in on demand — like tracking a pitch from the release point — improves because the underlying attention hardware is stronger.', howToUse: ['Choose a small visual target.', 'Lock your eyes on it. Do not let them wander.', '30 seconds. Bring your attention back if it drifts.', 'Practice daily. It compounds.'], bestTime: 'During practice. In the dugout. As a daily 30-second drill to build the skill.', difficulty: 'Easy', timeRequired: '30 sec', toolType: 'Mental', bestUsed: ['Pregame', 'In-Game', 'Focus'], quickTool: true },
+      { id: 'cue-word-system', name: 'Cue Word System', tagline: 'One word that brings you all the way back.', whatIs: 'Choose one word for the game and use it before every pitch. "See." "Attack." "Compete." "Hunt." The same word, every pitch.', whyItWorks: 'A cue word acts as an attentional anchor. When your mind drifts — to the last pitch, to the scoreboard, to the crowd — the cue word pulls it back to the immediate task. Consistency is critical: using the same word builds associative strength so it works faster over time.', howToUse: ['Choose one word. Personal and action-oriented.', 'Say it before every pitch. Not just pressure pitches — every one.', 'If your mind drifts, say it again.', 'Change words by week or by game if you want variety.'], bestTime: 'Between every pitch. Build it into your routine.', difficulty: 'Easy', timeRequired: '5 sec', toolType: 'Mental', bestUsed: ['In-Game', 'Between Pitches', 'Focus'], quickTool: true },
+      { id: 'between-pitch-routine', name: 'Between-Pitch Routine', tagline: 'Same routine. Every pitch. No exceptions.', whatIs: 'A 10-15 second sequence you run between every pitch: step out → breath → reset posture → cue word → step in.', whyItWorks: 'Without a routine, your between-pitch time fills with whatever emotion the last pitch created. A structured routine creates a firewall between plays. It resets your physiology, clears your cognitive slate, and sets your intent — every single time.', howToUse: ['Step out. Physically disengage.', 'One breath. Slow exhale.', 'Reset posture. Shoulders down.', 'Say your cue word.', 'Step in. The last pitch is gone.'], bestTime: 'Between every pitch. Practice it until it is automatic.', cue: 'Step out. Breathe. Reset. Step in.', difficulty: 'Easy', timeRequired: '10 sec', toolType: 'Routine', bestUsed: ['In-Game', 'Between Pitches', 'Focus'], quickTool: true },
+      { id: 'distraction-reset', name: 'Distraction Reset', tagline: 'Practice coming back. That is the real skill.', whatIs: 'During practice, intentionally create a distraction (a coach yells, music changes, someone calls your name), then practice refocusing immediately using your cue word and routine.', whyItWorks: 'The ability to refocus after distraction is a separate skill from the ability to focus in the first place. Most athletes never train it. This drill builds the neural pathway for rapid attention recovery — the same pathway you need when the crowd erupts, a coach yells, or your own mind drifts.', howToUse: ['During BP or practice, have someone randomly distract you.', 'When it happens, use your cue word and routine immediately.', 'Measure how fast you come back. Try to shorten it.', 'The goal: instant return to focus regardless of the distraction.'], bestTime: 'During practice. Build it into training so it is automatic in games.', difficulty: 'Medium', timeRequired: '1 min', toolType: 'Mental', bestUsed: ['Pregame', 'Focus'], quickTool: false },
+      { id: 'one-pitch', name: 'One Pitch Focus', tagline: 'This pitch is the only pitch that exists.', whatIs: 'A mental frame that eliminates the past and future from your attention. There is no last pitch. There is no next pitch. There is only this one.', whyItWorks: 'Performance anxiety comes from thinking about sequences — what happened, what might happen. One-pitch focus collapses your attention to the smallest possible unit, which eliminates the weight of context. You cannot choke on one pitch. You can only execute it or not.', howToUse: ['Before each pitch, say: "This pitch. Only this pitch."', 'Do not carry the last pitch forward.', 'Do not pre-plan the next pitch.', 'Execute this one. Then repeat for the next one.'], bestTime: 'Every pitch. Especially critical in high-leverage counts and late innings.', cue: 'This pitch. Only this pitch.', difficulty: 'Easy', timeRequired: '5 sec', toolType: 'Mental', bestUsed: ['In-Game', 'Between Pitches', 'Pressure', 'Focus'], quickTool: true },
+    ],
+  },
+  {
+    icon: 'pulse-outline',
+    title: 'Emotional Control',
+    desc: 'Master your emotions so they work for you, not against you.',
+    color: '#ef4444',
+    items: ['Physiological Sigh', 'Body Language Reset', 'Release Breath', '10-Second Reset', 'Name It to Tame It'],
+    structuredItems: [
+      { id: 'phys-sigh', name: 'Physiological Sigh', tagline: 'The fastest nervous system reset in baseball.', whatIs: 'Two quick inhales through your nose followed by one long exhale through your mouth. One cycle. Five seconds.', whyItWorks: 'The double inhale maximally inflates the alveoli in your lungs, increasing the surface area for CO2 to exit your blood. The long exhale then activates parasympathetic response through vagal stimulation. Stanford research showed this pattern reduces stress faster than box breathing or meditation. One rep is often enough.', howToUse: ['Quick inhale through nose.', 'Immediately second quick inhale (stacking).', 'Long slow exhale through mouth.', 'One cycle. Done.'], bestTime: 'After a mistake, before the next pitch. On the mound after a walk. In the box after a bad swing. Fastest tool in the toolbox.', difficulty: 'Easy', timeRequired: '5 sec', toolType: 'Breathing', bestUsed: ['In-Game', 'Between Pitches', 'After Mistake'], quickTool: true },
+      { id: 'body-lang-reset', name: 'Body Language Reset', tagline: 'Your body tells your brain how to feel. Take control.', whatIs: 'After any negative event, immediately reset your posture: shoulders back, chin level, walk with purpose. Not because you feel confident — because the posture generates the state.', whyItWorks: 'Slumped posture sends a defeat signal to your brain, triggering cortisol and deflation. Upright posture sends a dominance signal that triggers testosterone. Your body leads your mind — not the other way around. Resetting posture is the fastest visible and internal state change available.', howToUse: ['After any negative play, check your posture.', 'Shoulders back. Chin level. Eyes forward.', 'Walk at the same pace you would after your best play.', 'Nobody should be able to tell what just happened.'], bestTime: 'Walking back after a strikeout. After an error. After giving up a big hit.', cue: 'Look the same. Always.', difficulty: 'Easy', timeRequired: '5 sec', toolType: 'Physical', bestUsed: ['In-Game', 'After Mistake', 'Emotional Control'], quickTool: true },
+      { id: 'release-breath', name: 'Release Breath', tagline: 'Breathe the tension out through your hands.', whatIs: 'Deep inhale where you imagine pulling tension from your body into your hands, then exhale while shaking your hands out — physically releasing the tension.', whyItWorks: 'Standard breathing is cognitive — you control ratios and hope the body follows. The release breath adds a somatic component: the hand shake-out creates a physical discharge that helps your nervous system release stored muscular tension. Paired respiratory and motor release is more effective than either alone.', howToUse: ['Inhale deeply. Imagine pulling tension into your hands.', 'Exhale forcefully. Shake hands out like flicking water.', 'One more normal breath.', 'Feel the lightness in your arms.'], bestTime: 'On-deck when your hands feel locked. After a high-stress play. On the mound when your arm feels heavy from tension.', difficulty: 'Easy', timeRequired: '10 sec', toolType: 'Breathing', bestUsed: ['In-Game', 'On-Deck', 'After Mistake'], quickTool: true },
+      { id: '10-sec-reset', name: '10-Second Reset', tagline: 'The complete between-play emotional firewall.', whatIs: 'A 10-second protocol: step out → breathe → reset posture → say cue → step in. Four channels of reset in 10 seconds.', whyItWorks: 'Emotional carryover is the top mental performance killer in baseball. This protocol engages four reset channels simultaneously: physical (step out), physiological (breath), cognitive (cue), behavioral (step in). No single channel is enough alone. The four together create a hard boundary between plays.', howToUse: ['Step out. Physically disengage.', 'One breath. Physiological sigh or slow exhale.', 'Reset posture. Shoulders back. Hands loose.', 'Say your cue. "Next pitch."', 'Step in. Clean.'], bestTime: 'After every negative play. Make it automatic — use it after neutral plays too.', cue: 'Step out. Breathe. Reset. Step in.', difficulty: 'Easy', timeRequired: '10 sec', toolType: 'Reset', bestUsed: ['In-Game', 'After Mistake', 'Between Pitches'], quickTool: true },
+      { id: 'name-tame', name: 'Name It to Tame It', tagline: 'Emotions lose power the second you name them.', whatIs: 'When an emotion escalates, name it with one specific word. "Anger." "Embarrassment." "Panic." Say it like a fact, not a complaint.', whyItWorks: 'Naming an emotion shifts brain activity from the amygdala to the prefrontal cortex. The emotion does not disappear but loses roughly half its intensity. You go from being inside the emotion to observing it, creating space for a deliberate response instead of an automatic reaction.', howToUse: ['Feel the emotion rising.', 'Name it. One word. "Frustration."', 'Say it like a fact. Not "Why am I frustrated?" Just "Frustration."', 'One breath. Move to your next action.'], bestTime: 'After bad calls. After errors. After getting hit. Any moment where emotion is about to dictate your next behavior.', difficulty: 'Easy', timeRequired: '5 sec', toolType: 'Mental', bestUsed: ['In-Game', 'After Mistake', 'Emotional Control'], quickTool: true },
+    ],
+  },
+  {
+    icon: 'megaphone-outline',
+    title: 'Self-Talk',
+    desc: 'Control your inner voice. Replace negative thoughts with productive cues.',
+    color: '#84cc16',
+    items: ['Thought Swap', 'Inner Coach Voice', 'Cue Card Review', 'Self-Talk Audit', '"I Am" Statements'],
+    structuredItems: [
+      { id: 'thought-swap', name: 'Thought Swap', tagline: 'Catch the bad thought. Replace it before it does damage.', whatIs: 'When you notice a negative or unhelpful thought during competition, swap it for a short, direct, productive one. Not positive thinking — productive thinking.', whyItWorks: '"I\'m going to strike out" activates the same threat circuits as physical danger. Your body tightens, reaction time slows, decision-making narrows. A thought swap interrupts that circuit and replaces the instruction your brain is operating on. You are not erasing the thought — you are replacing the command.', howToUse: ['Catch the thought.', 'Do not argue with it.', 'Swap it with one directive: "See the ball." "Attack." "My turn."', 'Execute from the new thought.'], bestTime: 'Between pitches when doubt creeps in. On-deck when predictions start. Anytime your internal voice is working against you.', cue: 'Catch it. Swap it. Compete.', difficulty: 'Easy', timeRequired: '5 sec', toolType: 'Mental', bestUsed: ['In-Game', 'Between Pitches', 'Slump'], quickTool: true },
+      { id: 'inner-coach', name: 'Inner Coach Voice', tagline: 'Talk to yourself the way a great coach would.', whatIs: 'Shift your internal voice from the critic to the coach. Same information, different delivery. "You suck" becomes "Okay, that pitch is out of the zone. Lay off it next time."', whyItWorks: 'Critical self-talk activates defensive responses — your body tightens, focus narrows to survival, aggression drops. Coach-like self-talk activates problem-solving circuits. A good coach does not ignore the mistake — they acknowledge it, correct it, and move forward. That is the voice you need.', howToUse: ['After a mistake, notice your first internal response.', 'Ask: "Would a great coach say this?"', 'If no, rephrase in coach tone.', 'Deliver it. Move on.'], bestTime: 'After errors. After strikeouts. During slumps. When the voice gets loud and mean.', difficulty: 'Easy', timeRequired: '10 sec', toolType: 'Mental', bestUsed: ['In-Game', 'After Mistake', 'Slump'], quickTool: true },
+      { id: 'cue-cards', name: 'Cue Card Review', tagline: 'Load your mental program before you compete.', whatIs: 'Write your top 3 cue words on a card or phone note. Read them before every game. These are your operating instructions for today.', whyItWorks: 'Without deliberate cue loading, your brain defaults to whatever it was last thinking about — usually worry. Reading cues primes your reticular activating system to filter for those specific things. It is a scouting report for your own mind.', howToUse: ['Write 3 cues. Short. ("Loose. Aggressive. Present.")','Read once during warm-ups.', 'Read once before first at-bat.', 'Update weekly.'], bestTime: 'During warm-ups. Before first at-bat. Every game day.', difficulty: 'Easy', timeRequired: '30 sec', toolType: 'Routine', bestUsed: ['Pregame'], quickTool: true },
+      { id: 'self-talk-audit', name: 'Self-Talk Audit', tagline: 'You cannot fix what you do not notice.', whatIs: 'For one full practice, pay attention to everything you say to yourself. After, write the top 5 phrases and sort them: helpful or harmful.', whyItWorks: 'Most athletes have no idea what their self-talk actually sounds like. An audit makes the invisible visible. Once you see the exact phrases you repeat under pressure, you can target them. Without the audit, you are fixing something you have not identified.', howToUse: ['Pick one practice. Set the intention: "Today I notice."', 'After each inning, note what you heard internally.', 'After practice, write top 5 phrases.', 'Mark each: helpful (H) or harmful (X).', 'For each X, write the swap.'], bestTime: 'Once per week during practice. During slumps.', difficulty: 'Medium', timeRequired: '5+ min', toolType: 'Journaling', bestUsed: ['After Game', 'Slump'], quickTool: false },
+      { id: 'iam-statements', name: '"I Am" Statements', tagline: 'Tell yourself who you are before the game tells you.', whatIs: 'Three identity-level statements said before competition. "I am a competitor." "I am prepared." "I am dangerous in the box."', whyItWorks: 'Your brain matches behavior to identity. "I hope I don\'t strike out" operates from fragile identity. "I am a dangerous hitter" activates the neural patterns of that self-concept — you stand taller, breathe deeper, see pitches clearer. Not fake confidence. Deliberate identity activation.', howToUse: ['Write 3 "I am" statements. Present tense. Aggressive.', 'Say them before warm-ups.', 'Say them before first at-bat.', 'During doubt: repeat the one that matters most.'], bestTime: 'Pregame. Before at-bats. During slumps.', cue: 'I am a competitor. I am prepared. I am dangerous.', difficulty: 'Easy', timeRequired: '10 sec', toolType: 'Mental', bestUsed: ['Pregame', 'Before At-Bat', 'Slump', 'Confidence'], quickTool: true },
+    ],
+  },
+  {
+    icon: 'list-outline',
+    title: 'Routines',
+    desc: 'Build pre-game, in-game, and post-game systems that run on autopilot.',
+    color: '#22c55e',
+    items: ['Pre-Game Routine', 'Pre-Pitch Routine', 'Between-Inning Routine', 'Post-Game Routine', 'Slump Routine'],
+    structuredItems: [
+      { id: 'pregame-routine', name: 'Pre-Game Routine', tagline: 'Same routine. Every game. No variation.', whatIs: 'A locked-in sequence you follow before every game: same warm-up, same music, same visualization, same cues. The exact same order every time.', whyItWorks: 'Routines create predictability in an unpredictable environment. Your brain reads consistency as safety, which lowers cortisol and increases confidence. When everything else is unknown — opponent, umpire, conditions — your routine is the one thing you control completely.', howToUse: ['Write your full pre-game routine. Every step.', 'Time it. Know exactly when to start before first pitch.', 'Follow it identically every game.', 'Do not skip steps when you feel good. Do not add steps when you feel bad.'], bestTime: 'Before every game. Same time before first pitch.', difficulty: 'Medium', timeRequired: '5+ min', toolType: 'Routine', bestUsed: ['Pregame'], quickTool: false },
+      { id: 'prepitch-routine', name: 'Pre-Pitch Routine', tagline: 'The 10 seconds that determine your next pitch.', whatIs: 'A micro-routine between every pitch: step out, breath, shoulders, cue word, step in. Same sequence, same timing, every pitch.', whyItWorks: 'Your between-pitch routine is where the game is won or lost mentally. Without one, each pitch carries the emotional residue of the last. With one, each pitch starts from the same mental state regardless of what just happened. The routine IS the mental game.', howToUse: ['Step out.', 'One breath.', 'Drop shoulders.', 'Cue word.', 'Step in.'], bestTime: 'Between every pitch. Practice it until it fires automatically.', difficulty: 'Easy', timeRequired: '10 sec', toolType: 'Routine', bestUsed: ['In-Game', 'Between Pitches'], quickTool: true },
+      { id: 'between-inning', name: 'Between-Inning Routine', tagline: 'Reset for the next chapter.', whatIs: 'A 60-second routine between innings: hydrate, one deep breath, review your approach for the next inning, and set one focus.', whyItWorks: 'Innings are natural chapter breaks. Without a between-inning routine, the emotional arc of the last inning bleeds directly into the next. This routine creates a hard reset between chapters.', howToUse: ['Hydrate. One sip.', 'One deep breath.', 'Review: "What am I focused on next inning?"', 'Set one focus. Move.'], bestTime: 'Every half-inning transition.', difficulty: 'Easy', timeRequired: '1 min', toolType: 'Routine', bestUsed: ['In-Game', 'Between Innings'], quickTool: true },
+      { id: 'postgame-routine', name: 'Post-Game Routine', tagline: 'Close the game before it follows you home.', whatIs: 'A structured postgame process: one win, one lesson, one focus for next game. Then physically separate from the game.', whyItWorks: 'Without a postgame routine, the game lives in your head for hours — especially losses. This routine forces closure. It extracts the useful data (win/learn), sets a forward focus, and creates a definitive endpoint so you can recover and be fresh.', howToUse: ['Write 1 win. Specific.', 'Write 1 thing to improve. Specific.', 'Write 1 focus for next game.', 'Close the notebook. The game is done.'], bestTime: 'Within 30 minutes of the game ending.', difficulty: 'Easy', timeRequired: '2 min', toolType: 'Routine', bestUsed: ['After Game'], quickTool: false },
+      { id: 'slump-routine', name: 'Slump Routine', tagline: 'When things go bad, tighten the routine. Simplify.', whatIs: 'A simplified, tightened version of your normal routine used during slumps. Fewer cues, fewer thoughts, more structure, more consistency.', whyItWorks: 'Slumps cause athletes to add — more video, more mechanical thoughts, more changes. Adding creates more noise. The answer is always to subtract. Tighten the routine. Go back to basics. Trust less thinking and more competing. Simplicity is the antidote to a slump.', howToUse: ['Cut your cue list to 1 word.', 'Simplify your warm-up to the essentials.', 'Stop watching video. Stop changing mechanics.', 'Compete with what you have. Trust the routine.', 'The slump breaks when you stop trying to fix it.'], bestTime: 'Any multi-game slump. When you are overthinking. When nothing is working.', cue: 'Simplify. Compete. Trust.', difficulty: 'Medium', timeRequired: '5+ min', toolType: 'Routine', bestUsed: ['Slump', 'Pregame'], quickTool: false },
+    ],
+  },
+  {
+    icon: 'book-outline',
+    title: 'Journals',
+    desc: 'Write to process, reflect, and grow. Consistency builds self-awareness.',
+    color: '#3b82f6',
+    route: '/(app)/training/mental/journals',
     items: [
-      'Close your eyes and find a calm, secure location in your mind (20 sec)',
-      'Visualize yourself in the box — see the pitcher, the mound, the field',
-      'Run through a perfect at-bat: See the pitch, feel the swing, hear the contact',
-      'See a hard-hit ball — a rocket to the gap, a line drive up the middle',
-      'Feel the confidence in your body — loose, ready, in control',
-      'Open your eyes. Nod. "I\'ve been here. Let\'s go."',
+      'Daily Reflection: 1 win, 1 thing to improve, 1 thing you\'re grateful for.',
+      'Competition Journal: What went well? What would I do differently? My focus for next game.',
+      'Confidence Evidence Log: 3 pieces of evidence that prove you are capable.',
+      'Self-Talk Audit: Write every negative thought from one day. Write the productive alternative.',
+      'Goal Clarity: 1 big goal. 3 things to do this week. Review weekly.',
+    ],
+  },
+  {
+    icon: 'leaf-outline',
+    title: 'Guided Meditations',
+    desc: 'Calm the mind, sharpen the focus, recover faster.',
+    color: '#a855f7',
+    route: '/(app)/training/mental/meditations',
+    items: [
+      'Pre-Game Calm (3 min): Breathe 4-4-6. Visualize competing with calm confidence.',
+      'Focus Reset (2 min): Single-point focus with slow breathing. Train your attention.',
+      'Post-Game Recovery (5 min): Replay 1 good moment. Let go of 1 bad moment. Release the game.',
+      'Confidence Visualization (4 min): See yourself succeeding. Feel it. Make it real.',
+      'Sleep Wind-Down (5 min): Body scan, slow breathing, release every muscle. Rest is training.',
     ],
   },
 ];

@@ -19,15 +19,24 @@ export type ProgressionStage = 'tee' | 'flips' | 'machine' | 'live' | 'competiti
 
 export interface DrillCard {
   name: string;
+  /** What this drill helps fix (primary field used by all existing drills) */
   fixes: string;
+  /** Step-by-step instructions */
   howTo: string;
+  /** Short focus cue */
   focus: string;
   /** Training environment progression */
   progression?: ProgressionStage;
   /** Equipment needed */
   equipment?: string[];
-  /** Future: video URL */
+  /** Video URL for drill demo (empty string or undefined = placeholder shown) */
   videoUrl?: string;
+  /** When to use this drill */
+  whenToUse?: string;
+  /** Common mistake athletes make with this drill */
+  commonMistake?: string;
+  /** Sets & reps / how long to do it */
+  setsReps?: string;
 }
 
 /* ─── Section ─────────────────────────────────────────────── */

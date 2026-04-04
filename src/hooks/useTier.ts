@@ -18,6 +18,8 @@ function normalize(raw: string | null | undefined): CanonicalTier {
       return 'TRIPLE';
     case 'HOME_RUN':
       return 'HOME_RUN';
+    case 'GRAND_SLAM':
+      return 'GRAND_SLAM';
     default:
       return 'WALK';
   }
@@ -39,36 +41,32 @@ export function useTier() {
   const isDouble  = !isCoach && tier === 'DOUBLE';
   const isTriple  = !isCoach && tier === 'TRIPLE';
   const isHomeRun = !isCoach && tier === 'HOME_RUN';
+  const isGrandSlam = !isCoach && tier === 'GRAND_SLAM';
 
   // ── Hitting Vault ──────────────────────────────────
-  // Walk: limited (intro drills only), Single+: complete
   const hasLimitedHitting = isWalk;
-  const hasFullHitting = isCoach || isSingle || isDouble || isTriple || isHomeRun;
+  const hasFullHitting = isCoach || isSingle || isDouble || isTriple || isHomeRun || isGrandSlam;
 
   // ── Lifting Vault ──────────────────────────────────
-  // Walk: none, Single: limited preview, Double: limited preview, Triple+: complete
   const hasLimitedLifting = isSingle || isDouble;
-  const hasFullLifting = isCoach || isTriple || isHomeRun;
+  const hasFullLifting = isCoach || isTriple || isHomeRun || isGrandSlam;
 
   // ── Mental Vault ───────────────────────────────────
-  // Walk: none, Single: limited (preview), Double+: complete
   const hasLimitedMental = isSingle;
-  const hasFullMental = isCoach || isDouble || isTriple || isHomeRun;
+  const hasFullMental = isCoach || isDouble || isTriple || isHomeRun || isGrandSlam;
 
   // ── Guided Program ─────────────────────────────────
-  // Home Run only: full guided lifting + hitting + mental system
-  const hasGuidedProgram = isCoach || isHomeRun;
+  const hasGuidedProgram = isCoach || isGrandSlam;
 
   // ── Coach's Corner ────────────────────────────────
-  const hasCoachesCorner = isCoach || isSingle || isDouble || isTriple || isHomeRun;
+  const hasCoachesCorner = isCoach || isSingle || isDouble || isTriple || isHomeRun || isGrandSlam;
 
-  // ── 1-on-1 Coaching (inquire through app, delivered outside) ──
-  const hasCoaching = isCoach || isHomeRun;
+  // ── 1-on-1 Coaching ──
+  const hasCoaching = isCoach || isGrandSlam;
 
   // ── Messaging ─────────────────────────────────────
-  // Double, Triple, Home Run can DM coach. Walk + Single cannot.
-  const canMessage = isCoach || isDouble || isTriple || isHomeRun;
-  const hasUnlimitedMessaging = isCoach || isDouble || isTriple || isHomeRun;
+  const canMessage = isCoach || isDouble || isTriple || isHomeRun || isGrandSlam;
+  const hasUnlimitedMessaging = isCoach || isDouble || isTriple || isHomeRun || isGrandSlam;
 
   return {
     isCoach,
@@ -80,6 +78,7 @@ export function useTier() {
     isDouble,
     isTriple,
     isHomeRun,
+    isGrandSlam,
 
     // Content access
     hasLimitedHitting,

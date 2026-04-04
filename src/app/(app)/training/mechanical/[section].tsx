@@ -159,32 +159,70 @@ export default function SectionScreen() {
                 )}
               </View>
 
-              {/* Expanded — full drill card */}
+              {/* Expanded — full drill detail */}
               {isExpanded && !isLocked && (
                 <View style={styles.drillBody}>
-                  {/* Fixes */}
+                  {/* Purpose */}
                   <View style={styles.fieldRow}>
-                    <Text style={[styles.fieldLabel, { color: section.color }]}>FIXES</Text>
+                    <Text style={[styles.fieldLabel, { color: section.color }]}>PURPOSE</Text>
                     <Text style={styles.fieldText}>{drill.fixes}</Text>
                   </View>
 
+                  {/* When To Use */}
+                  {drill.whenToUse && (
+                    <View style={styles.fieldRow}>
+                      <Text style={[styles.fieldLabel, { color: '#f59e0b' }]}>WHEN TO USE THIS DRILL</Text>
+                      <Text style={styles.fieldText}>{drill.whenToUse}</Text>
+                    </View>
+                  )}
+
                   {/* How To Do It */}
                   <View style={styles.fieldRow}>
-                    <Text style={[styles.fieldLabel, { color: section.color }]}>HOW TO DO IT</Text>
+                    <Text style={[styles.fieldLabel, { color: '#22c55e' }]}>HOW TO DO IT</Text>
                     <Text style={styles.fieldText}>{drill.howTo}</Text>
                   </View>
 
-                  {/* Focus */}
+                  {/* Drill Video */}
+                  <View style={styles.fieldRow}>
+                    <Text style={[styles.fieldLabel, { color: '#3b82f6' }]}>DRILL VIDEO</Text>
+                    {drill.videoUrl ? (
+                      <View style={styles.videoContainer}>
+                        <Ionicons name="play-circle" size={32} color="#3b82f6" />
+                        <Text style={styles.videoText}>Tap to play drill demo</Text>
+                      </View>
+                    ) : (
+                      <View style={styles.videoPlaceholder}>
+                        <Ionicons name="videocam-outline" size={28} color={colors.textMuted} />
+                        <Text style={styles.videoPlaceholderText}>Video coming soon</Text>
+                      </View>
+                    )}
+                  </View>
+
+                  {/* Common Mistake */}
+                  {drill.commonMistake && (
+                    <View style={[styles.mistakeRow, { borderColor: '#ef444430' }]}>
+                      <Ionicons name="warning-outline" size={14} color="#ef4444" />
+                      <View style={{ flex: 1 }}>
+                        <Text style={[styles.fieldLabel, { color: '#ef4444' }]}>COMMON MISTAKE</Text>
+                        <Text style={styles.fieldText}>{drill.commonMistake}</Text>
+                      </View>
+                    </View>
+                  )}
+
+                  {/* Focus Cue */}
                   <View style={[styles.focusBadge, { borderColor: section.color + '40' }]}>
-                    <Text style={[styles.focusLabel, { color: section.color }]}>FOCUS</Text>
+                    <Ionicons name="mic-outline" size={14} color={section.color} />
+                    <Text style={[styles.focusLabel, { color: section.color }]}>FOCUS CUE</Text>
                     <Text style={styles.focusText}>{drill.focus}</Text>
                   </View>
 
-                  {/* Watch Demo placeholder */}
-                  <View style={styles.demoRow}>
-                    <Ionicons name="play-circle-outline" size={18} color={colors.textMuted} />
-                    <Text style={styles.demoText}>Watch Demo — coming soon</Text>
-                  </View>
+                  {/* Sets & Reps */}
+                  {drill.setsReps && (
+                    <View style={styles.setsRow}>
+                      <Ionicons name="repeat-outline" size={14} color={colors.textMuted} />
+                      <Text style={styles.setsText}>{drill.setsReps}</Text>
+                    </View>
+                  )}
                 </View>
               )}
             </TouchableOpacity>
@@ -322,4 +360,30 @@ const styles = StyleSheet.create({
     paddingTop: 4,
   },
   demoText: { fontSize: 12, fontWeight: '600', color: colors.textMuted },
+
+  /* Video section */
+  videoContainer: {
+    alignItems: 'center', justifyContent: 'center', gap: 6,
+    paddingVertical: 24, backgroundColor: '#3b82f608',
+    borderWidth: 1, borderColor: '#3b82f630', borderRadius: radius.md,
+  },
+  videoText: { fontSize: 12, fontWeight: '600', color: '#3b82f6' },
+  videoPlaceholder: {
+    alignItems: 'center', justifyContent: 'center', gap: 6,
+    paddingVertical: 24, backgroundColor: colors.bg,
+    borderWidth: 1, borderColor: colors.border, borderRadius: radius.md,
+    borderStyle: 'dashed' as const,
+  },
+  videoPlaceholderText: { fontSize: 11, color: colors.textMuted },
+
+  /* Common mistake */
+  mistakeRow: {
+    flexDirection: 'row', alignItems: 'flex-start', gap: 8,
+    padding: 10, borderWidth: 1, borderRadius: radius.sm,
+    backgroundColor: '#ef444408',
+  },
+
+  /* Sets & reps */
+  setsRow: { flexDirection: 'row', alignItems: 'center', gap: 6 },
+  setsText: { fontSize: 12, fontWeight: '600', color: colors.textMuted },
 });

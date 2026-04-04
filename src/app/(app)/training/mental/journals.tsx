@@ -8,19 +8,30 @@ import { router, useLocalSearchParams } from 'expo-router';
 import { Ionicons } from '@expo/vector-icons';
 import AsyncStorage from '@react-native-async-storage/async-storage';
 import { colors, radius } from '@/theme';
-import { MENTAL_SKILLS } from '@/data/skillsJournal';
-import { SKILL_JOURNAL_CONFIG, type SkillJournalType } from '@/data/skill-journal-prompts';
 import { useTier } from '@/hooks/useTier';
 import { useAccountability } from '@/hooks/useAccountability';
 
 const ACCENT = '#8b5cf6';
 
+const GRATITUDE_PROMPTS = [
+  'What are 3 things you\'re grateful for today?',
+  'What is something baseball has given you that you would not have without it?',
+  'Who is someone that has helped you that you are grateful for?',
+  'What is one challenge you are grateful for because it made you better?',
+  'What is something you get to do that most people don\'t?',
+  'What is one opportunity in front of you that you are grateful for right now?',
+];
+
 const STANDARD_JOURNALS = [
-  { key: 'daily', label: 'Daily Entry', icon: 'today-outline' as const, color: '#3b82f6', desc: 'Reflect on today — what happened, how you responded, and what you learned.' },
-  { key: 'game_day', label: 'Game Day', icon: 'baseball-outline' as const, color: '#E10600', desc: 'Pre-game and post-game thoughts. Mental approach, adjustments, takeaways.' },
-  { key: 'mental_reset', label: 'Mental Reset', icon: 'refresh-outline' as const, color: '#22c55e', desc: 'After a rough day. Brain dump, release, and set a new intention.' },
-  { key: 'weekly', label: 'Weekly Review', icon: 'calendar-outline' as const, color: '#f59e0b', desc: 'Look back on the week. Patterns, wins, areas to grow.' },
-  { key: 'weekly_reflection', label: 'Weekly Reflection', icon: 'sparkles-outline' as const, color: '#a855f7', desc: 'Deeper reflection. What kind of competitor are you becoming?' },
+  { key: 'daily', label: 'Daily Reflection', icon: 'today-outline' as const, color: '#3b82f6', desc: 'Reflect on today — what happened, how you responded, and what you learned.', prompts: undefined as string[] | undefined },
+  { key: 'pregame', label: 'Pre-Game Reflection', icon: 'flash-outline' as const, color: '#22c55e', desc: 'Set your intention. What is your approach? What are you focused on? How will you compete?', prompts: ['What is my approach today?', 'What one thing am I focused on?', 'How do I want to compete today?'] },
+  { key: 'game_day', label: 'Post-Game Reflection', icon: 'baseball-outline' as const, color: '#E10600', desc: 'Review what happened. What went well? What broke down? What will you do differently?', prompts: ['What went well today?', 'Where did my mental game break down?', 'What is my one focus for next game?'] },
+  { key: 'weekly', label: 'Weekly Reflection', icon: 'calendar-outline' as const, color: '#f59e0b', desc: 'Look back on the week. Patterns, wins, areas to grow.', prompts: ['What patterns did I see this week?', 'What was my best mental moment?', 'What do I need to improve next week?'] },
+  { key: 'confidence', label: 'Confidence Journal', icon: 'shield-checkmark-outline' as const, color: '#f97316', desc: 'Stack evidence that you belong. Write proof of your ability.', prompts: ['What are 3 things I did well recently?', 'What evidence proves I am capable?', 'What is something I have overcome that proves I am tough?'] },
+  { key: 'self_talk', label: 'Self-Talk Journal', icon: 'megaphone-outline' as const, color: '#84cc16', desc: 'Audit your internal voice. Catch negative thoughts and replace them.', prompts: ['What negative thoughts showed up today?', 'What would a great coach say instead?', 'What is my top cue word for tomorrow?'] },
+  { key: 'pressure', label: 'Pressure Journal', icon: 'flame-outline' as const, color: '#e11d48', desc: 'Process pressure moments. Learn from them instead of avoiding them.', prompts: ['When did I feel pressure today?', 'How did my body respond?', 'What would it look like to thrive in that moment next time?'] },
+  { key: 'mistake_recovery', label: 'Mistake Recovery Journal', icon: 'refresh-outline' as const, color: '#0891b2', desc: 'Process mistakes without carrying them. Extract the lesson. Move on.', prompts: ['What mistake am I holding onto?', 'What did I learn from it?', 'What will I do differently next time? Now let it go.'] },
+  { key: 'gratitude', label: 'Gratitude Journal', icon: 'heart-outline' as const, color: '#a855f7', desc: 'Train your brain to find the good. Gratitude builds resilience and perspective.', prompts: GRATITUDE_PROMPTS },
 ];
 
 type Screen = 'list' | 'write';
@@ -49,22 +60,35 @@ export default function JournalsScreen() {
   // Auto-open a specific journal when deep-linked from Daily Work
   useEffect(() => {
     if (deepLinked || !deepLinkType) return;
-    const config = SKILL_JOURNAL_CONFIG[deepLinkType as SkillJournalType];
-    if (config) {
+    const match = STANDARD_JOURNALS.find(j => j.key === deepLinkType);
+    if (match) {
       setDeepLinked(true);
       openJournal({
-        key: deepLinkType,
-        label: config.label,
-        color: config.color,
-        prompts: config.prompts,
+        key: match.key,
+        label: match.label,
+        color: match.color,
+        prompts: match.prompts ?? [match.desc],
       });
     }
   }, [deepLinkType, deepLinked]);
 
-  const openJournal = (t: JournalTarget) => {
+  const openJournal = async (t: JournalTarget) => {
     setTarget(t);
-    setEntry('');
     setSaved(false);
+    // Load previous entry for today if it exists
+    try {
+      const key = `otc:journal:${t.key}:${dayIdx}`;
+      const raw = await AsyncStorage.getItem(key);
+      if (raw) {
+        const parsed = JSON.parse(raw);
+        setEntry(parsed.entry ?? '');
+        setSaved(true); // Show as saved since it was loaded
+      } else {
+        setEntry('');
+      }
+    } catch {
+      setEntry('');
+    }
     setScreen('write');
   };
 
@@ -153,7 +177,7 @@ export default function JournalsScreen() {
           <TouchableOpacity
             key={j.key}
             style={styles.card}
-            onPress={() => openJournal({ key: j.key, label: j.label, color: j.color, prompts: [j.desc] })}
+            onPress={() => openJournal({ key: j.key, label: j.label, color: j.color, prompts: j.prompts ?? [j.desc] })}
             activeOpacity={0.85}
           >
             <View style={[styles.cardIcon, { backgroundColor: j.color + '18' }]}>
@@ -167,51 +191,21 @@ export default function JournalsScreen() {
           </TouchableOpacity>
         ))}
 
-        {/* Skill Journals */}
-        <Text style={[styles.sectionLabel, { marginTop: 8 }]}>SKILL JOURNALS</Text>
-        <Text style={styles.skillJournalIntro}>
-          Targeted reflection tied to specific mental skills. Each journal rotates through 3 prompts.
-        </Text>
-
-        {MENTAL_SKILLS.map((skill, i) => {
-          const config = SKILL_JOURNAL_CONFIG[`skill_${skill.key}` as SkillJournalType];
-          if (!config) return null;
-          const locked = !canAccess && i >= 4;
-          return (
-            <TouchableOpacity
-              key={skill.key}
-              style={[styles.card, locked && styles.cardLocked]}
-              onPress={() => !locked && openJournal({
-                key: `skill_${skill.key}`,
-                label: config.label,
-                color: config.color,
-                prompts: config.prompts,
-              })}
-              activeOpacity={locked ? 1 : 0.85}
-            >
-              <View style={[styles.cardIcon, { backgroundColor: config.color + '18' }]}>
-                <Ionicons name={locked ? 'lock-closed-outline' : config.icon} size={22} color={locked ? colors.textMuted : config.color} />
-              </View>
-              <View style={styles.cardBody}>
-                <Text style={[styles.cardTitle, locked && styles.cardTitleLocked]}>{config.label}</Text>
-                <Text style={styles.cardSub}>{skill.builds}</Text>
-              </View>
-              {!locked && <Ionicons name="chevron-forward" size={16} color={colors.textMuted} />}
-            </TouchableOpacity>
-          );
-        })}
-
-        {!canAccess && (
-          <TouchableOpacity
-            style={styles.upgradeBanner}
-            onPress={() => router.push('/(app)/upgrade' as any)}
-            activeOpacity={0.8}
-          >
-            <Ionicons name="lock-open-outline" size={16} color={ACCENT} />
-            <Text style={styles.upgradeBannerText}>Upgrade to Double for all skill journals</Text>
-            <Ionicons name="chevron-forward" size={14} color={colors.textMuted} />
-          </TouchableOpacity>
-        )}
+        {/* Mental Mastery Course link */}
+        <TouchableOpacity
+          style={[styles.card, { borderColor: ACCENT + '30' }]}
+          onPress={() => router.push('/(app)/training/mental/courses-list' as any)}
+          activeOpacity={0.85}
+        >
+          <View style={[styles.cardIcon, { backgroundColor: ACCENT + '18' }]}>
+            <Ionicons name="school-outline" size={22} color={ACCENT} />
+          </View>
+          <View style={styles.cardBody}>
+            <Text style={styles.cardTitle}>Mental Mastery Course</Text>
+            <Text style={styles.cardSub}>11 skills × 2 weeks. Structured skill journals live inside the course.</Text>
+          </View>
+          <Ionicons name="chevron-forward" size={16} color={colors.textMuted} />
+        </TouchableOpacity>
       </ScrollView>
     </SafeAreaView>
   );

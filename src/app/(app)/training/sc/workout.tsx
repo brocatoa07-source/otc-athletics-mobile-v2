@@ -20,8 +20,17 @@ import {
   type StrengthProgress,
 } from '@/data/strength-program-engine';
 import { OTCS_PHASE_META, OTCS_ALL_BLOCKS, type OtcsBlockKey } from '@/data/otcs-types';
+import { saveSessionLog } from '@/features/strength/services/feedbackLoop';
 
 const ACCENT = '#1DB954';
+
+const RPE_OPTIONS = [
+  { value: 1, label: 'Easy', desc: 'Could do much more', color: '#22c55e' },
+  { value: 2, label: 'Moderate', desc: 'Comfortable effort', color: '#84cc16' },
+  { value: 3, label: 'Hard', desc: 'Challenging but doable', color: '#f59e0b' },
+  { value: 4, label: 'Very Hard', desc: 'Near limit', color: '#f97316' },
+  { value: 5, label: 'Maximal', desc: 'Nothing left', color: '#ef4444' },
+];
 
 /** Block color/icon lookup from metadata */
 function getBlockMeta(key: OtcsBlockKey) {
@@ -46,6 +55,9 @@ export default function WorkoutScreen() {
   const [dayNum, setDayNum] = useState(1);
   const [completedExercises, setCompletedExercises] = useState<Set<string>>(new Set());
   const [workoutComplete, setWorkoutComplete] = useState(false);
+  const [showRPE, setShowRPE] = useState(false);
+  const [selectedRPE, setSelectedRPE] = useState<number | null>(null);
+  const [hasPain, setHasPain] = useState<boolean | null>(null);
 
   useFocusEffect(
     useCallback(() => {
@@ -93,8 +105,13 @@ export default function WorkoutScreen() {
     });
   }
 
-  async function markWorkoutDone() {
-    if (!progress || !program) return;
+  function handleFinishPress() {
+    // Show RPE + pain screen before saving
+    setShowRPE(true);
+  }
+
+  async function submitWorkoutWithFeedback() {
+    if (!progress || !program || selectedRPE === null || hasPain === null) return;
 
     const key = getWorkoutKey(monthNum, weekNum, dayNum);
     const updated: StrengthProgress = {
@@ -130,7 +147,17 @@ export default function WorkoutScreen() {
       await AsyncStorage.setItem('otc:workout-completions', JSON.stringify(map));
     } catch {}
 
+    // Save session log for feedback loop (RPE + pain + compliance tracking)
+    await saveSessionLog({
+      date: today,
+      workoutKey: key,
+      rpe: selectedRPE,
+      pain: hasPain,
+      completedAt: now,
+    });
+
     setProgress(updated);
+    setShowRPE(false);
     setWorkoutComplete(true);
   }
 
@@ -287,10 +314,64 @@ export default function WorkoutScreen() {
         })}
 
         {/* Finish button */}
-        {!workoutComplete && (
+        {/* RPE + Pain Post-Workout Flow */}
+        {showRPE && !workoutComplete && (
+          <View style={styles.rpeCard}>
+            <Text style={styles.rpeTitle}>How hard was that session?</Text>
+            <View style={styles.rpeRow}>
+              {RPE_OPTIONS.map((opt) => (
+                <TouchableOpacity
+                  key={opt.value}
+                  style={[
+                    styles.rpeChip,
+                    { borderColor: opt.color + '40' },
+                    selectedRPE === opt.value && { backgroundColor: opt.color + '20', borderColor: opt.color },
+                  ]}
+                  onPress={() => setSelectedRPE(opt.value)}
+                  activeOpacity={0.7}
+                >
+                  <Text style={[styles.rpeChipNum, { color: opt.color }]}>{opt.value}</Text>
+                  <Text style={styles.rpeChipLabel}>{opt.label}</Text>
+                </TouchableOpacity>
+              ))}
+            </View>
+
+            <Text style={[styles.rpeTitle, { marginTop: 16 }]}>Any pain during the session?</Text>
+            <View style={styles.painRow}>
+              <TouchableOpacity
+                style={[styles.painBtn, hasPain === false && { backgroundColor: '#22c55e20', borderColor: '#22c55e' }]}
+                onPress={() => setHasPain(false)}
+                activeOpacity={0.7}
+              >
+                <Ionicons name="checkmark-circle" size={18} color={hasPain === false ? '#22c55e' : colors.textMuted} />
+                <Text style={[styles.painBtnText, hasPain === false && { color: '#22c55e' }]}>No Pain</Text>
+              </TouchableOpacity>
+              <TouchableOpacity
+                style={[styles.painBtn, hasPain === true && { backgroundColor: '#ef444420', borderColor: '#ef4444' }]}
+                onPress={() => setHasPain(true)}
+                activeOpacity={0.7}
+              >
+                <Ionicons name="alert-circle" size={18} color={hasPain === true ? '#ef4444' : colors.textMuted} />
+                <Text style={[styles.painBtnText, hasPain === true && { color: '#ef4444' }]}>Yes</Text>
+              </TouchableOpacity>
+            </View>
+
+            <TouchableOpacity
+              style={[styles.finishBtn, (selectedRPE === null || hasPain === null) && { opacity: 0.4 }]}
+              onPress={submitWorkoutWithFeedback}
+              disabled={selectedRPE === null || hasPain === null}
+              activeOpacity={0.85}
+            >
+              <Ionicons name="checkmark-circle" size={20} color="#fff" />
+              <Text style={styles.finishBtnText}>Submit & Complete</Text>
+            </TouchableOpacity>
+          </View>
+        )}
+
+        {!workoutComplete && !showRPE && (
           <TouchableOpacity
             style={[styles.finishBtn, completedCount < totalExercises && { opacity: 0.5 }]}
-            onPress={markWorkoutDone}
+            onPress={handleFinishPress}
             activeOpacity={0.85}
           >
             <Ionicons name="checkmark-circle" size={20} color="#fff" />
@@ -395,4 +476,26 @@ const styles = StyleSheet.create({
     borderWidth: 1, borderColor: colors.border,
   },
   doneBtnText: { fontSize: 15, fontWeight: '800', color: colors.textPrimary },
+
+  /* ── RPE + Pain Post-Workout ────────── */
+  rpeCard: {
+    backgroundColor: colors.surface, borderWidth: 1, borderColor: colors.border,
+    borderRadius: radius.lg, padding: 16, gap: 8,
+  },
+  rpeTitle: { fontSize: 14, fontWeight: '800', color: colors.textPrimary },
+  rpeRow: { flexDirection: 'row', gap: 6, flexWrap: 'wrap' },
+  rpeChip: {
+    flex: 1, minWidth: 56, alignItems: 'center', paddingVertical: 10,
+    borderWidth: 1, borderColor: colors.border, borderRadius: radius.md,
+    backgroundColor: colors.bg,
+  },
+  rpeChipNum: { fontSize: 18, fontWeight: '900' },
+  rpeChipLabel: { fontSize: 9, fontWeight: '700', color: colors.textMuted, marginTop: 2 },
+  painRow: { flexDirection: 'row', gap: 10 },
+  painBtn: {
+    flex: 1, flexDirection: 'row', alignItems: 'center', justifyContent: 'center',
+    gap: 6, paddingVertical: 12, borderWidth: 1, borderColor: colors.border,
+    borderRadius: radius.md, backgroundColor: colors.bg,
+  },
+  painBtnText: { fontSize: 13, fontWeight: '700', color: colors.textMuted },
 });

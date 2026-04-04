@@ -169,39 +169,6 @@ export default function TopicDetailScreen() {
               </View>
             )}
 
-            {/* Good / Bad Examples */}
-            <View style={styles.card}>
-              <Text style={[styles.sectionLabel, { color: '#ef4444' }]}>WHAT IT SHOULD NOT LOOK LIKE</Text>
-              {content.badVideoUrl ? (
-                <View style={styles.videoPlaceholder}>
-                  <Ionicons name="videocam" size={24} color="#ef4444" />
-                  <Text style={styles.videoPlaceholderText}>Bad example video</Text>
-                </View>
-              ) : (
-                <View style={styles.videoPlaceholder}>
-                  <Ionicons name="videocam-outline" size={24} color={colors.textMuted} />
-                  <Text style={styles.videoPlaceholderText}>Video coming soon</Text>
-                </View>
-              )}
-              <Text style={styles.exampleText}>{content.whatBadLooksLike}</Text>
-            </View>
-
-            <View style={styles.card}>
-              <Text style={[styles.sectionLabel, { color: '#22c55e' }]}>WHAT IT SHOULD LOOK LIKE</Text>
-              {content.goodVideoUrl ? (
-                <View style={[styles.videoPlaceholder, { borderColor: '#22c55e30' }]}>
-                  <Ionicons name="videocam" size={24} color="#22c55e" />
-                  <Text style={styles.videoPlaceholderText}>Good example video</Text>
-                </View>
-              ) : (
-                <View style={[styles.videoPlaceholder, { borderColor: '#22c55e30' }]}>
-                  <Ionicons name="videocam-outline" size={24} color={colors.textMuted} />
-                  <Text style={styles.videoPlaceholderText}>Video coming soon</Text>
-                </View>
-              )}
-              <Text style={styles.exampleText}>{content.whatGoodLooksLike}</Text>
-            </View>
-
             {/* 7-Day Practice Plan */}
             <View style={styles.card}>
               <Text style={[styles.sectionLabel, { color: category.color }]}>7-DAY PRACTICE PLAN</Text>

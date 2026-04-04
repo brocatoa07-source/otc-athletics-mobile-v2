@@ -20,6 +20,7 @@ import {
   type GeneratedBlock,
 } from '@/features/strength/services/applyProfileOverrides';
 import { validateSessionCoherence } from '@/features/strength/services/validateSessionCoherence';
+import { auditSessionMetadata } from '@/features/strength/services/auditMetadata';
 import {
   type OtcsArchetype,
   type OtcsPosition,
@@ -375,6 +376,11 @@ function generateDay(
     if (__DEV__ && coherence.warnings.length > 0) {
       console.log(`[program-engine] Coherence for ${day.key}:`,
         coherence.warnings.join(' | '));
+    }
+
+    // Step 9: Metadata coverage audit (dev only)
+    if (__DEV__) {
+      auditSessionMetadata(blocks as GeneratedBlock[], true);
     }
   }
 

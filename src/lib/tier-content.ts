@@ -22,12 +22,13 @@ import type { DailyWorkItem } from '@/data/daily-work';
 type ItemType = DailyWorkItem['type'];
 
 const TIER_ALLOWED_TYPES: Record<CanonicalTier | 'COACH', Set<ItemType>> = {
-  WALK:     new Set(['hitting', 'foundation']),
-  SINGLE:   new Set(['hitting', 'foundation']),
-  DOUBLE:   new Set(['hitting', 'foundation', 'mental']),
-  TRIPLE:   new Set(['hitting', 'foundation', 'mental', 'strength']),
-  HOME_RUN: new Set(['hitting', 'foundation', 'mental', 'strength']),
-  COACH:    new Set(['hitting', 'foundation', 'mental', 'strength']),
+  WALK:       new Set(['hitting', 'foundation']),
+  SINGLE:     new Set(['hitting', 'foundation']),
+  DOUBLE:     new Set(['hitting', 'foundation', 'mental']),
+  TRIPLE:     new Set(['hitting', 'foundation', 'mental', 'strength']),
+  HOME_RUN:   new Set(['hitting', 'foundation', 'mental', 'strength']),
+  GRAND_SLAM: new Set(['hitting', 'foundation', 'mental', 'strength']),
+  COACH:      new Set(['hitting', 'foundation', 'mental', 'strength']),
 };
 
 /**
@@ -84,6 +85,7 @@ const TIER_UPGRADE_TARGET: Partial<Record<CanonicalTier, string>> = {
   SINGLE: 'Double',
   DOUBLE: 'Triple',
   TRIPLE: 'Home Run',
+  HOME_RUN: 'Grand Slam',
 };
 
 export function getUpgradeTargetLabel(tier: CanonicalTier): string | null {

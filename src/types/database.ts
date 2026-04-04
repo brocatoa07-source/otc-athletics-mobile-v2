@@ -9,7 +9,7 @@
 
 export type UserRole = 'ATHLETE' | 'COACH' | 'PARENT';
 
-export type AthleteTier = 'WALK' | 'SINGLE' | 'DOUBLE' | 'TRIPLE' | 'HOME_RUN';
+export type AthleteTier = 'WALK' | 'SINGLE' | 'DOUBLE' | 'TRIPLE' | 'HOME_RUN' | 'GRAND_SLAM';
 
 export type ProgramType = 'lifting' | 'hitting' | 'general';
 

@@ -11,6 +11,7 @@ const TIER_LABELS: Record<AthleteTier, string> = {
   DOUBLE: 'DOUBLE',
   TRIPLE: 'TRIPLE',
   HOME_RUN: 'HOME RUN',
+  GRAND_SLAM: 'GRAND SLAM',
 };
 
 const TIER_COLORS: Record<AthleteTier, string> = {
@@ -19,6 +20,7 @@ const TIER_COLORS: Record<AthleteTier, string> = {
   DOUBLE: Colors.primary,
   TRIPLE: Colors.warning,
   HOME_RUN: '#a855f7',
+  GRAND_SLAM: '#e11d48',
 };
 
 export function UpgradeDropdown() {

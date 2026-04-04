@@ -17,7 +17,6 @@ export default function AppLayout() {
   const isAthlete = dbUser?.role === 'ATHLETE';
   const { canMessage } = useTier();
 
-  // Still loading stored session + profile
   if (!isHydrated) {
     return (
       <View style={{ flex: 1, backgroundColor: colors.bg, alignItems: 'center', justifyContent: 'center' }}>
@@ -26,11 +25,8 @@ export default function AppLayout() {
     );
   }
 
-  // Not authenticated
   if (!session) return <Redirect href="/(auth)/login" />;
 
-  // Authenticated but role-specific data not loaded yet
-  // Parents have no athlete/coach row — allow them through once dbUser is set
   if (!dbUser || (isAthlete && !athlete) || (isCoach && !coach)) {
     return (
       <View style={{ flex: 1, backgroundColor: colors.bg, alignItems: 'center', justifyContent: 'center' }}>
@@ -64,7 +60,11 @@ export default function AppLayout() {
         },
       })}
     >
-      {/* ── Coach Home (coaches only) ── */}
+      {/* ═══════════════════════════════════════════
+       * TAB 1 — HOME (Dashboard / Command Center)
+       * ═══════════════════════════════════════════ */}
+
+      {/* Coach Home */}
       <Tabs.Screen
         name="coach"
         options={{
@@ -76,7 +76,7 @@ export default function AppLayout() {
         }}
       />
 
-      {/* ── Athlete / Parent Home ── */}
+      {/* Athlete / Parent Home */}
       <Tabs.Screen
         name="dashboard"
         options={{
@@ -88,19 +88,38 @@ export default function AppLayout() {
         }}
       />
 
-      {/* ── Lab (athletes only) ── */}
+      {/* ═══════════════════════════════════════════
+       * TAB 2 — TRAIN (Vaults, Drills, Programs)
+       * Replaces "Lab"
+       * ═══════════════════════════════════════════ */}
       <Tabs.Screen
         name="training"
         options={{
-          title: 'Lab',
+          title: 'Train',
           href: isAthlete ? undefined : null,
           tabBarIcon: ({ color, size }) => (
-            <Ionicons name="flask" size={size} color={color} />
+            <Ionicons name="barbell" size={size} color={color} />
           ),
         }}
       />
 
-      {/* ── Community (all roles — parents see announcements here) ── */}
+      {/* ═══════════════════════════════════════════
+       * TAB 3 — PROGRESS (Development + Feedback)
+       * ═══════════════════════════════════════════ */}
+      <Tabs.Screen
+        name="progress"
+        options={{
+          title: 'Progress',
+          href: isAthlete ? undefined : null,
+          tabBarIcon: ({ color, size }) => (
+            <Ionicons name="analytics" size={size} color={color} />
+          ),
+        }}
+      />
+
+      {/* ═══════════════════════════════════════════
+       * TAB 4 — COMMUNITY (Social + Competition)
+       * ═══════════════════════════════════════════ */}
       <Tabs.Screen
         name="community"
         options={{
@@ -111,25 +130,20 @@ export default function AppLayout() {
         }}
       />
 
-      {/* ── Messages (coaches + eligible athletes only, NOT parents) ── */}
-      <Tabs.Screen
-        name="messages"
-        options={{
-          title: 'Messages',
-          href: (canMessage && !isParent) ? undefined : null,
-          tabBarIcon: ({ color, size }) => (
-            <Ionicons name="chatbubbles" size={size} color={color} />
-          ),
-        }}
-      />
-
-      {/* ── Hidden routes ── */}
+      {/* ═══════════════════════════════════════════
+       * HIDDEN ROUTES (accessible via navigation, not tabs)
+       * ═══════════════════════════════════════════ */}
+      <Tabs.Screen name="messages" options={{ href: (canMessage && !isParent) ? undefined : null, title: 'Messages', tabBarIcon: ({ color, size }) => <Ionicons name="chatbubbles" size={size} color={color} /> }} />
       <Tabs.Screen name="upload" options={{ href: null }} />
       <Tabs.Screen name="profile" options={{ href: null }} />
-      <Tabs.Screen name="progress" options={{ href: null }} />
       <Tabs.Screen name="upgrade" options={{ href: null }} />
       <Tabs.Screen name="announcements" options={{ href: null }} />
       <Tabs.Screen name="playbook" options={{ href: null }} />
+      <Tabs.Screen name="onboarding" options={{ href: null }} />
+      <Tabs.Screen name="daily-work" options={{ href: null }} />
+      <Tabs.Screen name="how-it-works" options={{ href: null }} />
+      <Tabs.Screen name="weekly-review" options={{ href: null }} />
+      <Tabs.Screen name="my-path-levels" options={{ href: null }} />
     </Tabs>
   );
 }

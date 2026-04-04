@@ -74,3 +74,56 @@ export const MY_PATH_LANES: Record<MyPathStartPoint, MyPathLane> = {
     ],
   },
 };
+
+// ── Lane Progression Logic ──────────────────────────────────────────────────
+
+/**
+ * Determine which step (0-3) the athlete is on based on program month.
+ * Months 1-2 = step 0, Months 3-4 = step 1, Month 5 = step 2, Month 6 = step 3.
+ */
+export function getLaneStep(currentMonth: number): number {
+  if (currentMonth <= 2) return 0;
+  if (currentMonth <= 4) return 1;
+  if (currentMonth <= 5) return 2;
+  return 3;
+}
+
+/**
+ * Apply progression decision to lane advancement.
+ * PROGRESS: move forward one step (if not at end)
+ * HOLD: stay at current step
+ * REGRESS: move back one step (if not at start)
+ */
+export function adjustLaneStep(
+  currentStep: number,
+  decision: 'progress' | 'hold' | 'regress',
+): { step: number; changed: boolean; note: string } {
+  if (decision === 'progress' && currentStep < 3) {
+    return {
+      step: currentStep + 1,
+      changed: true,
+      note: 'Advancing to the next phase of your development path.',
+    };
+  }
+  if (decision === 'regress' && currentStep > 0) {
+    return {
+      step: currentStep - 1,
+      changed: true,
+      note: 'Repeating this phase to build a stronger foundation before advancing.',
+    };
+  }
+  if (decision === 'progress' && currentStep >= 3) {
+    return {
+      step: currentStep,
+      changed: false,
+      note: 'You are at the final phase. Maintain and refine.',
+    };
+  }
+  return {
+    step: currentStep,
+    changed: false,
+    note: decision === 'hold'
+      ? 'Staying at this phase. Your body is adapting.'
+      : 'Continuing at the foundation phase.',
+  };
+}

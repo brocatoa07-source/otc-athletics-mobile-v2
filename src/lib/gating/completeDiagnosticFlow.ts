@@ -25,6 +25,7 @@ import AsyncStorage from '@react-native-async-storage/async-storage';
 import { submitDiagnostic } from './diagnosticService';
 import { generateDiagnosticResult } from './generateDiagnosticResult';
 import { VAULT, DIAGNOSTIC, QUERY_KEYS, CACHE_KEYS, CANONICAL_PAIRS } from './diagnosticConstants';
+import { logDiagnosticEvent, startTimer } from './diagnosticEvents';
 import type { VaultType, DiagnosticKey } from './vaultConfig';
 
 // ── Error types ─────────────────────────────────────────────────────────────
@@ -71,20 +72,20 @@ export async function completeDiagnosticFlow(
 ): Promise<DiagnosticFlowResult> {
   const { supabase, queryClient, userId, vaultType, diagnosticType, resultPayload, cacheEntry } = params;
 
-  const tag = `[completeDiagnosticFlow:${vaultType}/${diagnosticType}]`;
+  const elapsed = startTimer();
 
   // ── 1. Prerequisites ─────────────────────────────────────────────────────
   if (!userId) {
-    console.error(tag, 'No userId provided');
+    logDiagnosticEvent({ event: 'diagnostic_submit_failed', vault: vaultType, diagnostic: diagnosticType, error: 'No userId' });
     return { success: false, error: 'prerequisite_missing', errorMessage: 'No user session. Please sign in again.' };
   }
 
   if (!isValidPair(vaultType, diagnosticType)) {
-    console.error(tag, 'Invalid vault/diagnostic pair:', vaultType, diagnosticType);
+    logDiagnosticEvent({ event: 'diagnostic_submit_failed', vault: vaultType, diagnostic: diagnosticType, error: 'Invalid pair' });
     return { success: false, error: 'prerequisite_missing', errorMessage: `Invalid diagnostic type: ${vaultType}/${diagnosticType}` };
   }
 
-  console.log(tag, 'START — userId:', userId.slice(0, 8));
+  logDiagnosticEvent({ event: 'diagnostic_submit_started', vault: vaultType, diagnostic: diagnosticType, userId: userId.slice(0, 8) });
 
   // ── 2. Submit ─────────────────────────────────────────────────────────────
   let submissionId: string | undefined;
@@ -96,9 +97,9 @@ export async function completeDiagnosticFlow(
       resultPayload,
     });
     submissionId = submission.id;
-    console.log(tag, 'Submit OK — id:', submissionId);
+    logDiagnosticEvent({ event: 'diagnostic_submit_succeeded', vault: vaultType, diagnostic: diagnosticType, durationMs: elapsed(), metadata: { submissionId } });
   } catch (err: any) {
-    console.error(tag, 'Submit FAILED:', err?.message ?? err);
+    logDiagnosticEvent({ event: 'diagnostic_submit_failed', vault: vaultType, diagnostic: diagnosticType, error: err?.message, durationMs: elapsed() });
     return {
       success: false,
       error: 'submit_failed',
@@ -108,8 +109,6 @@ export async function completeDiagnosticFlow(
 
   // ── 3. Generate result (vault-specific) ───────────────────────────────────
   if (vaultType === VAULT.MENTAL) {
-    // Mental vault needs all 3 diagnostics before generating
-    // Only trigger generation if this might be the final diagnostic
     const { data: mentalSubs } = await supabase
       .from('diagnostic_submissions')
       .select('diagnostic_type')
@@ -122,10 +121,10 @@ export async function completeDiagnosticFlow(
       && completedMental.has(DIAGNOSTIC.HABITS);
 
     if (allMentalDone) {
-      console.log(tag, 'All 3 mental diagnostics complete — generating profile');
+      logDiagnosticEvent({ event: 'profile_generation_started', vault: 'mental' });
       const genResult = await generateDiagnosticResult({ supabase, userId, vaultType: VAULT.MENTAL });
       if (!genResult.success) {
-        console.error(tag, 'Generation FAILED:', genResult.error);
+        logDiagnosticEvent({ event: 'profile_generation_failed', vault: 'mental', error: genResult.error, durationMs: elapsed() });
         return {
           success: false,
           error: 'generation_failed',
@@ -133,18 +132,15 @@ export async function completeDiagnosticFlow(
           submissionId,
         };
       }
-      console.log(tag, 'Profile generation OK');
-    } else {
-      console.log(tag, 'Not all mental diagnostics complete yet — skipping generation',
-        Array.from(completedMental));
+      logDiagnosticEvent({ event: 'profile_generation_succeeded', vault: 'mental', durationMs: elapsed() });
     }
   }
-  // SC vault: generate strength profile after lifting-mover quiz
+
   if (vaultType === VAULT.SC) {
-    console.log(tag, 'SC diagnostic complete — generating strength profile');
+    logDiagnosticEvent({ event: 'profile_generation_started', vault: 'sc' });
     const genResult = await generateDiagnosticResult({ supabase, userId, vaultType: VAULT.SC });
     if (!genResult.success) {
-      console.error(tag, 'Strength profile generation FAILED:', genResult.error);
+      logDiagnosticEvent({ event: 'profile_generation_failed', vault: 'sc', error: genResult.error, durationMs: elapsed() });
       return {
         success: false,
         error: 'generation_failed',
@@ -152,45 +148,35 @@ export async function completeDiagnosticFlow(
         submissionId,
       };
     }
-    console.log(tag, 'Strength profile generation OK');
+    logDiagnosticEvent({ event: 'profile_generation_succeeded', vault: 'sc', durationMs: elapsed() });
   }
 
   // ── 4. Cache to AsyncStorage (best-effort) ────────────────────────────────
   if (cacheEntry) {
     try {
       await AsyncStorage.setItem(cacheEntry.key, cacheEntry.value);
-      console.log(tag, 'Cache write OK:', cacheEntry.key);
     } catch {
-      console.warn(tag, 'Cache write failed (non-critical):', cacheEntry.key);
+      // Non-critical
     }
   }
 
   // ── 5. Invalidate queries ─────────────────────────────────────────────────
   try {
-    // Always invalidate gate state
     queryClient.invalidateQueries({ queryKey: QUERY_KEYS.gateState(userId) });
 
-    // Vault-specific invalidations
     if (vaultType === VAULT.MENTAL) {
       queryClient.invalidateQueries({ queryKey: QUERY_KEYS.mentalSubmissions(userId) });
       queryClient.invalidateQueries({ queryKey: QUERY_KEYS.mentalProfile(userId) });
     } else if (vaultType === VAULT.SC) {
-      queryClient.invalidateQueries({
-        queryKey: QUERY_KEYS.diagnosticResult(vaultType, diagnosticType, userId),
-      });
+      queryClient.invalidateQueries({ queryKey: QUERY_KEYS.diagnosticResult(vaultType, diagnosticType, userId) });
       queryClient.invalidateQueries({ queryKey: QUERY_KEYS.strengthProfile(userId) });
     } else {
-      queryClient.invalidateQueries({
-        queryKey: QUERY_KEYS.diagnosticResult(vaultType, diagnosticType, userId),
-      });
+      queryClient.invalidateQueries({ queryKey: QUERY_KEYS.diagnosticResult(vaultType, diagnosticType, userId) });
     }
-
-    console.log(tag, 'Queries invalidated');
-  } catch (err: any) {
-    // Query invalidation failure is non-critical but worth logging
-    console.warn(tag, 'Query invalidation error (non-critical):', err?.message);
+  } catch {
+    // Query invalidation failure is non-critical
   }
 
-  console.log(tag, 'COMPLETE');
+  logDiagnosticEvent({ event: 'diagnostic_submit_succeeded', vault: vaultType, diagnostic: diagnosticType, durationMs: elapsed(), metadata: { flowComplete: true } });
   return { success: true, submissionId };
 }

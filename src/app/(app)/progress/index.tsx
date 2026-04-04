@@ -82,7 +82,7 @@ export default function PerformanceTrendHome() {
         </View>
 
         <Text style={styles.guidanceCopy}>
-          Retest your key metrics every 4 weeks. Use the same testing conditions each time for better comparisons.
+          Real progress is measured — not guessed. Retest every 4 weeks under the same conditions. Compare baseline to latest. That is your truth.
         </Text>
 
         {/* Latest Snapshot Summary */}

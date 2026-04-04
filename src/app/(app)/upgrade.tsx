@@ -11,6 +11,7 @@ import { router } from 'expo-router';
 import { Ionicons } from '@expo/vector-icons';
 import { Colors } from '@/constants/colors';
 import { useTier, type CanonicalTier } from '@/hooks/useTier';
+import { useAccess } from '@/features/billing/useAccess';
 
 // ── Feature lists per tier ─────────────────────────────────────────────────
 
@@ -48,9 +49,17 @@ const TRIPLE_BULLETS = [
 
 const HOME_RUN_BULLETS = [
   'Everything in Triple',
-  'Priority coach access',
-  'Inquire about 1-on-1 coaching',
-  'Early access to new features',
+  'Lifetime access — no monthly payment',
+  'Full hitting, mental, and strength system',
+  'All future updates included',
+];
+
+const GRAND_SLAM_BULLETS = [
+  'Everything in Home Run',
+  'Custom lifting program',
+  'Custom hitting plan',
+  'Custom mental plan',
+  'Direct coaching access',
 ];
 
 // ── Tier card definitions ──────────────────────────────────────────────────
@@ -83,7 +92,7 @@ const TIERS: TierDef[] = [
     name: 'SINGLE',
     transformation: 'Fix your swing mechanics',
     tagline: 'Full hitting system — every drill, every fix, every day.',
-    price: '$19.99',
+    price: '$29.99',
     pricePer: '/ mo',
     bullets: SINGLE_BULLETS,
     accentColor: Colors.success,
@@ -94,18 +103,18 @@ const TIERS: TierDef[] = [
     name: 'DOUBLE',
     transformation: 'Master the mental game',
     tagline: 'Add the mental edge to your hitting foundation.',
-    price: '$39.99',
+    price: '$54.99',
     pricePer: '/ mo',
     bullets: DOUBLE_BULLETS,
     accentColor: Colors.primary,
-    ctaLabel: 'Upgrade to Double',
+    ctaLabel: 'Start 7-Day Free Trial',
   },
   {
     id: 'TRIPLE',
     name: 'TRIPLE',
     transformation: 'Build the complete athlete',
     tagline: 'Hitting, mental, and strength — the full development stack.',
-    price: '$119.99',
+    price: '$99.99',
     pricePer: '/ mo',
     bullets: TRIPLE_BULLETS,
     accentColor: Colors.warning,
@@ -114,30 +123,42 @@ const TIERS: TierDef[] = [
   {
     id: 'HOME_RUN',
     name: 'HOME RUN',
-    transformation: 'Get coached personally',
-    tagline: 'Everything in the system, plus a coach in your corner.',
-    price: 'Custom',
+    transformation: 'Lifetime access',
+    tagline: 'One payment. No subscription. Full system forever.',
+    price: '$500',
     bullets: HOME_RUN_BULLETS,
-    accentColor: '#E8B84B',
+    accentColor: '#a855f7',
+    ctaLabel: 'Unlock Lifetime',
+  },
+  {
+    id: 'GRAND_SLAM',
+    name: 'GRAND SLAM',
+    transformation: '1-on-1 coaching',
+    tagline: 'Custom programs, direct coaching access, and personalized development.',
+    price: 'Custom',
+    bullets: GRAND_SLAM_BULLETS,
+    accentColor: '#e11d48',
     applicationOnly: true,
     ctaLabel: 'Apply Now',
   },
 ];
 
-const TIER_ORDER: CanonicalTier[] = ['WALK', 'SINGLE', 'DOUBLE', 'TRIPLE', 'HOME_RUN'];
+const TIER_ORDER: CanonicalTier[] = ['WALK', 'SINGLE', 'DOUBLE', 'TRIPLE', 'HOME_RUN', 'GRAND_SLAM'];
 
 function tierLabel(tier: CanonicalTier): string {
   switch (tier) {
-    case 'WALK':     return "YOU'RE ON WALK — FREE";
-    case 'SINGLE':   return "YOU'RE ON SINGLE — $19.99/MO";
-    case 'DOUBLE':   return "YOU'RE ON DOUBLE — $39.99/MO";
-    case 'TRIPLE':   return "YOU'RE ON TRIPLE — $119.99/MO";
-    case 'HOME_RUN': return "YOU'RE ON HOME RUN";
+    case 'WALK':       return "YOU'RE ON WALK — FREE";
+    case 'SINGLE':     return "YOU'RE ON SINGLE — $29.99/MO";
+    case 'DOUBLE':     return "YOU'RE ON DOUBLE — $54.99/MO";
+    case 'TRIPLE':     return "YOU'RE ON TRIPLE — $99.99/MO";
+    case 'HOME_RUN':   return "YOU'RE ON HOME RUN — LIFETIME";
+    case 'GRAND_SLAM': return "YOU'RE ON GRAND SLAM — COACHING";
   }
 }
 
 export default function UpgradeScreen() {
   const { tier, isCoach } = useTier();
+  const access = useAccess();
 
   const currentIndex = TIER_ORDER.indexOf(tier);
 
@@ -227,9 +248,20 @@ export default function UpgradeScreen() {
               )}
 
               {isAboveCurrent && !def.applicationOnly && (
-                <View style={[styles.ctaBtn, { backgroundColor: def.accentColor }]}>
-                  <Text style={styles.ctaBtnText}>Coming Soon</Text>
-                </View>
+                <TouchableOpacity
+                  style={[styles.ctaBtn, { backgroundColor: def.accentColor }]}
+                  onPress={() => {
+                    if (def.id === 'DOUBLE' && access.trialEligible) {
+                      access.startTrial().then(() => router.back());
+                    }
+                    // TODO: Wire Stripe checkout for paid upgrades
+                  }}
+                  activeOpacity={0.85}
+                >
+                  <Text style={styles.ctaBtnText}>
+                    {def.id === 'DOUBLE' && access.trialEligible ? 'Start 7-Day Free Trial' : def.ctaLabel ?? 'Upgrade'}
+                  </Text>
+                </TouchableOpacity>
               )}
 
               {isAboveCurrent && def.applicationOnly && (

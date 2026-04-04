@@ -95,6 +95,18 @@ const FATIGUE_BUDGET_BY_PHASE: Record<string, number> = {
   deload: 10,
 };
 
+// ── Fatigue Helpers ─────────────────────────────────────────────────────────
+
+function computeTotalFatigue(blocks: GeneratedBlock[]): number {
+  let total = 0;
+  for (const block of blocks) {
+    for (const ex of block.exercises) {
+      total += getExerciseMetadata(ex.name).fatigueCost;
+    }
+  }
+  return total;
+}
+
 // ── Main Validator ──────────────────────────────────────────────────────────
 
 /**
@@ -128,17 +140,53 @@ export function validateSessionCoherence(
     }
   }
 
-  // ── Check 2: Fatigue budget ───────────────────────────────────────────
+  // ── Check 2: Fatigue budget — ENFORCED ─────────────────────────────────
+  // If over budget, remove lowest-priority injected exercises first,
+  // then trim optional accessory/conditioning if still over.
   const budget = FATIGUE_BUDGET_BY_PHASE[phase] ?? 30;
-  let totalFatigue = 0;
-  for (const block of modified) {
-    for (const ex of block.exercises) {
-      const meta = getExerciseMetadata(ex.name);
-      totalFatigue += meta.fatigueCost;
-    }
-  }
+  let totalFatigue = computeTotalFatigue(modified);
+
   if (totalFatigue > budget) {
-    warnings.push(`[fatigue] Total fatigue cost ${totalFatigue} exceeds phase budget ${budget}. Consider reducing volume.`);
+    warnings.push(`[fatigue] Total fatigue ${totalFatigue} exceeds budget ${budget} — enforcing trim`);
+
+    // Priority 1: Remove profile-injected exercises (lowest value, added last)
+    const injectedBlocks = ['accessory-circuit', 'sprint-cooldown', 'plyometrics'];
+    for (const blockKey of injectedBlocks) {
+      if (totalFatigue <= budget) break;
+      const block = modified.find((b) => b.key === blockKey);
+      if (!block) continue;
+
+      for (let i = block.exercises.length - 1; i >= 0; i--) {
+        if (totalFatigue <= budget) break;
+        if (block.exercises[i].modifiedBy === 'profile') {
+          const removedMeta = getExerciseMetadata(block.exercises[i].name);
+          warnings.push(`[fatigue-trim] Removed injected "${block.exercises[i].name}" (cost ${removedMeta.fatigueCost}) from ${blockKey}`);
+          totalFatigue -= removedMeta.fatigueCost;
+          block.exercises.splice(i, 1);
+          removals++;
+        }
+      }
+    }
+
+    // Priority 2: If still over, trim last exercise from largest non-essential blocks
+    if (totalFatigue > budget) {
+      const trimmable = modified
+        .filter((b) => ['accessory-circuit', 'shoulder-durability', 'sprint-cooldown'].includes(b.key))
+        .sort((a, b) => b.exercises.length - a.exercises.length);
+
+      for (const block of trimmable) {
+        if (totalFatigue <= budget || block.exercises.length <= 1) continue;
+        const removed = block.exercises.pop()!;
+        const removedMeta = getExerciseMetadata(removed.name);
+        totalFatigue -= removedMeta.fatigueCost;
+        warnings.push(`[fatigue-trim] Trimmed "${removed.name}" (cost ${removedMeta.fatigueCost}) from ${block.key}`);
+        removals++;
+      }
+    }
+
+    if (totalFatigue > budget) {
+      warnings.push(`[fatigue] Still over budget after trim: ${totalFatigue}/${budget}`);
+    }
   }
 
   // ── Check 3: Coherence rules ──────────────────────────────────────────

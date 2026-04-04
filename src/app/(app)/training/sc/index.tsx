@@ -18,6 +18,7 @@ import { useTier } from '@/hooks/useTier';
 import { useGating } from '@/hooks/useGating';
 import { useDiagnosticResult } from '@/hooks/useDiagnosticResult';
 import { generateDiagnosticResult } from '@/lib/gating/generateDiagnosticResult';
+import { logDiagnosticEvent } from '@/lib/gating/diagnosticEvents';
 import { supabase } from '@/lib/supabase';
 import { useAuthStore } from '@/store/auth.store';
 import { useStrengthProfile } from '@/hooks/useStrengthProfile';
@@ -25,7 +26,8 @@ import { LIFTING_MOVER_TYPES } from '@/data/lifting-mover-type-data';
 import { DAILY_WORK_RECIPES } from '@/features/strength/config/dailyWorkMapping';
 import { MY_PATH_LANES } from '@/features/strength/config/myPathMapping';
 import { ExpandableProfileCard } from '@/components/training/ExpandableProfileCard';
-import type { DailyWorkFocus, MyPathStartPoint } from '@/features/strength/types/strengthProfile';
+import { generateAthleteProfileSummary } from '@/features/strength/config/athleteProfileLanguage';
+import type { DailyWorkFocus, MyPathStartPoint, StrengthArchetype, StrengthNeed } from '@/features/strength/types/strengthProfile';
 
 const ACCENT = '#1DB954';
 
@@ -60,6 +62,8 @@ const BUILD_ITEMS: BuildItem[] = [
   { key: 'fuel', label: 'Fuel The Engine', sub: 'Performance nutrition', icon: 'flame-outline', color: '#10b981', route: '/(app)/training/sc/fuel' },
   { key: 'my-path', label: 'My Path', sub: '6-month personalized program', icon: 'map-outline', color: '#8b5cf6', route: '/(app)/training/sc/my-path' },
   { key: 'philosophy', label: 'Why We Train This Way', sub: 'Training philosophy & system', icon: 'bulb-outline', color: '#f59e0b', route: '/(app)/training/sc/philosophy' },
+  { key: 'coach-brain', label: 'Coach Brain', sub: 'How the system makes decisions', icon: 'hardware-chip-outline', color: '#3b82f6', route: '/(app)/training/sc/coach-brain' },
+  { key: 'monthly', label: 'Monthly Report', sub: 'Progress report card', icon: 'document-text-outline', color: '#22c55e', route: '/(app)/training/sc/monthly-report' },
 ];
 
 // ── Resolve focus items from strength profile ───────────────────────────────
@@ -107,11 +111,11 @@ export default function StrengthHome() {
   useEffect(() => {
     if (moverDone && !strengthProfile && user?.id && !backfillRan.current) {
       backfillRan.current = true;
-      console.log('[sc-home] Backfilling strength profile for', user.id.slice(0, 8));
+      logDiagnosticEvent({ event: 'profile_backfill_started', vault: 'sc', userId: user.id.slice(0, 8) });
       generateDiagnosticResult({ supabase, userId: user.id, vaultType: 'sc' })
         .then((r) => {
-          if (r.success) console.log('[sc-home] Backfill OK');
-          else console.warn('[sc-home] Backfill failed:', r.error);
+          if (r.success) logDiagnosticEvent({ event: 'profile_backfill_succeeded', vault: 'sc' });
+          else logDiagnosticEvent({ event: 'profile_backfill_failed', vault: 'sc', error: r.error });
         });
     }
   }, [moverDone, strengthProfile, user?.id]);
@@ -123,6 +127,16 @@ export default function StrengthHome() {
     : null;
   const myPathLane = strengthProfile?.my_path_start_point
     ? MY_PATH_LANES[strengthProfile.my_path_start_point as MyPathStartPoint]
+    : null;
+
+  // Generate athlete-facing summary from profile (no internal labels in UI)
+  const profileSummary = (strengthProfile?.primary_archetype && strengthProfile?.secondary_need && strengthProfile?.daily_work_focus && strengthProfile?.my_path_start_point)
+    ? generateAthleteProfileSummary(
+        strengthProfile.primary_archetype as StrengthArchetype,
+        strengthProfile.secondary_need as StrengthNeed,
+        strengthProfile.daily_work_focus as DailyWorkFocus,
+        strengthProfile.my_path_start_point as MyPathStartPoint,
+      )
     : null;
 
   // Focus items from profile priorities (preferred) or mover emphasis (fallback)
@@ -237,26 +251,52 @@ export default function StrengthHome() {
 
         {/* A. Today's Strength Focus */}
         {moverDone && moverData ? (
-          <View style={[styles.focusCard, { borderColor: ACCENT + '30' }]}>
+          <View style={[styles.focusCard, { borderColor: (profileSummary?.accentColor ?? ACCENT) + '30' }]}>
+            {/* Profile Identity */}
             <View style={styles.focusHeader}>
-              <View style={[styles.focusIconWrap, { backgroundColor: ACCENT + '15' }]}>
-                <Ionicons name="flash" size={18} color={ACCENT} />
+              <View style={[styles.focusIconWrap, { backgroundColor: (profileSummary?.accentColor ?? ACCENT) + '15' }]}>
+                <Ionicons name="flash" size={18} color={profileSummary?.accentColor ?? ACCENT} />
               </View>
               <View style={{ flex: 1 }}>
-                <Text style={styles.focusLabel}>
-                  {dailyWorkRecipe ? dailyWorkRecipe.label.toUpperCase() : 'TODAY\'S STRENGTH FOCUS'}
+                <Text style={styles.focusLabel}>YOUR STRENGTH PROFILE</Text>
+                <Text style={styles.focusArchetype}>
+                  {profileSummary ? profileSummary.whoYouAre.split('.')[0] : moverData.name}
                 </Text>
-                <Text style={styles.focusArchetype}>{moverData.name}</Text>
-                {strengthProfile?.secondary_need && (
-                  <Text style={styles.focusSub}>
-                    Focus: {strengthProfile.secondary_need.replace('_', ' ')}
-                  </Text>
-                )}
               </View>
             </View>
 
-            {/* Daily Work recipe buckets */}
-            {dailyWorkRecipe && (
+            {/* Biggest Need */}
+            {profileSummary && (
+              <View style={[styles.summaryBlock, { borderColor: '#f59e0b30' }]}>
+                <Ionicons name="flag" size={13} color="#f59e0b" />
+                <Text style={styles.summaryText}>{profileSummary.biggestNeed}</Text>
+              </View>
+            )}
+
+            {/* Program Emphasis */}
+            {profileSummary && (
+              <View style={styles.summaryBlock}>
+                <Ionicons name="trending-up" size={13} color="#22c55e" />
+                <Text style={styles.summaryText}>{profileSummary.programEmphasis}</Text>
+              </View>
+            )}
+
+            {/* Program Reduces */}
+            {profileSummary && (
+              <View style={styles.summaryBlock}>
+                <Ionicons name="trending-down" size={13} color="#ef4444" />
+                <Text style={styles.summaryText}>{profileSummary.programReduces}</Text>
+              </View>
+            )}
+
+            {/* Daily Work */}
+            {profileSummary ? (
+              <View style={styles.recipeWrap}>
+                <Text style={[styles.recipeLabel, { color: ACCENT }]}>DAILY WORK</Text>
+                <Text style={styles.toolName}>{profileSummary.dailyWork.title}</Text>
+                <Text style={styles.focusSub}>{profileSummary.dailyWork.description}</Text>
+              </View>
+            ) : dailyWorkRecipe ? (
               <View style={styles.recipeWrap}>
                 <Text style={[styles.recipeLabel, { color: ACCENT }]}>DAILY WORK</Text>
                 {dailyWorkRecipe.buckets.slice(0, 4).map((bucket: string) => (
@@ -266,26 +306,25 @@ export default function StrengthHome() {
                   </View>
                 ))}
               </View>
-            )}
+            ) : null}
 
-            {/* Top training priorities */}
-            {focusItems.map((item: FocusItem, idx: number) => (
+            {/* My Path */}
+            {profileSummary ? (
               <TouchableOpacity
-                key={idx}
-                style={styles.toolRow}
-                onPress={() => router.push(item.route as any)}
+                style={[styles.pathRow, { borderColor: '#8b5cf630' }]}
+                onPress={() => router.push('/(app)/training/sc/my-path' as any)}
                 activeOpacity={0.8}
               >
-                <View style={[styles.toolDot, { backgroundColor: item.color }]} />
-                <Text style={styles.toolName}>{item.name}</Text>
+                <Ionicons name="map-outline" size={14} color="#8b5cf6" />
+                <View style={{ flex: 1 }}>
+                  <Text style={[styles.pathTitle, { color: '#8b5cf6' }]}>{profileSummary.myPath.title}</Text>
+                  <Text style={styles.pathStep}>{profileSummary.myPath.description}</Text>
+                </View>
                 <Ionicons name="chevron-forward" size={14} color={colors.textMuted} />
               </TouchableOpacity>
-            ))}
-
-            {/* My Path lane */}
-            {myPathLane && (
+            ) : myPathLane ? (
               <TouchableOpacity
-                style={[styles.pathRow, { borderColor: '#8b5cf6' + '30' }]}
+                style={[styles.pathRow, { borderColor: '#8b5cf630' }]}
                 onPress={() => router.push('/(app)/training/sc/my-path' as any)}
                 activeOpacity={0.8}
               >
@@ -296,6 +335,16 @@ export default function StrengthHome() {
                 </View>
                 <Ionicons name="chevron-forward" size={14} color={colors.textMuted} />
               </TouchableOpacity>
+            ) : null}
+
+            {/* Stop Overdoing */}
+            {profileSummary && profileSummary.stopOverdoing.length > 0 && (
+              <View style={[styles.summaryBlock, { borderColor: '#ef444430' }]}>
+                <Ionicons name="warning" size={13} color="#ef4444" />
+                <Text style={[styles.summaryText, { color: '#ef4444' }]}>
+                  Stop overdoing: {profileSummary.stopOverdoing[0]}
+                </Text>
+              </View>
             )}
 
             {/* CTA */}
@@ -373,6 +422,22 @@ export default function StrengthHome() {
             <Text style={styles.quickTitle}>Mobility{'\n'}Flows</Text>
           </TouchableOpacity>
         </View>
+
+        {/* Progress Dashboard Link */}
+        {moverDone && (
+          <TouchableOpacity
+            style={[styles.progressLink, { borderColor: '#3b82f630' }]}
+            onPress={() => router.push('/(app)/training/sc/progress' as any)}
+            activeOpacity={0.8}
+          >
+            <Ionicons name="analytics" size={16} color="#3b82f6" />
+            <View style={{ flex: 1 }}>
+              <Text style={[styles.progressLinkTitle, { color: '#3b82f6' }]}>Your Progress</Text>
+              <Text style={styles.focusSub}>Compliance, readiness, trends & status</Text>
+            </View>
+            <Ionicons name="chevron-forward" size={14} color={colors.textMuted} />
+          </TouchableOpacity>
+        )}
 
         {/* C. Today's Cue */}
         <View style={styles.cueCard}>
@@ -453,6 +518,17 @@ const styles = StyleSheet.create({
 
   /* ── Daily Work recipe ──────────────── */
   recipeWrap: { gap: 4, paddingTop: 6, borderTopWidth: 1, borderTopColor: colors.border },
+  summaryBlock: {
+    flexDirection: 'row', alignItems: 'flex-start', gap: 8,
+    padding: 10, borderWidth: 1, borderColor: colors.border,
+    borderRadius: radius.md, backgroundColor: colors.bg,
+  },
+  summaryText: { flex: 1, fontSize: 12, color: colors.textSecondary, lineHeight: 17 },
+  progressLink: {
+    flexDirection: 'row', alignItems: 'center', gap: 10, padding: 12,
+    backgroundColor: colors.surface, borderWidth: 1, borderRadius: radius.md,
+  },
+  progressLinkTitle: { fontSize: 13, fontWeight: '800' },
   recipeLabel: { fontSize: 9, fontWeight: '900', letterSpacing: 1.2 },
 
   /* ── My Path lane ───────────────────── */

@@ -12,6 +12,7 @@ const TIER_LABELS: Record<AthleteTier | 'COACH', string> = {
   DOUBLE: 'DOUBLE',
   TRIPLE: 'TRIPLE',
   HOME_RUN: 'HOME RUN',
+  GRAND_SLAM: 'GRAND SLAM',
   COACH: 'COACH',
 };
 
@@ -21,6 +22,7 @@ const TIER_COLORS: Record<AthleteTier | 'COACH', string> = {
   DOUBLE: Colors.primary,
   TRIPLE: Colors.warning,
   HOME_RUN: '#a855f7',
+  GRAND_SLAM: '#e11d48',
   COACH: Colors.info,
 };
 

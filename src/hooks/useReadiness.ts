@@ -1,12 +1,14 @@
 import { useState, useEffect, useCallback } from 'react';
 import AsyncStorage from '@react-native-async-storage/async-storage';
 import type { ReadinessResult } from '@/data/readiness-engine';
+import { saveReadinessToHistory } from '@/features/strength/services/feedbackLoop';
 
 const STORAGE_KEY = 'otc:readiness';
 
 /**
  * Persists today's readiness check-in.
  * Only one result per day — re-checking overwrites.
+ * Also writes to readiness history for 7-day average computation.
  */
 export function useReadiness() {
   const [readiness, setReadiness] = useState<ReadinessResult | null>(null);
@@ -32,6 +34,8 @@ export function useReadiness() {
   const saveReadiness = useCallback(async (data: ReadinessResult) => {
     await AsyncStorage.setItem(STORAGE_KEY, JSON.stringify(data));
     setReadiness(data);
+    // Also write to history for 7-day average tracking
+    saveReadinessToHistory(data).catch(() => {});
   }, []);
 
   const clearReadiness = useCallback(async () => {

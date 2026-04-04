@@ -7,7 +7,7 @@ import { router } from 'expo-router';
 import { Ionicons } from '@expo/vector-icons';
 import { colors, radius } from '@/theme';
 import { useTier } from '@/hooks/useTier';
-import { TOOLS, type Tool } from '@/data/mental-tools';
+import { TOOLS } from '@/data/mental-tools';
 
 const ACCENT = '#8b5cf6';
 
@@ -48,6 +48,11 @@ export default function ToolboxScreen() {
                 style={[styles.categoryCard, locked && styles.cardLocked]}
                 onPress={() => {
                   if (locked) return;
+                  // Categories with a dedicated screen route there directly
+                  if (category.route) {
+                    router.push(category.route as any);
+                    return;
+                  }
                   setExpandedIdx(isExpanded ? null : catIdx);
                 }}
                 activeOpacity={locked ? 1 : 0.8}
@@ -67,26 +72,53 @@ export default function ToolboxScreen() {
                     {category.desc}
                   </Text>
                   <Text style={[styles.catCount, { color: category.color }]}>
-                    {category.items.length} tools
+                    {category.items.length} {category.route ? 'sessions' : 'tools'}
                   </Text>
                 </View>
                 {!locked && (
                   <Ionicons
-                    name={isExpanded ? 'chevron-up' : 'chevron-down'}
+                    name={category.route ? 'chevron-forward' : isExpanded ? 'chevron-up' : 'chevron-down'}
                     size={18}
                     color={colors.textMuted}
                   />
                 )}
               </TouchableOpacity>
 
-              {isExpanded && !locked && (
+              {isExpanded && !locked && !category.route && (
                 <View style={styles.toolsList}>
-                  {category.items.map((item, itemIdx) => (
-                    <View key={itemIdx} style={styles.toolItem}>
-                      <View style={[styles.toolDot, { backgroundColor: category.color }]} />
-                      <Text style={styles.toolText}>{item}</Text>
-                    </View>
-                  ))}
+                  {/* Structured tools — tappable with detail screen */}
+                  {category.structuredItems ? (
+                    category.structuredItems.map((tool) => (
+                      <TouchableOpacity
+                        key={tool.id}
+                        style={styles.structuredToolItem}
+                        onPress={() => router.push(`/(app)/training/mental/tool-detail?catIdx=${catIdx}&toolId=${tool.id}` as any)}
+                        activeOpacity={0.7}
+                      >
+                        <View style={[styles.toolDot, { backgroundColor: category.color }]} />
+                        <View style={{ flex: 1 }}>
+                          <Text style={styles.structuredToolName}>{tool.name}</Text>
+                          <Text style={styles.structuredToolTagline}>{tool.tagline}</Text>
+                        </View>
+                        <View style={styles.quickBadgeWrap}>
+                          {tool.quickTool && (
+                            <View style={[styles.quickBadge, { backgroundColor: category.color + '15' }]}>
+                              <Text style={[styles.quickBadgeText, { color: category.color }]}>QUICK</Text>
+                            </View>
+                          )}
+                          <Ionicons name="chevron-forward" size={14} color={colors.textMuted} />
+                        </View>
+                      </TouchableOpacity>
+                    ))
+                  ) : (
+                    /* Legacy string items — no detail screen */
+                    category.items.map((item, itemIdx) => (
+                      <View key={itemIdx} style={styles.toolItem}>
+                        <View style={[styles.toolDot, { backgroundColor: category.color }]} />
+                        <Text style={styles.toolText}>{item}</Text>
+                      </View>
+                    ))
+                  )}
                 </View>
               )}
             </View>
@@ -159,4 +191,16 @@ const styles = StyleSheet.create({
     borderRadius: radius.lg, padding: 14, marginTop: 4,
   },
   upgradeBannerText: { flex: 1, fontSize: 13, fontWeight: '700', color: ACCENT },
+
+  /* Structured tool items */
+  structuredToolItem: {
+    flexDirection: 'row', alignItems: 'center', gap: 10,
+    paddingVertical: 10, paddingHorizontal: 4,
+    borderBottomWidth: 1, borderBottomColor: colors.border,
+  },
+  structuredToolName: { fontSize: 14, fontWeight: '700', color: colors.textPrimary },
+  structuredToolTagline: { fontSize: 11, color: colors.textMuted, marginTop: 1 },
+  quickBadgeWrap: { flexDirection: 'row', alignItems: 'center', gap: 6 },
+  quickBadge: { paddingHorizontal: 5, paddingVertical: 2, borderRadius: 3 },
+  quickBadgeText: { fontSize: 7, fontWeight: '900', letterSpacing: 0.8 },
 });
