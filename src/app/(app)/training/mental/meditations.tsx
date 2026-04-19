@@ -1,6 +1,6 @@
 import { View, Text, ScrollView, TouchableOpacity, StyleSheet } from 'react-native';
 import { SafeAreaView } from 'react-native-safe-area-context';
-import { router } from 'expo-router';
+import { router, useLocalSearchParams } from 'expo-router';
 import { Ionicons } from '@expo/vector-icons';
 import { useState, useRef, useEffect, useCallback } from 'react';
 import { colors, radius } from '@/theme';
@@ -270,9 +270,21 @@ function MeditationPlayer({ meditation, onClose }: { meditation: Meditation; onC
  * ──────────────────────────────────────────────── */
 
 export default function GuidedMeditations() {
+  const { key: deepLinkKey } = useLocalSearchParams<{ key?: string }>();
   const [activeMeditation, setActiveMeditation] = useState<Meditation | null>(null);
+  const [deepLinked, setDeepLinked] = useState(false);
   const { hasFullMental, isCoach } = useTier();
   const canAccess = hasFullMental || isCoach;
+
+  // Auto-open a specific meditation when deep-linked
+  useEffect(() => {
+    if (deepLinked || !deepLinkKey) return;
+    const match = MEDITATIONS.find(m => m.key === deepLinkKey);
+    if (match) {
+      setDeepLinked(true);
+      setActiveMeditation(match);
+    }
+  }, [deepLinkKey, deepLinked]);
 
   if (activeMeditation) {
     return (

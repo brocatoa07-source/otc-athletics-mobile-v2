@@ -17,7 +17,6 @@ import { TrialBanner } from '@/features/billing/TrialBanner';
 import { useAccess } from '@/features/billing/useAccess';
 import { InlineLock } from '@/features/billing/AccessGate';
 import { loadTodayCheckIn, getStreakInfo, loadCheckIns, getLocalDateString } from '@/data/own-the-cost-checkin';
-import { isOnboardingComplete } from '@/features/onboarding/onboardingState';
 import { getTimeOfDayGreeting } from '@/lib/dashboard/dashboardInsight';
 import {
   getProgressionDecision,
@@ -43,24 +42,12 @@ export default function DashboardScreen() {
   if (dbUser?.role === 'PARENT') return <ParentDashboard />;
 
   const redirectedDateRef = useRef<string | null>(null);
-  const onboardingCheckedRef = useRef(false);
   const { loaded: accountabilityLoaded, otcCheckedInToday } = useAccountability();
 
   const [streakDays, setStreakDays] = useState(0);
   const [snapshot, setSnapshot] = useState<ProgressionSnapshot | null>(null);
   const [notifications, setNotifications] = useState<BehaviorNotification[]>([]);
   // missedYesterday is computed inside useFocusEffect and passed directly to notification generator
-
-  // Onboarding redirect — once per session
-  useFocusEffect(
-    useCallback(() => {
-      if (isCoach || onboardingCheckedRef.current) return;
-      onboardingCheckedRef.current = true;
-      isOnboardingComplete().then((done) => {
-        if (!done) router.push('/(app)/onboarding' as any);
-      });
-    }, [isCoach]),
-  );
 
   useFocusEffect(
     useCallback(() => {
@@ -227,17 +214,6 @@ export default function DashboardScreen() {
           >
             <Ionicons name="flash" size={20} color="#fff" />
             <Text style={styles.ctaPrimaryText}>Daily Work</Text>
-          </TouchableOpacity>
-        </View>
-
-        <View style={styles.ctaSecondaryRow}>
-          <TouchableOpacity
-            style={styles.ctaSecondary}
-            onPress={() => router.push('/(app)/weekly-review' as any)}
-            activeOpacity={0.8}
-          >
-            <Ionicons name="document-text-outline" size={16} color="#22c55e" />
-            <Text style={styles.ctaSecondaryText}>Weekly Review</Text>
           </TouchableOpacity>
         </View>
 

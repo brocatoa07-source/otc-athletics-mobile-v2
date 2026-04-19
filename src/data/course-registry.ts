@@ -1,184 +1,170 @@
 /* ────────────────────────────────────────────────
- * Course Registry — maps courseId to week data
- * Used by the shared course screen component.
+ * Course Registry — Mental Mastery Course
+ *
+ * 11 sequential weeks, one mental skill per week.
+ * Each skill has a shadow pattern the athlete is replacing
+ * and a mastery pattern they are building toward.
  * ──────────────────────────────────────────────── */
 
-import { WEEK_1, WEEK_2 } from './awareness-course-data';
-import { WEEK_3, WEEK_4 } from './confidence-course-data';
-import { WEEK_5, WEEK_6 } from './focus-course-data';
-import { WEEK_7, WEEK_8 } from './emotional-control-course-data';
-import { WEEK_9, WEEK_10 } from './resilience-course-data';
-import { WEEK_11, WEEK_12 } from './accountability-course-data';
+import { AWARENESS_WEEK } from './awareness-course-data';
+import { CONFIDENCE_WEEK } from './confidence-course-data';
+import { FOCUS_WEEK } from './focus-course-data';
+import { EMOTIONAL_CONTROL_WEEK } from './emotional-control-course-data';
+import { RESILIENCE_WEEK } from './resilience-course-data';
+import { ACCOUNTABILITY_WEEK } from './accountability-course-data';
+import { COMMUNICATION_WEEK } from './communication-course-data';
+import { PRESENCE_WEEK } from './presence-course-data';
+import { COMPOSURE_WEEK } from './composure-course-data';
+import { LEADERSHIP_WEEK } from './leadership-course-data';
+import { FLOW_STATE_WEEK } from './flow-state-course-data';
 
-export interface OutlineSegment {
-  segment: string;
-  focus: string;
-  objective: string;
+// Re-export types from shared module
+export type {
+  OutlineSegment, CoachScience, CourseQuestion,
+  CourseWeekContent, CourseEntry,
+} from './course-types';
+
+import type { CourseWeekContent, CourseEntry } from './course-types';
+
+// ── Registry ───────────────────────────────────────
+
+function entry(
+  id: string,
+  week: number,
+  label: string,
+  whatItBuilds: string,
+  shadowPattern: string,
+  shadowLooksLike: string,
+  color: string,
+  content: CourseWeekContent,
+): CourseEntry {
+  return {
+    id,
+    week,
+    label,
+    whatItBuilds,
+    shadowPattern,
+    shadowLooksLike,
+    color,
+    content,
+    totalSections: content.outline.length,
+  };
 }
 
-export interface CoachScience {
-  videoTitle: string;
-  points: string[];
-  playerAnalogy: string;
-  baseballAnalogy: string;
-}
+export const COURSE_REGISTRY: Record<string, CourseEntry> = {};
 
-export interface CourseQuestion {
-  question: string;
-  insight: string;
-}
+// Week 1
+COURSE_REGISTRY['awareness'] = entry(
+  'awareness', 1, 'Awareness',
+  'Recognizing thoughts, emotions, and triggers in real time',
+  'Autopilot',
+  'Going through the motions, unaware of focus or emotion',
+  '#8b5cf6',
+  AWARENESS_WEEK,
+);
 
-export interface CourseWeek {
-  title: string;
-  quote: string;
-  objective?: string;
-  outline: OutlineSegment[];
-  coachScience: CoachScience;
-  questions?: CourseQuestion[];
-}
+// Week 2
+COURSE_REGISTRY['confidence'] = entry(
+  'confidence', 2, 'Confidence',
+  'Trusting preparation and self-belief',
+  'Perfectionism / Fear of Failure',
+  'Only confident when things go perfectly',
+  '#E10600',
+  CONFIDENCE_WEEK,
+);
 
-export interface CourseEntry {
-  id: string;
-  label: string;
-  color: string;
-  skillNum: number;
-  shadow: CourseWeek;
-  mastery: CourseWeek;
-  /** Total outline segments across both weeks (for progress tracking) */
-  totalSections: number;
-  /** True for courses 7–11 whose content is not yet built */
-  placeholder?: boolean;
-}
+// Week 3
+COURSE_REGISTRY['focus'] = entry(
+  'focus', 3, 'Focus',
+  'Staying locked in pitch-to-pitch',
+  'Distraction / Outcome Obsession',
+  'Thinking about results or stats mid-game',
+  '#3b82f6',
+  FOCUS_WEEK,
+);
 
-export const COURSE_REGISTRY: Record<string, CourseEntry> = {
-  awareness: {
-    id: 'awareness',
-    label: 'Awareness',
-    color: '#8b5cf6',
-    skillNum: 1,
-    shadow: WEEK_1 as CourseWeek,
-    mastery: WEEK_2 as CourseWeek,
-    totalSections: WEEK_1.outline.length + WEEK_2.outline.length,
-  },
-  confidence: {
-    id: 'confidence',
-    label: 'Confidence',
-    color: '#E10600',
-    skillNum: 2,
-    shadow: WEEK_3 as CourseWeek,
-    mastery: WEEK_4 as CourseWeek,
-    totalSections: WEEK_3.outline.length + WEEK_4.outline.length,
-  },
-  focus: {
-    id: 'focus',
-    label: 'Focus',
-    color: '#3b82f6',
-    skillNum: 3,
-    shadow: WEEK_5 as CourseWeek,
-    mastery: WEEK_6 as CourseWeek,
-    totalSections: WEEK_5.outline.length + WEEK_6.outline.length,
-  },
-  'emotional-control': {
-    id: 'emotional-control',
-    label: 'Emotional Control',
-    color: '#ef4444',
-    skillNum: 4,
-    shadow: WEEK_7 as CourseWeek,
-    mastery: WEEK_8 as CourseWeek,
-    totalSections: WEEK_7.outline.length + WEEK_8.outline.length,
-  },
-  resilience: {
-    id: 'resilience',
-    label: 'Resilience',
-    color: '#22c55e',
-    skillNum: 5,
-    shadow: WEEK_9 as CourseWeek,
-    mastery: WEEK_10 as CourseWeek,
-    totalSections: WEEK_9.outline.length + WEEK_10.outline.length,
-  },
-  accountability: {
-    id: 'accountability',
-    label: 'Accountability',
-    color: '#f59e0b',
-    skillNum: 6,
-    shadow: WEEK_11 as CourseWeek,
-    mastery: WEEK_12 as CourseWeek,
-    totalSections: WEEK_11.outline.length + WEEK_12.outline.length,
-  },
-};
+// Week 4
+COURSE_REGISTRY['emotional-control'] = entry(
+  'emotional-control', 4, 'Emotional Control',
+  'Regulating reactions and staying composed',
+  'Overreaction / Suppression',
+  'Slamming gear or shutting down after mistakes',
+  '#ef4444',
+  EMOTIONAL_CONTROL_WEEK,
+);
 
-/* ─── Placeholder stub for courses 7–11 ─────────── */
+// Week 5
+COURSE_REGISTRY['resilience'] = entry(
+  'resilience', 5, 'Resilience',
+  'Bouncing back after failure',
+  'Victim Mindset / Avoidance',
+  'Blaming others or quitting mentally after errors',
+  '#22c55e',
+  RESILIENCE_WEEK,
+);
 
-const PLACEHOLDER_WEEK: CourseWeek = {
-  title: 'Coming Soon',
-  quote: 'This module is being built.',
-  outline: [],
-  coachScience: {
-    videoTitle: 'Content in Development',
-    points: ['Full course content is being developed.'],
-    playerAnalogy: '',
-    baseballAnalogy: '',
-  },
-};
+// Week 6
+COURSE_REGISTRY['accountability'] = entry(
+  'accountability', 6, 'Accountability',
+  'Taking ownership of actions and attitude',
+  'Excuses / Blame',
+  'Pointing fingers, externalizing problems',
+  '#f59e0b',
+  ACCOUNTABILITY_WEEK,
+);
 
-/** Advanced courses 7–11: visible as placeholders, gated behind 1–6 completion */
+// Week 7
+COURSE_REGISTRY['communication'] = entry(
+  'communication', 7, 'Communication',
+  'Clear expression and connection with coaches/teammates',
+  'Assumptions / Poor Listening',
+  'Misunderstanding feedback, tone, or intent',
+  '#06b6d4',
+  COMMUNICATION_WEEK,
+);
 
-COURSE_REGISTRY['communication'] = {
-  id: 'communication',
-  label: 'Communication',
-  color: '#06b6d4',
-  skillNum: 7,
-  shadow: PLACEHOLDER_WEEK,
-  mastery: PLACEHOLDER_WEEK,
-  totalSections: 0,
-  placeholder: true,
-};
+// Week 8
+COURSE_REGISTRY['presence'] = entry(
+  'presence', 8, 'Presence',
+  'Competing in the "now" moment',
+  'Anxiety / Rumination',
+  'Living in past mistakes or future fears',
+  '#a855f7',
+  PRESENCE_WEEK,
+);
 
-COURSE_REGISTRY['presence'] = {
-  id: 'presence',
-  label: 'Presence',
-  color: '#a855f7',
-  skillNum: 8,
-  shadow: PLACEHOLDER_WEEK,
-  mastery: PLACEHOLDER_WEEK,
-  totalSections: 0,
-  placeholder: true,
-};
+// Week 9
+COURSE_REGISTRY['composure'] = entry(
+  'composure', 9, 'Composure',
+  'Maintaining calm body language and posture',
+  'Frustration / Ego',
+  'Emotional leak through visible frustration',
+  '#64748b',
+  COMPOSURE_WEEK,
+);
 
-COURSE_REGISTRY['composure'] = {
-  id: 'composure',
-  label: 'Composure',
-  color: '#64748b',
-  skillNum: 9,
-  shadow: PLACEHOLDER_WEEK,
-  mastery: PLACEHOLDER_WEEK,
-  totalSections: 0,
-  placeholder: true,
-};
+// Week 10
+COURSE_REGISTRY['leadership'] = entry(
+  'leadership', 10, 'Leadership',
+  'Modeling consistency, discipline, and energy',
+  'Self-Centeredness / Inconsistency',
+  'Low energy or lack of follow-through when struggling',
+  '#ec4899',
+  LEADERSHIP_WEEK,
+);
 
-COURSE_REGISTRY['leadership'] = {
-  id: 'leadership',
-  label: 'Leadership',
-  color: '#ec4899',
-  skillNum: 10,
-  shadow: PLACEHOLDER_WEEK,
-  mastery: PLACEHOLDER_WEEK,
-  totalSections: 0,
-  placeholder: true,
-};
+// Week 11
+COURSE_REGISTRY['flow-state'] = entry(
+  'flow-state', 11, 'Flow State',
+  'Competing in total immersion and freedom',
+  'Over-Control / Tension',
+  'Trying too hard, losing rhythm and feel',
+  '#14b8a6',
+  FLOW_STATE_WEEK,
+);
 
-COURSE_REGISTRY['flow-state'] = {
-  id: 'flow-state',
-  label: 'Flow State',
-  color: '#14b8a6',
-  skillNum: 11,
-  shadow: PLACEHOLDER_WEEK,
-  mastery: PLACEHOLDER_WEEK,
-  totalSections: 0,
-  placeholder: true,
-};
+/** Ordered course list (week 1 → 11) */
+export const COURSE_LIST = Object.values(COURSE_REGISTRY).sort((a, b) => a.week - b.week);
 
-export const COURSE_LIST = Object.values(COURSE_REGISTRY);
-
-/** IDs of the 6 core courses that must be completed to unlock advanced courses */
-export const CORE_COURSE_IDS = ['awareness', 'confidence', 'focus', 'emotional-control', 'resilience', 'accountability'] as const;
+/** All 11 course IDs in week order */
+export const ALL_COURSE_IDS = COURSE_LIST.map((c) => c.id);

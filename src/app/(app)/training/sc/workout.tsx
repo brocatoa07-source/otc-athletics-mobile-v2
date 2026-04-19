@@ -1,6 +1,6 @@
 import { useState, useCallback, useEffect } from 'react';
 import {
-  View, Text, ScrollView, TouchableOpacity, StyleSheet,
+  View, Text, ScrollView, TouchableOpacity, TextInput, StyleSheet,
 } from 'react-native';
 import { SafeAreaView } from 'react-native-safe-area-context';
 import { router, useLocalSearchParams } from 'expo-router';
@@ -21,6 +21,11 @@ import {
 } from '@/data/strength-program-engine';
 import { OTCS_PHASE_META, OTCS_ALL_BLOCKS, type OtcsBlockKey } from '@/data/otcs-types';
 import { saveSessionLog } from '@/features/strength/services/feedbackLoop';
+import {
+  saveExerciseLog, getLastExerciseLog, getTodayExerciseLog,
+  parseSetsReps, formatLastWeight,
+  type SetLog,
+} from '@/features/strength/services/exerciseLog';
 
 const ACCENT = '#1DB954';
 
@@ -58,6 +63,16 @@ export default function WorkoutScreen() {
   const [showRPE, setShowRPE] = useState(false);
   const [selectedRPE, setSelectedRPE] = useState<number | null>(null);
   const [hasPain, setHasPain] = useState<boolean | null>(null);
+  /** Which exercise is expanded for weight logging */
+  const [loggingExId, setLoggingExId] = useState<string | null>(null);
+  /** Weight inputs keyed by exId → set index → weight string */
+  const [weightInputs, setWeightInputs] = useState<Record<string, Record<number, string>>>({});
+  /** Notes per exercise */
+  const [noteInputs, setNoteInputs] = useState<Record<string, string>>({});
+  /** Previous weight display keyed by exercise name */
+  const [lastWeights, setLastWeights] = useState<Record<string, string>>({});
+  /** Saved indicator keyed by exId */
+  const [savedExercises, setSavedExercises] = useState<Set<string>>(new Set());
 
   useFocusEffect(
     useCallback(() => {
@@ -88,7 +103,7 @@ export default function WorkoutScreen() {
             setWeekNum(next.week);
             setDayNum(next.day);
             setWorkout(next.workout);
-            setWorkoutComplete(false);
+            setWorkoutComplete(!!next.alreadyDone);
           }
         }
       })();
@@ -113,12 +128,15 @@ export default function WorkoutScreen() {
   async function submitWorkoutWithFeedback() {
     if (!progress || !program || selectedRPE === null || hasPain === null) return;
 
+    const today = new Date().toISOString().slice(0, 10);
     const key = getWorkoutKey(monthNum, weekNum, dayNum);
     const updated: StrengthProgress = {
       ...progress,
       completedWorkouts: { ...progress.completedWorkouts, [key]: true },
+      lastCompletedDate: today,
     };
 
+    // Check if all days in this week are done — advance week/month for TOMORROW's session
     const monthData = program.months[monthNum - 1];
     const weekData = monthData?.weeks[weekNum - 1];
     const allDaysInWeek = weekData?.days.length ?? 0;
@@ -139,7 +157,6 @@ export default function WorkoutScreen() {
 
     // Mark today's session complete for Daily Standards tracking
     const now = new Date().toISOString();
-    const today = now.slice(0, 10);
     try {
       const raw = await AsyncStorage.getItem('otc:workout-completions');
       const map = raw ? JSON.parse(raw) : {};
@@ -272,41 +289,111 @@ export default function WorkoutScreen() {
               {block.exercises.map((ex, exIdx) => {
                 const exId = `${block.key}-${exIdx}`;
                 const isDone = completedExercises.has(exId);
+                const isLogging = loggingExId === exId;
+                const isSaved = savedExercises.has(exId);
+                const lastW = lastWeights[ex.name];
+                const parsed = parseSetsReps(ex.sets);
+
                 return (
-                  <TouchableOpacity
-                    key={exId}
-                    style={[styles.exerciseCard, isDone && styles.exerciseCardDone]}
-                    onPress={() => toggleExercise(exId)}
-                    activeOpacity={0.7}
-                  >
-                    <View style={[
-                      styles.checkbox,
-                      isDone && { backgroundColor: ACCENT, borderColor: ACCENT },
-                    ]}>
-                      {isDone && <Ionicons name="checkmark" size={14} color="#fff" />}
-                    </View>
-                    <View style={{ flex: 1 }}>
-                      <Text style={[styles.exerciseName, isDone && styles.exerciseNameDone]}>
-                        {ex.name}
-                      </Text>
-                      <Text style={styles.exerciseSets}>{ex.sets}</Text>
-                      <Text style={styles.exerciseCue}>{ex.cue}</Text>
-                      {ex.modNote && (
-                        <Text style={styles.modNote}>{ex.modNote}</Text>
-                      )}
-                    </View>
-                    {ex.isModified && (
-                      <View style={[styles.modifiedBadge, {
-                        backgroundColor: ex.modifiedBy === 'position' ? '#3b82f6' + '15' : '#f59e0b' + '15',
-                      }]}>
-                        <Ionicons
-                          name={ex.modifiedBy === 'position' ? 'location' : 'fitness'}
-                          size={10}
-                          color={ex.modifiedBy === 'position' ? '#3b82f6' : '#f59e0b'}
+                  <View key={exId}>
+                    <TouchableOpacity
+                      style={[styles.exerciseCard, isDone && styles.exerciseCardDone]}
+                      onPress={() => {
+                        toggleExercise(exId);
+                        setLoggingExId(isLogging ? null : exId);
+                        // Load previous weight on expand
+                        if (!isLogging && !lastWeights[ex.name]) {
+                          getLastExerciseLog(ex.name).then(prev => {
+                            if (prev) setLastWeights(p => ({ ...p, [ex.name]: formatLastWeight(prev) }));
+                          });
+                          // Load today's saved data if exists
+                          getTodayExerciseLog(ex.name).then(today => {
+                            if (today) {
+                              const wMap: Record<number, string> = {};
+                              today.sets.forEach(s => { wMap[s.set] = String(s.weight); });
+                              setWeightInputs(p => ({ ...p, [exId]: wMap }));
+                              if (today.notes) setNoteInputs(p => ({ ...p, [exId]: today.notes }));
+                              setSavedExercises(p => new Set(p).add(exId));
+                            }
+                          });
+                        }
+                      }}
+                      activeOpacity={0.7}
+                    >
+                      <View style={[
+                        styles.checkbox,
+                        isDone && { backgroundColor: ACCENT, borderColor: ACCENT },
+                      ]}>
+                        {isDone && <Ionicons name="checkmark" size={14} color="#fff" />}
+                      </View>
+                      <View style={{ flex: 1 }}>
+                        <Text style={[styles.exerciseName, isDone && styles.exerciseNameDone]}>
+                          {ex.name}
+                        </Text>
+                        <Text style={styles.exerciseSets}>{ex.sets}</Text>
+                        {lastW && <Text style={styles.lastWeight}>{lastW}</Text>}
+                        <Text style={styles.exerciseCue}>{ex.cue}</Text>
+                      </View>
+                      {isSaved && <Ionicons name="checkmark-circle" size={16} color="#22c55e" />}
+                      <Ionicons name={isLogging ? 'chevron-up' : 'chevron-down'} size={14} color={colors.textMuted} />
+                    </TouchableOpacity>
+
+                    {/* Weight Logging Panel */}
+                    {isLogging && (
+                      <View style={styles.logPanel}>
+                        {Array.from({ length: parsed.sets }, (_, i) => i + 1).map(setNum => (
+                          <View key={setNum} style={styles.setRow}>
+                            <Text style={styles.setLabel}>Set {setNum}</Text>
+                            <TextInput
+                              style={styles.weightInput}
+                              placeholder="lbs"
+                              placeholderTextColor={colors.textMuted}
+                              keyboardType="numeric"
+                              value={weightInputs[exId]?.[setNum] ?? ''}
+                              onChangeText={(val) => {
+                                setWeightInputs(prev => ({
+                                  ...prev,
+                                  [exId]: { ...(prev[exId] ?? {}), [setNum]: val },
+                                }));
+                              }}
+                            />
+                            <Text style={styles.repsLabel}>× {parsed.reps}</Text>
+                          </View>
+                        ))}
+                        <TextInput
+                          style={styles.notesInput}
+                          placeholder="Notes (optional)"
+                          placeholderTextColor={colors.textMuted}
+                          value={noteInputs[exId] ?? ''}
+                          onChangeText={(val) => setNoteInputs(prev => ({ ...prev, [exId]: val }))}
                         />
+                        <TouchableOpacity
+                          style={styles.saveLogBtn}
+                          onPress={async () => {
+                            const sets: SetLog[] = Array.from({ length: parsed.sets }, (_, i) => ({
+                              set: i + 1,
+                              weight: parseFloat(weightInputs[exId]?.[i + 1] ?? '0') || 0,
+                              reps: parsed.reps,
+                            })).filter(s => s.weight > 0);
+                            if (sets.length === 0) return;
+                            await saveExerciseLog({
+                              exerciseName: ex.name,
+                              date: new Date().toISOString().slice(0, 10),
+                              sets,
+                              notes: noteInputs[exId] ?? '',
+                            });
+                            setSavedExercises(prev => new Set(prev).add(exId));
+                          }}
+                          activeOpacity={0.8}
+                        >
+                          <Ionicons name="save-outline" size={14} color="#fff" />
+                          <Text style={styles.saveLogBtnText}>
+                            {isSaved ? 'Update Log' : 'Save Log'}
+                          </Text>
+                        </TouchableOpacity>
                       </View>
                     )}
-                  </TouchableOpacity>
+                  </View>
                 );
               })}
             </View>
@@ -498,4 +585,29 @@ const styles = StyleSheet.create({
     borderRadius: radius.md, backgroundColor: colors.bg,
   },
   painBtnText: { fontSize: 13, fontWeight: '700', color: colors.textMuted },
+
+  /* ── Weight Logging ────────── */
+  lastWeight: { fontSize: 10, fontWeight: '700', color: '#22c55e', marginTop: 1 },
+  logPanel: {
+    marginLeft: 36, paddingLeft: 12, borderLeftWidth: 2, borderLeftColor: colors.border,
+    gap: 8, paddingVertical: 8, marginBottom: 4,
+  },
+  setRow: { flexDirection: 'row', alignItems: 'center', gap: 8 },
+  setLabel: { fontSize: 11, fontWeight: '700', color: colors.textMuted, width: 40 },
+  weightInput: {
+    flex: 1, height: 36, borderWidth: 1, borderColor: colors.border, borderRadius: radius.sm,
+    backgroundColor: colors.bg, paddingHorizontal: 10, fontSize: 14, fontWeight: '700',
+    color: colors.textPrimary,
+  },
+  repsLabel: { fontSize: 12, fontWeight: '600', color: colors.textMuted, width: 36 },
+  notesInput: {
+    height: 36, borderWidth: 1, borderColor: colors.border, borderRadius: radius.sm,
+    backgroundColor: colors.bg, paddingHorizontal: 10, fontSize: 12,
+    color: colors.textPrimary,
+  },
+  saveLogBtn: {
+    flexDirection: 'row', alignItems: 'center', justifyContent: 'center',
+    gap: 6, paddingVertical: 8, borderRadius: radius.sm, backgroundColor: '#22c55e',
+  },
+  saveLogBtnText: { fontSize: 12, fontWeight: '800', color: '#fff' },
 });

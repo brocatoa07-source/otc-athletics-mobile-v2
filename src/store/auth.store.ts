@@ -18,6 +18,8 @@ interface AuthState {
 
   setSession: (session: Session | null) => void;
   fetchProfile: (userId: string) => Promise<void>;
+  /** Re-read just the athlete row (e.g. after tier change from Stripe webhook) */
+  refreshAthleteProfile: () => Promise<void>;
   clearAuth: () => void;
   hydrate: () => Promise<void>;
 }
@@ -81,6 +83,27 @@ export const useAuthStore = create<AuthState>((set) => ({
     } catch (err) {
       console.error('[auth] fetchProfile unexpected error:', err);
       set({ dbUser: null, athlete: null, coach: null });
+    }
+  },
+
+  refreshAthleteProfile: async () => {
+    const userId = useAuthStore.getState().user?.id;
+    if (!userId) return;
+    try {
+      const { data: athlete, error } = await supabase
+        .from('athletes')
+        .select('*')
+        .eq('user_id', userId)
+        .maybeSingle();
+      if (error) {
+        if (__DEV__) console.error('[auth] refreshAthleteProfile error:', error.message);
+        return;
+      }
+      if (athlete) {
+        set({ athlete: athlete as Athlete });
+      }
+    } catch (err) {
+      if (__DEV__) console.error('[auth] refreshAthleteProfile unexpected:', err);
     }
   },
 

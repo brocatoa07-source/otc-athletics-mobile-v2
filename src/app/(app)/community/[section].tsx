@@ -111,7 +111,7 @@ function LeaderboardSection() {
     mutationFn: async () => {
       const numVal = parseFloat(submitValue);
       if (isNaN(numVal)) throw new Error('Enter a valid number');
-      if (!athlete) throw new Error('Your athlete profile is not set up yet. Complete onboarding before submitting to the leaderboard.');
+      if (!athlete) throw new Error('Your athlete profile is not set up yet.');
       const cat = LEADERBOARD_CATEGORIES[submitCategory];
       const { error } = await supabase.from('athlete_progress').insert({
         athlete_id: athlete.id,

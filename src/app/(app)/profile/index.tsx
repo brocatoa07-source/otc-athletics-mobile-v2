@@ -123,17 +123,6 @@ export default function ProfileScreen() {
           {!isCoach && !isParent && (
             <TouchableOpacity
               style={styles.menuItem}
-              onPress={() => router.push('/(app)/profile/connect-coach' as any)}
-            >
-              <Ionicons name="key" size={20} color="#8b5cf6" />
-              <Text style={styles.menuLabel}>Coach Connection</Text>
-              <Ionicons name="chevron-forward" size={16} color={Colors.textMuted} />
-            </TouchableOpacity>
-          )}
-
-          {!isCoach && !isParent && (
-            <TouchableOpacity
-              style={styles.menuItem}
               onPress={() => router.push('/(app)/profile/invite-parent' as any)}
             >
               <Ionicons name="people" size={20} color="#8b5cf6" />
@@ -258,6 +247,11 @@ const styles = StyleSheet.create({
     borderBottomColor: Colors.border,
   },
   menuLabel: { flex: 1, fontSize: 15, color: Colors.textPrimary, fontWeight: '500' },
+  walkthroughBtn: {
+    flexDirection: 'row', alignItems: 'center', justifyContent: 'center',
+    gap: 6, paddingVertical: 12, marginTop: 8,
+  },
+  walkthroughText: { fontSize: 13, fontWeight: '600', color: Colors.textMuted },
   signOutBtn: {
     flexDirection: 'row',
     alignItems: 'center',

@@ -450,10 +450,13 @@ export function generateProgram(profile: {
   deficiency: OtcsDeficiency;
   daysPerWeek?: OtcsDaysPerWeek;
   seasonPhase?: OtcsSeasonPhase;
+  /** Program duration in months (1-12). Defaults to 6. */
+  programDurationMonths?: number;
   strengthProfile?: StrengthProfileOverride;
 }): OtcsGeneratedProgram {
   const daysPerWeek: OtcsDaysPerWeek = profile.daysPerWeek ?? 3;
   const seasonPhase: OtcsSeasonPhase = profile.seasonPhase ?? 'OFFSEASON';
+  const totalMonths = Math.max(1, Math.min(12, profile.programDurationMonths ?? 6));
 
   // Build profile override data if strength profile is provided
   const profileOverride: ProfileOverrideData | undefined = profile.strengthProfile
@@ -463,17 +466,19 @@ export function generateProgram(profile: {
       }
     : undefined;
 
-  if (__DEV__ && profileOverride) {
-    console.log('[program-engine] Generating with profile overrides:',
-      profileOverride.biasTags.length, 'bias tags,',
-      profileOverride.avoidTags.length, 'avoid tags');
+  if (__DEV__) {
+    console.log('[program-engine] Generating:', totalMonths, 'months,',
+      daysPerWeek, 'days/week,', seasonPhase,
+      profileOverride ? `(${profileOverride.biasTags.length} bias tags)` : '');
   }
 
   const months: OtcsGeneratedMonth[] = [];
   let globalWeek = 0;
 
-  for (let m = 1; m <= 6; m++) {
-    const template = getTemplate(profile.archetype, m);
+  for (let m = 1; m <= totalMonths; m++) {
+    // Templates cycle through 1-6, so month 7 reuses month 1 template, etc.
+    const templateMonth = ((m - 1) % 6) + 1;
+    const template = getTemplate(profile.archetype, templateMonth);
     const phaseMeta = OTCS_PHASE_META[template.phase];
 
     // Select days based on frequency
@@ -506,7 +511,7 @@ export function generateProgram(profile: {
     daysPerWeek,
     seasonPhase,
     months,
-    totalWeeks: 24,
+    totalWeeks: totalMonths * 4,
     generatedAt: new Date().toISOString(),
     version: 3,
   };
@@ -522,6 +527,8 @@ export interface StrengthProgress {
   currentWeek: number;    // 1-4 within month
   completedWorkouts: Record<string, boolean>; // key: "m{month}w{week}d{day}"
   startDate: string;
+  /** ISO date (YYYY-MM-DD) of the last completed workout — used for daily gating */
+  lastCompletedDate?: string;
 }
 
 export async function saveGeneratedProgram(program: OtcsGeneratedProgram): Promise<void> {
@@ -686,10 +693,41 @@ export function getCompletionCount(progress: StrengthProgress): number {
 /**
  * Get the next uncompleted workout for today's work.
  */
+/**
+ * Get today's workout. Enforces one-lift-per-day rule:
+ * - If today's lift is already completed, returns it with `alreadyDone: true`
+ * - If a lift was completed today, the next lift is locked until tomorrow
+ * - At midnight local time, the next lift becomes available
+ */
 export function getNextWorkout(
   program: OtcsGeneratedProgram,
   progress: StrengthProgress,
-): { month: number; week: number; day: number; workout: OtcsGeneratedDay } | null {
+): { month: number; week: number; day: number; workout: OtcsGeneratedDay; alreadyDone?: boolean } | null {
+  const today = new Date().toISOString().slice(0, 10);
+
+  // If a workout was already completed today, return it as done (no advancement)
+  if (progress.lastCompletedDate === today) {
+    // Find the workout that was last completed today
+    const monthData = program.months[progress.currentMonth - 1];
+    if (!monthData) return null;
+    const weekData = monthData.weeks[progress.currentWeek - 1];
+    if (!weekData) return null;
+
+    // Find the most recently completed workout in current context
+    for (const workout of [...weekData.days].reverse()) {
+      const key = getWorkoutKey(progress.currentMonth, progress.currentWeek, workout.dayNumber);
+      if (progress.completedWorkouts[key]) {
+        return {
+          month: progress.currentMonth,
+          week: progress.currentWeek,
+          day: workout.dayNumber,
+          workout,
+          alreadyDone: true,
+        };
+      }
+    }
+  }
+
   const monthData = program.months[progress.currentMonth - 1];
   if (!monthData) return null;
 

@@ -1,114 +1,43 @@
 /* ────────────────────────────────────────────────
- * COURSE DATA — SKILL #2: CONFIDENCE
- * Weeks 3–4 · Shadow → Mastery
+ * COURSE DATA — WEEK 2: CONFIDENCE
  * ──────────────────────────────────────────────── */
 
-export const WEEK_3 = {
-  title: 'The Shadow of Confidence',
-  quote: 'Most athletes don\'t lack confidence — they confuse it with control.',
-  objective: 'Identify how perfectionism, comparison, and outcome dependence weaken confidence — and replace "I hope I\'m ready" with "I know I\'ve earned it."',
+import type { CourseWeekContent } from './course-types';
+
+export const CONFIDENCE_WEEK: CourseWeekContent = {
+  title: 'The Shadow of Perfectionism',
+  quote: 'Confidence isn\'t earned by being perfect — it\'s built by trusting what you\'ve already done.',
+  objective: 'Build unshakable self-belief rooted in preparation, not results.',
+  lesson: 'Perfectionism disguises itself as high standards, but it actually destroys confidence. Real confidence comes from trusting your preparation — not needing every at-bat to go perfectly. This week you learn to stack evidence and compete with belief.',
+  tool: 'Evidence Log — write 3 pieces of proof that you belong every day this week',
+  meditation: 'Confidence Visualization — 5 minutes reliving your best competitive moments',
+  journalPrompt: 'When was the last time you felt truly confident? What was different about that day?',
+  weeklyChallenge: 'Before every at-bat or rep this week, say one power statement out loud or in your head. Track what happens to your body language.',
+  reflection: 'Did your confidence this week come from results or from preparation? What shifted?',
   outline: [
-    { segment: 'Arrival Reset', focus: 'Leave the noise outside', objective: 'Two breaths + shake out tension' },
-    { segment: 'Coach Video: Rented vs Owned', focus: 'Perfectionism vs preparation', objective: 'Redefine confidence' },
-    { segment: 'Questions to Ponder', focus: 'Shadow questions', objective: 'Expose perfectionism patterns' },
-    { segment: 'Exercise 1: Perfectionism Audit', focus: 'Self-examination', objective: 'Identify perfectionism traps' },
-    { segment: 'Exercise 2: Comparison Trap Reset', focus: 'Comparison awareness', objective: 'Convert comparison to fuel' },
-    { segment: 'Exercise 3: Build Your Proof List', focus: 'Evidence-based confidence', objective: 'Build a proof bank' },
-    { segment: 'Exercise 4: The Perfect Trap Sim', focus: 'Pressure simulation', objective: 'Feel freedom vs perfection' },
-    { segment: 'Daily Micro Log', focus: 'Daily proof practice', objective: 'Build the habit' },
-    { segment: 'Self-Assessment', focus: 'Rate your confidence', objective: 'Measure progress' },
+    { segment: 'Opening: Confidence vs Perfectionism', focus: 'Define real confidence', objective: 'Separate confidence from outcome dependency' },
+    { segment: 'Coach Video: The Evidence Model', focus: 'Evidence-based belief', objective: 'Show how to build confidence systematically' },
+    { segment: 'Shadow Pattern: Perfectionism / Fear of Failure', focus: 'Identify the trap', objective: 'See how perfectionism erodes belief' },
+    { segment: 'Exercise: Evidence Log', focus: 'Stack proof', objective: 'Build a bank of evidence that you belong' },
+    { segment: 'Exercise: Power Statements', focus: 'Self-talk', objective: 'Install confidence cues' },
+    { segment: 'Exercise: Body Language Check', focus: 'Physical confidence', objective: 'Use posture to shift internal state' },
+    { segment: 'Daily Confidence Stacking', focus: 'Habit building', objective: 'Write 3 pieces of evidence daily' },
+    { segment: 'Weekly Reflection & Certification', focus: 'Integration', objective: 'Lock in the confidence skill' },
   ],
   coachScience: {
-    videoTitle: 'Rented vs Owned Confidence',
+    videoTitle: 'How Confidence Actually Works',
     points: [
-      'Perfectionism = amygdala activation (stress + overthinking).',
-      'Confidence = self-efficacy (belief built through experience).',
-      'Repeated proof experiences build dopamine-driven trust.',
-      'When you focus on doing it perfect, your brain feels like it\'s under attack.',
-      'When you remember what you\'ve earned, your brain releases confidence chemicals instead of stress ones.',
+      'Confidence is not a feeling — it\'s a decision to trust your preparation.',
+      'The brain builds belief through repetition of evidence, not through hope.',
+      'Body language changes brain chemistry — posture creates confidence, not the other way around.',
+      'Perfectionism is fear disguised as standards. It makes you fragile under pressure.',
     ],
-    playerAnalogy: 'Perfectionism makes you believe confidence means doing everything right. Real confidence means you trust your work — even when it\'s not perfect.',
-    baseballAnalogy: 'Every rep in practice is a deposit. Confidence is remembering your deposits.',
+    playerAnalogy: 'The best hitters don\'t step in hoping — they step in knowing. The difference is the evidence they\'ve stacked.',
+    baseballAnalogy: 'You don\'t trust a swing you haven\'t practiced. Confidence works the same way — stack the reps, trust the work.',
   },
   questions: [
-    {
-      question: 'What\'s your version of perfectionism?',
-      insight: 'Chasing perfect takes your focus off competing. Notice how it shows up for you.',
-    },
-    {
-      question: 'How do you act different when confident vs. scared to fail?',
-      insight: 'Confidence attacks. Fear protects. Which mode are you in most often?',
-    },
-    {
-      question: 'Where does your confidence come from — results or preparation?',
-      insight: 'Confidence from results is rented. From preparation — owned.',
-    },
+    { question: 'Are your standards helping you or paralyzing you?', insight: 'High standards push you forward. Perfectionism freezes you. The difference is whether you can compete freely after a mistake.' },
+    { question: 'What would you do differently if you knew you couldn\'t fail?', insight: 'That version of you already exists — perfectionism is the only thing blocking it.' },
+    { question: 'Do you compete differently when no one is watching?', insight: 'If yes, your confidence is externally dependent. Real confidence doesn\'t need an audience.' },
   ],
 };
-
-export const WEEK_4 = {
-  title: 'The Skill of Confidence (Mastery)',
-  quote: 'Confidence isn\'t knowing you\'ll succeed — it\'s knowing you can handle it if you don\'t.',
-  objective: 'Create owned confidence — stable under pressure, anchored in preparation, posture, and process.',
-  outline: [
-    { segment: 'Arrival + Body Reset', focus: 'Posture + presence', objective: 'Stand like you belong' },
-    { segment: 'Coach Video: Self-Efficacy Loop', focus: 'Body chemistry + belief', objective: 'Understand how posture builds confidence' },
-    { segment: 'Exercise 1: Power Posture Reset', focus: 'Physical confidence', objective: 'Connect body to belief' },
-    { segment: 'Exercise 2: If-Then Confidence Plan', focus: 'Pre-programmed responses', objective: 'Build doubt-proof resets' },
-    { segment: 'Exercise 3: Slump Visualization', focus: 'Pressure scenario', objective: 'Maintain confidence under adversity' },
-    { segment: 'Exercise 4: 3-AB Confidence Test', focus: 'Results vs process', objective: 'Feel the difference' },
-    { segment: 'Build Your Box Routine', focus: 'On-field confidence loop', objective: 'Install the routine' },
-    { segment: 'Confidence Journal', focus: 'Written reflection', objective: 'Anchor the learning' },
-    { segment: 'Daily Confidence Proof', focus: 'Daily proof system', objective: 'Build evidence daily' },
-    { segment: 'End-of-Module Certification', focus: 'Reflect & certify', objective: 'Lock in the skill' },
-  ],
-  coachScience: {
-    videoTitle: 'The Self-Efficacy Loop',
-    points: [
-      'Self-efficacy loop: every rep of success → belief → dopamine → repeat.',
-      'Posture and breath change your hormones.',
-      'When you slump your shoulders, your brain believes you\'re losing.',
-      'When you stand tall, your brain believes you\'re in control.',
-    ],
-    playerAnalogy: 'Stand like you just roped a double — that posture is confidence.',
-    baseballAnalogy: 'Your body tells your brain how to feel. Control the body, control the belief.',
-  },
-};
-
-/* Box Routine builder options */
-export const BOX_STEP_OPTIONS = [
-  'One full exhale',
-  'Two deep breaths',
-  'Box breath (4-4-4-4)',
-  'Shake out hands',
-];
-export const BOX_CUE_OPTIONS = [
-  '"See it"', '"Smooth"', '"Barrel"', '"Hunt"',
-  '"Trust it"', '"My swing"', '"Be great"', '"Compete"',
-];
-export const BOX_VISUAL_OPTIONS = [
-  'See the pitch window',
-  'See the barrel path',
-  'See a line drive up the middle',
-  'See yourself locked in',
-];
-export const BOX_ENTRY_OPTIONS = [
-  'Step in tall, eyes soft',
-  'Tap the plate, deep breath',
-  'Set feet, lock eyes on pitcher',
-  'Hands relaxed, chin level',
-];
-
-/* Perfectionism audit items */
-export const PERFECTIONISM_ITEMS = [
-  'I get frustrated when I don\'t barrel every ball perfectly',
-  'I obsess about my warm-up routine being "right"',
-  'I replay bad at-bats for hours after the game',
-  'I compare my stats to teammates constantly',
-  'If my first swing doesn\'t feel perfect, I lose confidence',
-  'I\'d rather not try than risk looking bad',
-  'I avoid situations where I might fail publicly',
-  'I need coaches to tell me I\'m doing well to feel confident',
-  'A bad game can ruin my entire week',
-  'I set unrealistic expectations and then beat myself up',
-];

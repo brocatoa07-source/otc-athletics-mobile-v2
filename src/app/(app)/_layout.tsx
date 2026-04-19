@@ -2,7 +2,6 @@ import { Redirect, Tabs, router } from 'expo-router';
 import { View, ActivityIndicator } from 'react-native';
 import { Ionicons } from '@expo/vector-icons';
 import { useAuthStore } from '@/store/auth.store';
-import { useTier } from '@/hooks/useTier';
 import { colors } from '@/theme';
 
 export default function AppLayout() {
@@ -15,7 +14,6 @@ export default function AppLayout() {
   const isCoach = dbUser?.role === 'COACH';
   const isParent = dbUser?.role === 'PARENT';
   const isAthlete = dbUser?.role === 'ATHLETE';
-  const { canMessage } = useTier();
 
   if (!isHydrated) {
     return (
@@ -133,16 +131,14 @@ export default function AppLayout() {
       {/* ═══════════════════════════════════════════
        * HIDDEN ROUTES (accessible via navigation, not tabs)
        * ═══════════════════════════════════════════ */}
-      <Tabs.Screen name="messages" options={{ href: (canMessage && !isParent) ? undefined : null, title: 'Messages', tabBarIcon: ({ color, size }) => <Ionicons name="chatbubbles" size={size} color={color} /> }} />
+      <Tabs.Screen name="messages" options={{ href: null }} />
       <Tabs.Screen name="upload" options={{ href: null }} />
       <Tabs.Screen name="profile" options={{ href: null }} />
       <Tabs.Screen name="upgrade" options={{ href: null }} />
       <Tabs.Screen name="announcements" options={{ href: null }} />
       <Tabs.Screen name="playbook" options={{ href: null }} />
-      <Tabs.Screen name="onboarding" options={{ href: null }} />
       <Tabs.Screen name="daily-work" options={{ href: null }} />
       <Tabs.Screen name="how-it-works" options={{ href: null }} />
-      <Tabs.Screen name="weekly-review" options={{ href: null }} />
       <Tabs.Screen name="my-path-levels" options={{ href: null }} />
     </Tabs>
   );

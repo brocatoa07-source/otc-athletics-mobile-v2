@@ -1,3 +1,4 @@
+import { useState, useEffect, useRef } from 'react';
 import {
   View,
   Text,
@@ -5,13 +6,18 @@ import {
   TouchableOpacity,
   StyleSheet,
   Linking,
+  Alert,
+  AppState,
 } from 'react-native';
 import { SafeAreaView } from 'react-native-safe-area-context';
 import { router } from 'expo-router';
 import { Ionicons } from '@expo/vector-icons';
 import { Colors } from '@/constants/colors';
 import { useTier, type CanonicalTier } from '@/hooks/useTier';
-import { useAccess } from '@/features/billing/useAccess';
+import { useAuthStore } from '@/store/auth.store';
+import { startCheckout } from '@/features/billing/checkout';
+import { useSubscription } from '@/features/billing/useSubscription';
+import type { PurchasableTier } from '@/features/billing/stripeConfig';
 
 // ── Feature lists per tier ─────────────────────────────────────────────────
 
@@ -158,9 +164,44 @@ function tierLabel(tier: CanonicalTier): string {
 
 export default function UpgradeScreen() {
   const { tier, isCoach } = useTier();
-  const access = useAccess();
+  const { refresh: refreshSubscription } = useSubscription();
+  const refreshAthleteProfile = useAuthStore((s) => s.refreshAthleteProfile);
+  const [checkoutLoading, setCheckoutLoading] = useState<string | null>(null);
+  const checkoutInFlight = useRef(false);
 
   const currentIndex = TIER_ORDER.indexOf(tier);
+
+  // When the app returns to foreground after checkout, refresh both
+  // the subscription row and the athlete profile (in case the user
+  // cancelled or Stripe redirected to the cancel URL instead of success).
+  useEffect(() => {
+    const sub = AppState.addEventListener('change', (state) => {
+      if (state === 'active' && checkoutInFlight.current) {
+        checkoutInFlight.current = false;
+        refreshSubscription();
+        refreshAthleteProfile();
+      }
+    });
+    return () => sub.remove();
+  }, [refreshSubscription, refreshAthleteProfile]);
+
+  async function handleUpgrade(targetTier: PurchasableTier) {
+    setCheckoutLoading(targetTier);
+    try {
+      const result = await startCheckout(targetTier);
+      if (!result.success) {
+        Alert.alert('Checkout Error', result.error || 'Something went wrong. Please try again.');
+      } else {
+        // Mark that we left the app for checkout — the AppState listener above
+        // will refresh when the user returns
+        checkoutInFlight.current = true;
+      }
+    } catch {
+      Alert.alert('Error', 'Could not start checkout. Please try again.');
+    } finally {
+      setCheckoutLoading(null);
+    }
+  }
 
   return (
     <SafeAreaView style={styles.safe}>
@@ -249,17 +290,13 @@ export default function UpgradeScreen() {
 
               {isAboveCurrent && !def.applicationOnly && (
                 <TouchableOpacity
-                  style={[styles.ctaBtn, { backgroundColor: def.accentColor }]}
-                  onPress={() => {
-                    if (def.id === 'DOUBLE' && access.trialEligible) {
-                      access.startTrial().then(() => router.back());
-                    }
-                    // TODO: Wire Stripe checkout for paid upgrades
-                  }}
+                  style={[styles.ctaBtn, { backgroundColor: def.accentColor }, checkoutLoading === def.id && { opacity: 0.6 }]}
+                  onPress={() => handleUpgrade(def.id as PurchasableTier)}
+                  disabled={!!checkoutLoading}
                   activeOpacity={0.85}
                 >
                   <Text style={styles.ctaBtnText}>
-                    {def.id === 'DOUBLE' && access.trialEligible ? 'Start 7-Day Free Trial' : def.ctaLabel ?? 'Upgrade'}
+                    {checkoutLoading === def.id ? 'Opening Checkout...' : (def.ctaLabel ?? 'Upgrade')}
                   </Text>
                 </TouchableOpacity>
               )}

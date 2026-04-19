@@ -191,21 +191,6 @@ export default function JournalsScreen() {
           </TouchableOpacity>
         ))}
 
-        {/* Mental Mastery Course link */}
-        <TouchableOpacity
-          style={[styles.card, { borderColor: ACCENT + '30' }]}
-          onPress={() => router.push('/(app)/training/mental/courses-list' as any)}
-          activeOpacity={0.85}
-        >
-          <View style={[styles.cardIcon, { backgroundColor: ACCENT + '18' }]}>
-            <Ionicons name="school-outline" size={22} color={ACCENT} />
-          </View>
-          <View style={styles.cardBody}>
-            <Text style={styles.cardTitle}>Mental Mastery Course</Text>
-            <Text style={styles.cardSub}>11 skills × 2 weeks. Structured skill journals live inside the course.</Text>
-          </View>
-          <Ionicons name="chevron-forward" size={16} color={colors.textMuted} />
-        </TouchableOpacity>
       </ScrollView>
     </SafeAreaView>
   );

@@ -17,7 +17,6 @@ import { SafeAreaView } from 'react-native-safe-area-context';
 import { router } from 'expo-router';
 import { Ionicons } from '@expo/vector-icons';
 import { useState, useEffect, useCallback } from 'react';
-import * as Clipboard from 'expo-clipboard';
 import * as Haptics from 'expo-haptics';
 import { useQuery } from '@tanstack/react-query';
 import { Colors } from '@/constants/colors';
@@ -25,21 +24,17 @@ import { useAuthStore } from '@/store/auth.store';
 import { useCoachCode, type PendingRequest } from '@/hooks/useCoachCode';
 import { useCoachDashboard } from '@/hooks/useCoachDashboard';
 import { useConversations } from '@/hooks/useConversations';
-import { ConnectCodeCard } from '@/components/coach/ConnectCodeCard';
+// ConnectCodeCard removed — no longer part of the system
 import { supabase } from '@/lib/supabase';
 
 export default function CoachDashboardScreen() {
   const user  = useAuthStore((s) => s.user);
-  const coach = useAuthStore((s) => s.coach);
   const userId = user?.id;
 
-  const { loading: codeLoading, generateCode, fetchRequests, approveRequest, denyRequest } =
-    useCoachCode();
+  const { fetchRequests, approveRequest, denyRequest } = useCoachCode();
   const { data: dashboard, refetch } = useCoachDashboard(userId);
   const { conversations } = useConversations();
 
-  const [connectCode, setConnectCode] = useState(coach?.connect_code ?? null);
-  const [copied, setCopied] = useState(false);
   const [requests, setRequests] = useState<PendingRequest[]>([]);
 
   // Recent announcements with engagement
@@ -74,23 +69,6 @@ export default function CoachDashboardScreen() {
     refetch();
     loadRequests();
     Haptics.impactAsync(Haptics.ImpactFeedbackStyle.Light);
-  };
-
-  const handleGenerateCode = async () => {
-    if (!userId) return;
-    const code = await generateCode(userId);
-    if (code) {
-      setConnectCode(code);
-      Haptics.notificationAsync(Haptics.NotificationFeedbackType.Success);
-    }
-  };
-
-  const handleCopyCode = async () => {
-    if (!connectCode) return;
-    await Clipboard.setStringAsync(connectCode);
-    setCopied(true);
-    Haptics.impactAsync(Haptics.ImpactFeedbackStyle.Light);
-    setTimeout(() => setCopied(false), 2000);
   };
 
   const handleApprove = async (req: PendingRequest) => {
@@ -341,14 +319,7 @@ export default function CoachDashboardScreen() {
           </View>
         )}
 
-        {/* ═══════ CONNECT CODE ═══════ */}
-        <ConnectCodeCard
-          connectCode={connectCode}
-          copied={copied}
-          loading={codeLoading}
-          onCopy={handleCopyCode}
-          onGenerate={handleGenerateCode}
-        />
+        {/* Connect Code removed — no longer part of the system */}
       </ScrollView>
     </SafeAreaView>
   );

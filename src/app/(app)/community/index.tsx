@@ -25,7 +25,7 @@ const SECTIONS = [
 ];
 
 export default function CommunityIndex() {
-  const { isWalk } = useTier();
+  const { isWalk, canMessage } = useTier();
 
   const { data: announcementCount = 0 } = useQuery({
     queryKey: ['community-announcement-count'],
@@ -85,6 +85,24 @@ export default function CommunityIndex() {
             </TouchableOpacity>
           );
         })}
+
+        {/* Messages — visible for users with messaging access */}
+        {canMessage && (
+          <TouchableOpacity
+            style={styles.card}
+            onPress={() => router.push('/(app)/messages' as any)}
+            activeOpacity={0.85}
+          >
+            <View style={[styles.iconBox, { backgroundColor: '#3b82f620' }]}>
+              <Ionicons name="chatbubbles" size={22} color="#3b82f6" />
+            </View>
+            <View style={styles.cardText}>
+              <Text style={[styles.cardLabel, { color: '#3b82f6' }]}>Messages</Text>
+              <Text style={styles.cardDesc}>Direct messaging with your coach</Text>
+            </View>
+            <Ionicons name="chevron-forward" size={16} color={Colors.textMuted} />
+          </TouchableOpacity>
+        )}
 
         {isWalk && (
           <TouchableOpacity

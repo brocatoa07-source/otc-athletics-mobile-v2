@@ -35,21 +35,11 @@ interface WorkItem {
 }
 
 const WORK_ITEMS: WorkItem[] = [
-  // Strength
   { id: 'prep', title: 'Movement Prep', subtitle: 'Warm up and activate', icon: 'flash-outline', color: '#22c55e', route: '/(app)/training/sc/mobility/category?cat=movement_prep', permission: 'dailyWork.strength', pillar: 'strength' },
-  { id: 'plyos', title: 'Plyometrics', subtitle: 'Power and reactivity', icon: 'rocket-outline', color: '#f59e0b', route: '/(app)/training/sc/workout', permission: 'dailyWork.strength', pillar: 'strength' },
-  { id: 'sprints', title: 'Sprints', subtitle: 'Speed development', icon: 'flash', color: '#ef4444', route: '/(app)/training/sc/workout', permission: 'dailyWork.strength', pillar: 'strength' },
-  { id: 'strength', title: 'Strength', subtitle: 'Main lifts and accessory', icon: 'barbell-outline', color: '#3b82f6', route: '/(app)/training/sc/workout', permission: 'dailyWork.strength', pillar: 'strength' },
-  { id: 'conditioning', title: 'Conditioning', subtitle: 'Energy system work', icon: 'heart-outline', color: '#8b5cf6', route: '/(app)/training/sc/workout', permission: 'dailyWork.strength', pillar: 'strength' },
-  { id: 'recovery', title: 'Recovery', subtitle: 'Mobility and tissue work', icon: 'leaf-outline', color: '#0891b2', route: '/(app)/training/sc/mobility/category?cat=yoga_flow', permission: 'dailyWork.strength', pillar: 'strength' },
-
-  // Hitting
-  { id: 'hitting', title: 'Hitting Work', subtitle: 'Drills and focus work', icon: 'baseball-outline', color: '#f97316', route: '/(app)/training/mechanical/daily-work', permission: 'dailyWork.hitting', pillar: 'hitting' },
-
-  // Mental
-  { id: 'mental', title: 'Mental Work', subtitle: 'Focus, confidence, routines', icon: 'bulb-outline', color: '#a855f7', route: '/(app)/training/mental/daily-work', permission: 'dailyWork.mental', pillar: 'mental' },
-
-  // Accountability
+  { id: 'lifting', title: 'Lifting', subtitle: 'Plyos, sprints, lifts, accessory, conditioning', icon: 'barbell-outline', color: '#3b82f6', route: '/(app)/training/sc/workout', permission: 'dailyWork.strength', pillar: 'strength' },
+  { id: 'recovery', title: 'Recovery', subtitle: 'Mobility, tissue work, and recovery flows', icon: 'leaf-outline', color: '#0891b2', route: '/(app)/training/sc/mobility/category?cat=yoga_flow', permission: 'dailyWork.strength', pillar: 'strength' },
+  { id: 'hitting', title: 'Hitting', subtitle: 'Drills and focus work', icon: 'baseball-outline', color: '#f97316', route: '/(app)/training/mechanical/daily-work', permission: 'dailyWork.hitting', pillar: 'hitting' },
+  { id: 'mental', title: 'Mental', subtitle: 'Focus, confidence, routines', icon: 'bulb-outline', color: '#a855f7', route: '/(app)/training/mental/daily-work', permission: 'dailyWork.mental', pillar: 'mental' },
   { id: 'checkin', title: 'Daily Check-In', subtitle: 'Own the cost', icon: 'checkbox-outline', color: '#6b7280', route: '/(app)/training/own-the-cost-checkin', pillar: 'accountability' },
 ];
 

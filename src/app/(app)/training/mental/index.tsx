@@ -8,7 +8,6 @@
  *   2. Log Mental Check-In
  *   3. Troubleshoot My Mind
  *   4. Mental Tools
- *   5. Weekly Review
  */
 
 import { useState, useCallback } from 'react';
@@ -112,6 +111,22 @@ export default function MentalHome() {
 
       <ScrollView contentContainerStyle={styles.content} showsVerticalScrollIndicator={false}>
 
+        {/* ═══ 0. MY MENTAL PROFILE ═══ */}
+        <TouchableOpacity
+          style={styles.actionCard}
+          onPress={() => router.push('/(app)/training/mental/profile-summary' as any)}
+          activeOpacity={0.75}
+        >
+          <View style={[styles.actionIcon, { backgroundColor: ACCENT + '15' }]}>
+            <Ionicons name="person-circle-outline" size={20} color={ACCENT} />
+          </View>
+          <View style={{ flex: 1 }}>
+            <Text style={styles.actionTitle}>My Mental Profile</Text>
+            <Text style={styles.actionSub}>Strengths, watch-outs, and your development roadmap</Text>
+          </View>
+          <Ionicons name="chevron-forward" size={14} color={colors.textMuted} />
+        </TouchableOpacity>
+
         {/* ═══ 1. TODAY'S MENTAL WORK (Primary) ═══ */}
         {dailyRx && (
           <View style={[styles.workCard, { borderColor: ACCENT + '30' }]}>
@@ -190,22 +205,6 @@ export default function MentalHome() {
           <View style={{ flex: 1 }}>
             <Text style={styles.actionTitle}>Mental Tools</Text>
             <Text style={styles.actionSub}>Breathing, resets, visualization, routines, meditations</Text>
-          </View>
-          <Ionicons name="chevron-forward" size={14} color={colors.textMuted} />
-        </TouchableOpacity>
-
-        {/* ═══ 5. WEEKLY REVIEW ═══ */}
-        <TouchableOpacity
-          style={styles.actionCard}
-          onPress={() => router.push('/(app)/weekly-review' as any)}
-          activeOpacity={0.75}
-        >
-          <View style={[styles.actionIcon, { backgroundColor: '#0891b215' }]}>
-            <Ionicons name="document-text-outline" size={20} color="#0891b2" />
-          </View>
-          <View style={{ flex: 1 }}>
-            <Text style={styles.actionTitle}>Weekly Review</Text>
-            <Text style={styles.actionSub}>See how your mental week went</Text>
           </View>
           <Ionicons name="chevron-forward" size={14} color={colors.textMuted} />
         </TouchableOpacity>

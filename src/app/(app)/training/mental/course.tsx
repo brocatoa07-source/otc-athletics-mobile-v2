@@ -8,9 +8,8 @@ import { Ionicons } from '@expo/vector-icons';
 import { colors, radius } from '@/theme';
 import { useTier } from '@/hooks/useTier';
 import { useCourseProgress } from '@/hooks/useCourseProgress';
-import { COURSE_REGISTRY, type CourseWeek, type OutlineSegment } from '@/data/course-registry';
-
-type Phase = 'shadow' | 'mastery';
+import { COURSE_REGISTRY } from '@/data/course-registry';
+import type { OutlineSegment } from '@/data/course-types';
 
 export default function CourseScreen() {
   const { id } = useLocalSearchParams<{ id: string }>();
@@ -21,7 +20,6 @@ export default function CourseScreen() {
   const totalSections = course?.totalSections ?? 0;
   const progress = useCourseProgress(id ?? '', totalSections);
 
-  const [phase, setPhase] = useState<Phase>('shadow');
   const [expandedIdx, setExpandedIdx] = useState<number | null>(null);
 
   if (!course) {
@@ -37,46 +35,8 @@ export default function CourseScreen() {
     );
   }
 
-  if (course.placeholder) {
-    return (
-      <SafeAreaView style={styles.safe}>
-        <View style={styles.header}>
-          <TouchableOpacity onPress={() => router.back()} style={styles.backBtn}>
-            <Ionicons name="chevron-back" size={24} color={colors.textPrimary} />
-          </TouchableOpacity>
-          <View style={{ flex: 1 }}>
-            <Text style={[styles.headerSup, { color: course.color }]}>
-              SKILL #{course.skillNum}
-            </Text>
-            <Text style={styles.headerTitle}>{course.label}</Text>
-          </View>
-        </View>
-        <View style={styles.placeholderBody}>
-          <View style={[styles.placeholderIcon, { backgroundColor: course.color + '15' }]}>
-            <Ionicons name="hammer-outline" size={40} color={course.color} />
-          </View>
-          <Text style={styles.placeholderTitle}>Coming Soon</Text>
-          <Text style={styles.placeholderText}>
-            This advanced course is currently being developed. Check back soon for full content.
-          </Text>
-          <TouchableOpacity
-            style={[styles.placeholderBtn, { borderColor: course.color + '40' }]}
-            onPress={() => router.back()}
-            activeOpacity={0.7}
-          >
-            <Ionicons name="arrow-back-outline" size={16} color={course.color} />
-            <Text style={[styles.placeholderBtnText, { color: course.color }]}>
-              Back to Courses
-            </Text>
-          </TouchableOpacity>
-        </View>
-      </SafeAreaView>
-    );
-  }
-
   const ACCENT = course.color;
-  const week: CourseWeek = phase === 'shadow' ? course.shadow : course.mastery;
-  const weekNum = phase === 'shadow' ? course.skillNum * 2 - 1 : course.skillNum * 2;
+  const week = course.content;
 
   return (
     <SafeAreaView style={styles.safe}>
@@ -87,7 +47,7 @@ export default function CourseScreen() {
         </TouchableOpacity>
         <View style={{ flex: 1 }}>
           <Text style={[styles.headerSup, { color: ACCENT }]}>
-            SKILL #{course.skillNum} · WEEK {weekNum}
+            WEEK {course.week} OF 11
           </Text>
           <Text style={styles.headerTitle}>{course.label}</Text>
         </View>
@@ -96,36 +56,56 @@ export default function CourseScreen() {
         </Text>
       </View>
 
-      {/* Phase toggle */}
-      <View style={styles.phaseRow}>
-        {(['shadow', 'mastery'] as Phase[]).map((p) => (
-          <TouchableOpacity
-            key={p}
-            style={[styles.phaseTab, phase === p && { backgroundColor: ACCENT + '18', borderColor: ACCENT + '50' }]}
-            onPress={() => { setPhase(p); setExpandedIdx(null); }}
-            activeOpacity={0.7}
-          >
-            <Ionicons
-              name={p === 'shadow' ? 'cloudy-outline' : 'sunny-outline'}
-              size={16}
-              color={phase === p ? ACCENT : colors.textMuted}
-            />
-            <Text style={[styles.phaseTabText, phase === p && { color: ACCENT }]}>
-              {p === 'shadow' ? 'Shadow' : 'Mastery'}
-            </Text>
-          </TouchableOpacity>
-        ))}
-      </View>
-
       <ScrollView contentContainerStyle={styles.content} showsVerticalScrollIndicator={false}>
-        {/* Week title + quote */}
+
+        {/* ─── Skill + Shadow Identity Card ─────────────── */}
+        <View style={[styles.identityCard, { borderColor: ACCENT + '40' }]}>
+          {/* Skill */}
+          <View style={styles.identitySection}>
+            <View style={styles.identityLabelRow}>
+              <Ionicons name="trending-up-outline" size={14} color="#22c55e" />
+              <Text style={[styles.identityLabel, { color: '#22c55e' }]}>WHAT YOU'RE BUILDING</Text>
+            </View>
+            <Text style={styles.identityText}>{course.whatItBuilds}</Text>
+          </View>
+
+          <View style={styles.identityDivider} />
+
+          {/* Shadow */}
+          <View style={styles.identitySection}>
+            <View style={styles.identityLabelRow}>
+              <Ionicons name="warning-outline" size={14} color="#f59e0b" />
+              <Text style={[styles.identityLabel, { color: '#f59e0b' }]}>SHADOW PATTERN: {course.shadowPattern.toUpperCase()}</Text>
+            </View>
+            <Text style={styles.identityText}>{course.shadowLooksLike}</Text>
+          </View>
+        </View>
+
+        {/* ─── Week Title + Quote ──────────────────────── */}
         <View style={[styles.weekCard, { borderColor: ACCENT + '30' }]}>
           <Text style={[styles.weekTitle, { color: ACCENT }]}>{week.title}</Text>
           <Text style={styles.weekQuote}>"{week.quote}"</Text>
           {week.objective && <Text style={styles.weekObj}>{week.objective}</Text>}
         </View>
 
-        {/* Coach Science */}
+        {/* ─── This Week's Lesson ──────────────────────── */}
+        <Text style={styles.sectionLabel}>THIS WEEK'S LESSON</Text>
+        <View style={styles.lessonCard}>
+          <Text style={styles.lessonText}>{week.lesson}</Text>
+        </View>
+
+        {/* ─── Weekly Toolkit ──────────────────────────── */}
+        <Text style={styles.sectionLabel}>WEEKLY TOOLKIT</Text>
+        <View style={styles.toolkitCard}>
+          <ToolkitRow icon="build-outline" label="Tool" value={week.tool} accent={ACCENT} />
+          <ToolkitRow icon="headset-outline" label="Meditation" value={week.meditation} accent={ACCENT} />
+          <ToolkitRow icon="journal-outline" label="Journal" value={week.journalPrompt} accent={ACCENT} />
+          <ToolkitRow icon="flag-outline" label="Challenge" value={week.weeklyChallenge} accent={ACCENT} />
+          <ToolkitRow icon="chatbubble-outline" label="Reflection" value={week.reflection} accent={ACCENT} />
+        </View>
+
+        {/* ─── Coach Science ───────────────────────────── */}
+        <Text style={styles.sectionLabel}>COACH SCIENCE</Text>
         <View style={[styles.scienceCard, { borderColor: ACCENT + '25' }]}>
           <View style={styles.scienceHeader}>
             <Ionicons name="school-outline" size={18} color={ACCENT} />
@@ -137,22 +117,26 @@ export default function CourseScreen() {
               <Text style={styles.scienceText}>{pt}</Text>
             </View>
           ))}
-          <View style={[styles.analogyBox, { backgroundColor: ACCENT + '08' }]}>
-            <Text style={styles.analogyLabel}>Player Analogy</Text>
-            <Text style={styles.analogyText}>{week.coachScience.playerAnalogy}</Text>
-          </View>
-          <View style={[styles.analogyBox, { backgroundColor: ACCENT + '08' }]}>
-            <Text style={styles.analogyLabel}>Baseball Analogy</Text>
-            <Text style={styles.analogyText}>{week.coachScience.baseballAnalogy}</Text>
-          </View>
+          {week.coachScience.playerAnalogy ? (
+            <View style={[styles.analogyBox, { backgroundColor: ACCENT + '08' }]}>
+              <Text style={styles.analogyLabel}>Player Analogy</Text>
+              <Text style={styles.analogyText}>{week.coachScience.playerAnalogy}</Text>
+            </View>
+          ) : null}
+          {week.coachScience.baseballAnalogy ? (
+            <View style={[styles.analogyBox, { backgroundColor: ACCENT + '08' }]}>
+              <Text style={styles.analogyLabel}>Baseball Analogy</Text>
+              <Text style={styles.analogyText}>{week.coachScience.baseballAnalogy}</Text>
+            </View>
+          ) : null}
         </View>
 
-        {/* Questions (if any) */}
+        {/* ─── Questions ───────────────────────────────── */}
         {week.questions && week.questions.length > 0 && (
           <>
             <Text style={styles.sectionLabel}>QUESTIONS TO PONDER</Text>
             {week.questions.map((q, i) => {
-              const inputKey = `w${weekNum}-q${i}`;
+              const inputKey = `w${course.week}-q${i}`;
               return (
                 <View key={i} style={styles.questionCard}>
                   <Text style={styles.questionText}>{q.question}</Text>
@@ -171,11 +155,11 @@ export default function CourseScreen() {
           </>
         )}
 
-        {/* Outline / Segments */}
+        {/* ─── Outline / Segments ──────────────────────── */}
         <Text style={styles.sectionLabel}>COURSE OUTLINE</Text>
         {week.outline.map((seg: OutlineSegment, idx: number) => {
           const sectionId = seg.segment.toLowerCase().replace(/\s+/g, '-').replace(/[^a-z0-9-]/g, '');
-          const isComplete = progress.isSectionComplete(weekNum, sectionId);
+          const isComplete = progress.isSectionComplete(course.week, sectionId);
           const isExpanded = expandedIdx === idx;
 
           return (
@@ -189,8 +173,8 @@ export default function CourseScreen() {
                 <TouchableOpacity
                   style={[styles.checkCircle, isComplete && { backgroundColor: '#22c55e', borderColor: '#22c55e' }]}
                   onPress={() => {
-                    if (isComplete) progress.unmarkSectionComplete(weekNum, sectionId);
-                    else progress.markSectionComplete(weekNum, sectionId);
+                    if (isComplete) progress.unmarkSectionComplete(course.week, sectionId);
+                    else progress.markSectionComplete(course.week, sectionId);
                   }}
                 >
                   {isComplete && <Ionicons name="checkmark" size={12} color="#fff" />}
@@ -214,7 +198,7 @@ export default function CourseScreen() {
           );
         })}
 
-        {/* Tier gating note */}
+        {/* ─── Tier gating ─────────────────────────────── */}
         {!canAccess && (
           <TouchableOpacity
             style={styles.upgradeBanner}
@@ -233,6 +217,24 @@ export default function CourseScreen() {
   );
 }
 
+/* ─── Toolkit Row Component ─────────────────────────── */
+
+function ToolkitRow({ icon, label, value, accent }: {
+  icon: string; label: string; value: string; accent: string;
+}) {
+  return (
+    <View style={styles.toolkitRow}>
+      <Ionicons name={icon as any} size={16} color={accent} style={styles.toolkitIcon} />
+      <View style={{ flex: 1 }}>
+        <Text style={styles.toolkitLabel}>{label}</Text>
+        <Text style={styles.toolkitValue}>{value}</Text>
+      </View>
+    </View>
+  );
+}
+
+/* ─── Styles ────────────────────────────────────────── */
+
 const styles = StyleSheet.create({
   safe: { flex: 1, backgroundColor: colors.bg },
 
@@ -246,19 +248,22 @@ const styles = StyleSheet.create({
   headerTitle: { fontSize: 20, fontWeight: '900', color: colors.textPrimary },
   progressBadge: { fontSize: 12, fontWeight: '800' },
 
-  phaseRow: {
-    flexDirection: 'row', gap: 8,
-    paddingHorizontal: 16, paddingVertical: 10,
-  },
-  phaseTab: {
-    flex: 1, flexDirection: 'row', alignItems: 'center', justifyContent: 'center', gap: 6,
-    paddingVertical: 10, borderRadius: radius.md,
-    borderWidth: 1, borderColor: colors.border, backgroundColor: colors.surface,
-  },
-  phaseTabText: { fontSize: 13, fontWeight: '800', color: colors.textMuted },
-
   content: { padding: 16, paddingBottom: 60, gap: 12 },
 
+  /* Identity Card — Skill + Shadow */
+  identityCard: {
+    backgroundColor: colors.surface, borderWidth: 1, borderRadius: radius.lg,
+    padding: 16, gap: 0,
+  },
+  identitySection: { gap: 4 },
+  identityLabelRow: { flexDirection: 'row', alignItems: 'center', gap: 6 },
+  identityLabel: { fontSize: 9, fontWeight: '900', letterSpacing: 1.2 },
+  identityText: { fontSize: 14, fontWeight: '700', color: colors.textPrimary, lineHeight: 20 },
+  identityDivider: {
+    height: 1, backgroundColor: colors.border, marginVertical: 12,
+  },
+
+  /* Week Card */
   weekCard: {
     backgroundColor: colors.surface, borderWidth: 1, borderRadius: radius.lg,
     padding: 16, gap: 6,
@@ -267,6 +272,24 @@ const styles = StyleSheet.create({
   weekQuote: { fontSize: 13, color: colors.textSecondary, fontStyle: 'italic', lineHeight: 19 },
   weekObj: { fontSize: 12, color: colors.textSecondary, lineHeight: 18, marginTop: 4 },
 
+  /* Lesson */
+  lessonCard: {
+    backgroundColor: colors.surface, borderWidth: 1, borderColor: colors.border,
+    borderRadius: radius.lg, padding: 14,
+  },
+  lessonText: { fontSize: 13, color: colors.textSecondary, lineHeight: 20 },
+
+  /* Weekly Toolkit */
+  toolkitCard: {
+    backgroundColor: colors.surface, borderWidth: 1, borderColor: colors.border,
+    borderRadius: radius.lg, padding: 14, gap: 12,
+  },
+  toolkitRow: { flexDirection: 'row', gap: 10 },
+  toolkitIcon: { marginTop: 2 },
+  toolkitLabel: { fontSize: 10, fontWeight: '900', letterSpacing: 1, color: colors.textMuted },
+  toolkitValue: { fontSize: 13, color: colors.textSecondary, lineHeight: 18, marginTop: 1 },
+
+  /* Science */
   scienceCard: {
     backgroundColor: colors.surface, borderWidth: 1, borderRadius: radius.lg,
     padding: 16, gap: 8,
@@ -282,6 +305,7 @@ const styles = StyleSheet.create({
 
   sectionLabel: { fontSize: 10, fontWeight: '900', letterSpacing: 1.5, color: colors.textMuted, marginTop: 4 },
 
+  /* Questions */
   questionCard: {
     backgroundColor: colors.surface, borderWidth: 1, borderColor: colors.border,
     borderRadius: radius.lg, padding: 14, gap: 6,
@@ -294,6 +318,7 @@ const styles = StyleSheet.create({
     fontSize: 13, color: colors.textPrimary, lineHeight: 19, marginTop: 4,
   },
 
+  /* Segments */
   segCard: {
     backgroundColor: colors.surface, borderWidth: 1, borderColor: colors.border,
     borderRadius: radius.lg, padding: 14,
@@ -315,25 +340,4 @@ const styles = StyleSheet.create({
     borderRadius: radius.lg, padding: 14,
   },
   upgradeBannerText: { flex: 1, fontSize: 13, fontWeight: '700' },
-
-  placeholderBody: {
-    flex: 1, alignItems: 'center', justifyContent: 'center',
-    paddingHorizontal: 32, gap: 12,
-  },
-  placeholderIcon: {
-    width: 80, height: 80, borderRadius: 20,
-    alignItems: 'center', justifyContent: 'center', marginBottom: 4,
-  },
-  placeholderTitle: {
-    fontSize: 22, fontWeight: '900', color: colors.textPrimary,
-  },
-  placeholderText: {
-    fontSize: 14, color: colors.textSecondary, textAlign: 'center', lineHeight: 20,
-  },
-  placeholderBtn: {
-    flexDirection: 'row', alignItems: 'center', gap: 8,
-    borderWidth: 1, borderRadius: radius.md,
-    paddingHorizontal: 16, paddingVertical: 10, marginTop: 8,
-  },
-  placeholderBtnText: { fontSize: 14, fontWeight: '700' },
 });

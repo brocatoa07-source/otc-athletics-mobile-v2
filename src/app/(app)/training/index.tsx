@@ -19,6 +19,7 @@ const VAULT_CARDS = [
   { title: 'Hitting Vault', sub: 'The OTC hitting system', icon: 'baseball-outline', color: '#f97316', route: '/(app)/training/mechanical', permission: 'hittingVault.useFull' as const },
   { title: 'Strength Vault', sub: 'Strength, speed, and power', icon: 'barbell-outline', color: '#1DB954', route: '/(app)/training/sc', permission: 'strengthVault.useFull' as const },
   { title: 'Mental Vault', sub: 'Confidence, focus, and routines', icon: 'bulb-outline', color: '#a855f7', route: '/(app)/training/mental', permission: 'mentalVault.useFull' as const },
+  { title: 'Mobility Vault', sub: 'Mobility, movement prep, and recovery', icon: 'body-outline', color: '#0891b2', route: '/(app)/training/sc/mobility', permission: 'strengthVault.useFull' as const },
 ];
 
 export default function TrainHub() {
@@ -74,6 +75,22 @@ export default function TrainHub() {
           );
         })}
 
+        {/* Playbook — under Mobility Vault */}
+        <TouchableOpacity
+          style={[styles.playbookCard, { borderColor: '#0891b225' }]}
+          onPress={() => router.push('/(app)/playbook' as any)}
+          activeOpacity={0.75}
+        >
+          <View style={[styles.playbookIcon, { backgroundColor: '#0891b210' }]}>
+            <Ionicons name="book-outline" size={16} color="#0891b2" />
+          </View>
+          <View style={{ flex: 1 }}>
+            <Text style={styles.playbookTitle}>Playbook</Text>
+            <Text style={styles.cardSub}>Saved drills, tools, cues, and routines</Text>
+          </View>
+          <Ionicons name="chevron-forward" size={14} color={colors.textMuted} />
+        </TouchableOpacity>
+
         {/* ═══ PROGRAMS ═══ */}
         <Text style={styles.sectionLabel}>PROGRAMS</Text>
         <Text style={styles.sectionSub}>Included in your membership</Text>
@@ -104,22 +121,6 @@ export default function TrainHub() {
           );
         })}
 
-        {/* Playbook link */}
-        <TouchableOpacity
-          style={styles.vaultCard}
-          onPress={() => router.push('/(app)/playbook' as any)}
-          activeOpacity={0.75}
-        >
-          <View style={[styles.vaultIcon, { backgroundColor: '#0891b215' }]}>
-            <Ionicons name="book-outline" size={22} color="#0891b2" />
-          </View>
-          <View style={{ flex: 1 }}>
-            <Text style={styles.vaultTitle}>Playbook</Text>
-            <Text style={styles.cardSub}>Notes, cues, and saved tools</Text>
-          </View>
-          <Ionicons name="chevron-forward" size={14} color={colors.textMuted} />
-        </TouchableOpacity>
-
       </ScrollView>
     </SafeAreaView>
   );
@@ -140,11 +141,18 @@ function ContentCard({
       onPress={() => {
         if (lockState === 'locked_tier') {
           router.push('/(app)/upgrade' as any);
-        } else if (lockState === 'locked_purchase') {
-          // TODO: Open purchase flow
-          router.push('/(app)/upgrade' as any);
+          return;
         }
-        // TODO: Route to program/course detail screen when unlocked
+        if (lockState === 'locked_purchase') {
+          router.push('/(app)/upgrade' as any);
+          return;
+        }
+        // Route unlocked courses/programs to their detail screens
+        if (item.id === 'course-mental-mastery') {
+          router.push('/(app)/training/mental/courses-list' as any);
+          return;
+        }
+        // Other courses/programs — detail screens not yet built
       }}
       activeOpacity={0.75}
     >
@@ -210,4 +218,12 @@ const styles = StyleSheet.create({
     backgroundColor: colors.bg, borderRadius: 6,
   },
   lockText: { fontSize: 9, fontWeight: '700', color: colors.textMuted },
+
+  /* Playbook (sub-item of Mobility Vault) */
+  playbookCard: {
+    flexDirection: 'row', alignItems: 'center', gap: 10, padding: 10, marginLeft: 20,
+    backgroundColor: colors.surface, borderWidth: 1, borderRadius: radius.sm,
+  },
+  playbookIcon: { width: 30, height: 30, borderRadius: 8, alignItems: 'center', justifyContent: 'center' },
+  playbookTitle: { fontSize: 13, fontWeight: '700', color: colors.textPrimary },
 });

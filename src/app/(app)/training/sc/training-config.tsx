@@ -1,6 +1,6 @@
 import { useState } from 'react';
 import {
-  View, Text, ScrollView, TouchableOpacity, StyleSheet,
+  View, Text, ScrollView, TouchableOpacity, TextInput, StyleSheet,
 } from 'react-native';
 import { SafeAreaView } from 'react-native-safe-area-context';
 import { router, useLocalSearchParams } from 'expo-router';
@@ -8,45 +8,38 @@ import { Ionicons } from '@expo/vector-icons';
 import AsyncStorage from '@react-native-async-storage/async-storage';
 import { colors, radius } from '@/theme';
 import {
-  DAYS_PER_WEEK_OPTIONS,
-  SEASON_PHASE_META,
+  DAYS_PER_WEEK_OPTIONS, SEASON_PHASE_META,
+  GOAL_META, GYM_ACCESS_META,
   saveStrengthProfile,
-  type BaseballPosition,
-  type MovementDeficiency,
-  type StrengthArchetype,
-  type DaysPerWeek,
-  type SeasonPhase,
+  type BaseballPosition, type MovementDeficiency, type StrengthArchetype,
+  type DaysPerWeek, type SeasonPhase, type ProgramDuration, type PrimaryGoal, type GymAccess,
 } from '@/data/strength-profile';
 import {
-  generateProgram,
-  saveGeneratedProgram,
-  initStrengthProgress,
+  generateProgram, saveGeneratedProgram, initStrengthProgress,
 } from '@/data/strength-program-engine';
 
 const ACCENT = '#1DB954';
-
 const SEASON_PHASES: SeasonPhase[] = ['OFFSEASON', 'PRESEASON', 'IN_SEASON'];
+const GOALS: PrimaryGoal[] = ['get_stronger', 'get_faster', 'maintain_in_season', 'improve_mobility', 'return_from_layoff'];
+const GYM_OPTIONS: GymAccess[] = ['full_gym', 'limited_gym', 'home_bodyweight'];
 
 export default function TrainingConfigScreen() {
-  const { position, deficiency } = useLocalSearchParams<{
-    position: string;
-    deficiency: string;
-  }>();
+  const { position, deficiency } = useLocalSearchParams<{ position: string; deficiency: string }>();
 
-  const [daysPerWeek, setDaysPerWeek] = useState<DaysPerWeek>(3);
   const [seasonPhase, setSeasonPhase] = useState<SeasonPhase>('OFFSEASON');
+  const [daysPerWeek, setDaysPerWeek] = useState<DaysPerWeek>(3);
+  const [duration, setDuration] = useState<ProgramDuration>(6);
+  const [goal, setGoal] = useState<PrimaryGoal>('get_stronger');
+  const [gymAccess, setGymAccess] = useState<GymAccess>('full_gym');
+  const [limitations, setLimitations] = useState('');
   const [saving, setSaving] = useState(false);
 
   async function handleFinish() {
     if (!position || !deficiency || saving) return;
     setSaving(true);
-
     try {
       const moverType = (await AsyncStorage.getItem('otc:lifting-mover-type')) as StrengthArchetype | null;
-      if (!moverType) {
-        router.back();
-        return;
-      }
+      if (!moverType) { router.back(); return; }
 
       const profile = {
         archetype: moverType,
@@ -54,16 +47,17 @@ export default function TrainingConfigScreen() {
         deficiency: deficiency as MovementDeficiency,
         daysPerWeek,
         seasonPhase,
+        programDurationMonths: duration,
+        primaryGoal: goal,
+        gymAccess,
+        limitations: limitations.trim() || undefined,
         updatedAt: new Date().toISOString(),
       };
 
       await saveStrengthProfile(profile);
-
       const program = generateProgram(profile);
       await saveGeneratedProgram(program);
-
       await initStrengthProgress();
-
       router.replace('/(app)/training/sc' as any);
     } catch (err) {
       if (__DEV__) console.warn('[training-config] error:', err);
@@ -79,191 +73,194 @@ export default function TrainingConfigScreen() {
         </TouchableOpacity>
         <View style={{ flex: 1 }}>
           <Text style={styles.headerSup}>STRENGTH SETUP</Text>
-          <Text style={styles.headerTitle}>Training Schedule</Text>
+          <Text style={styles.headerTitle}>Program Setup</Text>
         </View>
-        <Text style={styles.stepBadge}>Step 3 of 3</Text>
       </View>
 
       <ScrollView contentContainerStyle={styles.content} showsVerticalScrollIndicator={false}>
-        {/* ── Days Per Week ──────────────────────── */}
-        <Text style={styles.sectionLabel}>DAYS PER WEEK</Text>
-        <Text style={styles.intro}>
-          How many days per week can you commit to strength training?
-        </Text>
 
-        <View style={styles.daysRow}>
+        {/* 1. Season Phase */}
+        <Text style={styles.sectionLabel}>WHAT PART OF THE SEASON ARE YOU IN?</Text>
+        <Text style={styles.intro}>This changes the volume, intensity, and emphasis of your program.</Text>
+        {SEASON_PHASES.map((phase) => {
+          const meta = SEASON_PHASE_META[phase];
+          const selected = seasonPhase === phase;
+          return (
+            <TouchableOpacity
+              key={phase}
+              style={[styles.optionCard, selected && { borderColor: meta.color, backgroundColor: meta.color + '08' }]}
+              onPress={() => setSeasonPhase(phase)}
+              activeOpacity={0.7}
+            >
+              <Ionicons name={meta.icon as any} size={20} color={selected ? meta.color : colors.textMuted} />
+              <View style={{ flex: 1 }}>
+                <Text style={[styles.optionTitle, selected && { color: meta.color }]}>{meta.label}</Text>
+                <Text style={styles.optionDesc}>{meta.description}</Text>
+              </View>
+              {selected && <Ionicons name="checkmark-circle" size={18} color={meta.color} />}
+            </TouchableOpacity>
+          );
+        })}
+
+        {/* 2. Days Per Week */}
+        <Text style={styles.sectionLabel}>HOW MANY DAYS PER WEEK?</Text>
+        <View style={styles.chipRow}>
           {DAYS_PER_WEEK_OPTIONS.map(({ value, label }) => {
-            const isSelected = daysPerWeek === value;
+            const selected = daysPerWeek === value;
             return (
               <TouchableOpacity
                 key={value}
-                style={[styles.dayChip, isSelected && styles.dayChipSelected]}
+                style={[styles.chip, selected && { borderColor: ACCENT, backgroundColor: ACCENT + '15' }]}
                 onPress={() => setDaysPerWeek(value)}
                 activeOpacity={0.7}
               >
-                <Text style={[styles.dayChipText, isSelected && styles.dayChipTextSelected]}>
-                  {label}
-                </Text>
+                <Text style={[styles.chipText, selected && { color: ACCENT }]}>{label}</Text>
               </TouchableOpacity>
             );
           })}
         </View>
 
-        <View style={styles.dayDescCard}>
-          <Ionicons name="calendar-outline" size={16} color={ACCENT} />
-          <Text style={styles.dayDescText}>
-            {DAYS_PER_WEEK_OPTIONS.find(o => o.value === daysPerWeek)?.description}
-          </Text>
+        {/* 3. Duration */}
+        <Text style={styles.sectionLabel}>HOW LONG SHOULD THE PROGRAM BE?</Text>
+        <View style={styles.chipRow}>
+          {[1, 2, 3, 4, 5, 6, 8, 10, 12].map((m) => {
+            const selected = duration === m;
+            return (
+              <TouchableOpacity
+                key={m}
+                style={[styles.chip, selected && { borderColor: ACCENT, backgroundColor: ACCENT + '15' }]}
+                onPress={() => setDuration(m as ProgramDuration)}
+                activeOpacity={0.7}
+              >
+                <Text style={[styles.chipText, selected && { color: ACCENT }]}>{m} mo</Text>
+              </TouchableOpacity>
+            );
+          })}
         </View>
 
-        {/* ── Season Phase ───────────────────────── */}
-        <Text style={[styles.sectionLabel, { marginTop: 20 }]}>SEASON PHASE</Text>
-        <Text style={styles.intro}>
-          Where are you in your competitive season? This changes volume and training emphasis.
-        </Text>
-
-        {SEASON_PHASES.map((phase) => {
-          const meta = SEASON_PHASE_META[phase];
-          const isSelected = seasonPhase === phase;
+        {/* 4. Primary Goal */}
+        <Text style={styles.sectionLabel}>PRIMARY GOAL</Text>
+        {GOALS.map((g) => {
+          const meta = GOAL_META[g];
+          const selected = goal === g;
           return (
             <TouchableOpacity
-              key={phase}
-              style={[
-                styles.phaseCard,
-                isSelected && { borderColor: meta.color, backgroundColor: meta.color + '08' },
-              ]}
-              onPress={() => setSeasonPhase(phase)}
+              key={g}
+              style={[styles.optionCard, selected && { borderColor: meta.color, backgroundColor: meta.color + '08' }]}
+              onPress={() => setGoal(g)}
               activeOpacity={0.7}
             >
-              <View style={[
-                styles.phaseIcon,
-                { backgroundColor: isSelected ? meta.color + '20' : colors.surfaceElevated },
-              ]}>
-                <Ionicons
-                  name={meta.icon as any}
-                  size={24}
-                  color={isSelected ? meta.color : colors.textMuted}
-                />
-              </View>
+              <Ionicons name={meta.icon as any} size={18} color={selected ? meta.color : colors.textMuted} />
               <View style={{ flex: 1 }}>
-                <Text style={[styles.phaseLabel, isSelected && { color: meta.color }]}>
-                  {meta.label}
-                </Text>
-                <Text style={styles.phaseDesc}>{meta.description}</Text>
+                <Text style={[styles.optionTitle, selected && { color: meta.color }]}>{meta.label}</Text>
+                <Text style={styles.optionDesc}>{meta.description}</Text>
               </View>
-              {isSelected && (
-                <Ionicons name="checkmark-circle" size={24} color={meta.color} />
-              )}
+              {selected && <Ionicons name="checkmark-circle" size={18} color={meta.color} />}
             </TouchableOpacity>
           );
         })}
 
-        <View style={styles.noteCard}>
-          <Ionicons name="information-circle-outline" size={15} color={colors.textMuted} />
-          <Text style={styles.noteText}>
-            You can update these settings anytime from My Path. Your program will regenerate with the new configuration.
-          </Text>
+        {/* 5. Gym Access */}
+        <Text style={styles.sectionLabel}>GYM ACCESS</Text>
+        <View style={styles.chipRow}>
+          {GYM_OPTIONS.map((g) => {
+            const meta = GYM_ACCESS_META[g];
+            const selected = gymAccess === g;
+            return (
+              <TouchableOpacity
+                key={g}
+                style={[styles.chip, { minWidth: '30%' }, selected && { borderColor: ACCENT, backgroundColor: ACCENT + '15' }]}
+                onPress={() => setGymAccess(g)}
+                activeOpacity={0.7}
+              >
+                <Text style={[styles.chipText, selected && { color: ACCENT }]}>{meta.label}</Text>
+              </TouchableOpacity>
+            );
+          })}
         </View>
-      </ScrollView>
 
-      {/* Bottom CTA */}
-      <View style={styles.bottomBar}>
+        {/* 6. Limitations */}
+        <Text style={styles.sectionLabel}>LIMITATIONS OR INJURIES (OPTIONAL)</Text>
+        <TextInput
+          style={styles.textInput}
+          placeholder="Any current injuries, soreness, or areas to avoid..."
+          placeholderTextColor={colors.textMuted}
+          value={limitations}
+          onChangeText={setLimitations}
+          multiline
+        />
+
+        {/* Summary */}
+        <View style={styles.summaryCard}>
+          <Text style={styles.summaryTitle}>YOUR PROGRAM</Text>
+          <Text style={styles.summaryItem}>{SEASON_PHASE_META[seasonPhase].label} · {daysPerWeek} days/week · {duration} months</Text>
+          <Text style={styles.summaryItem}>Goal: {GOAL_META[goal].label}</Text>
+          <Text style={styles.summaryItem}>Equipment: {GYM_ACCESS_META[gymAccess].label}</Text>
+          {limitations.trim() ? <Text style={styles.summaryItem}>Notes: {limitations.trim()}</Text> : null}
+        </View>
+
+        {/* Generate */}
         <TouchableOpacity
-          style={[styles.finishBtn, saving && { opacity: 0.4 }]}
+          style={[styles.generateBtn, saving && { opacity: 0.5 }]}
           onPress={handleFinish}
-          activeOpacity={0.85}
           disabled={saving}
+          activeOpacity={0.85}
         >
-          <Ionicons name="checkmark-circle" size={20} color="#fff" />
-          <Text style={styles.finishBtnText}>
-            {saving ? 'Generating Program...' : 'Generate My Program'}
-          </Text>
+          <Ionicons name="flash" size={18} color="#fff" />
+          <Text style={styles.generateBtnText}>{saving ? 'Generating...' : 'Generate My Program'}</Text>
         </TouchableOpacity>
-      </View>
+
+      </ScrollView>
     </SafeAreaView>
   );
 }
 
 const styles = StyleSheet.create({
   safe: { flex: 1, backgroundColor: colors.bg },
-
   header: {
-    flexDirection: 'row', alignItems: 'center', gap: 10,
+    flexDirection: 'row', alignItems: 'center', gap: 8,
     paddingHorizontal: 16, paddingVertical: 12,
     borderBottomWidth: 1, borderBottomColor: colors.border,
   },
   backBtn: { padding: 2 },
   headerSup: { fontSize: 9, fontWeight: '900', letterSpacing: 1.5, color: ACCENT },
-  headerTitle: { fontSize: 18, fontWeight: '900', color: colors.textPrimary },
-  stepBadge: { fontSize: 11, fontWeight: '700', color: colors.textMuted },
+  headerTitle: { fontSize: 20, fontWeight: '900', color: colors.textPrimary },
+  content: { padding: 16, paddingBottom: 60, gap: 10 },
 
-  content: { padding: 16, paddingBottom: 100, gap: 10 },
+  sectionLabel: { fontSize: 10, fontWeight: '900', letterSpacing: 1.2, color: colors.textMuted, marginTop: 12 },
+  intro: { fontSize: 11, color: colors.textMuted, lineHeight: 16, marginBottom: 4 },
 
-  sectionLabel: {
-    fontSize: 10, fontWeight: '900', letterSpacing: 1.5, color: colors.textMuted, marginTop: 4,
+  optionCard: {
+    flexDirection: 'row', alignItems: 'center', gap: 12, padding: 14,
+    backgroundColor: colors.surface, borderWidth: 1, borderColor: colors.border, borderRadius: radius.md,
   },
+  optionTitle: { fontSize: 14, fontWeight: '700', color: colors.textPrimary },
+  optionDesc: { fontSize: 11, color: colors.textMuted, marginTop: 1, lineHeight: 15 },
 
-  intro: {
-    fontSize: 14, fontWeight: '600', color: colors.textSecondary, lineHeight: 21,
+  chipRow: { flexDirection: 'row', flexWrap: 'wrap', gap: 8 },
+  chip: {
+    paddingHorizontal: 14, paddingVertical: 10,
+    borderWidth: 1, borderColor: colors.border, borderRadius: radius.sm,
+    backgroundColor: colors.surface, alignItems: 'center',
   },
+  chipText: { fontSize: 13, fontWeight: '700', color: colors.textMuted },
 
-  /* Days per week chips */
-  daysRow: {
-    flexDirection: 'row', gap: 8, marginTop: 4,
-  },
-  dayChip: {
-    flex: 1, alignItems: 'center', paddingVertical: 14,
-    backgroundColor: colors.surface, borderWidth: 1.5, borderColor: colors.border,
-    borderRadius: radius.md,
-  },
-  dayChipSelected: {
-    borderColor: ACCENT, backgroundColor: ACCENT + '10',
-  },
-  dayChipText: {
-    fontSize: 14, fontWeight: '800', color: colors.textMuted,
-  },
-  dayChipTextSelected: {
-    color: ACCENT,
+  textInput: {
+    minHeight: 60, borderWidth: 1, borderColor: colors.border, borderRadius: radius.sm,
+    backgroundColor: colors.surface, paddingHorizontal: 12, paddingVertical: 10,
+    fontSize: 13, color: colors.textPrimary, textAlignVertical: 'top',
   },
 
-  dayDescCard: {
-    flexDirection: 'row', alignItems: 'center', gap: 10,
-    backgroundColor: ACCENT + '08', borderRadius: radius.sm,
-    padding: 12,
+  summaryCard: {
+    padding: 14, backgroundColor: colors.surface,
+    borderWidth: 1, borderColor: ACCENT + '30', borderRadius: radius.md, gap: 4, marginTop: 8,
   },
-  dayDescText: {
-    flex: 1, fontSize: 13, fontWeight: '600', color: colors.textSecondary, lineHeight: 18,
-  },
+  summaryTitle: { fontSize: 10, fontWeight: '900', letterSpacing: 1.2, color: ACCENT },
+  summaryItem: { fontSize: 12, color: colors.textSecondary },
 
-  /* Season phase cards */
-  phaseCard: {
-    flexDirection: 'row', alignItems: 'center', gap: 14,
-    backgroundColor: colors.surface, borderWidth: 1.5, borderColor: colors.border,
-    borderRadius: radius.lg, padding: 16,
+  generateBtn: {
+    flexDirection: 'row', alignItems: 'center', justifyContent: 'center',
+    gap: 8, paddingVertical: 16, borderRadius: radius.md, backgroundColor: ACCENT, marginTop: 8,
   },
-  phaseIcon: {
-    width: 48, height: 48, borderRadius: 14,
-    alignItems: 'center', justifyContent: 'center',
-  },
-  phaseLabel: { fontSize: 16, fontWeight: '900', color: colors.textPrimary },
-  phaseDesc: { fontSize: 12, color: colors.textSecondary, lineHeight: 17, marginTop: 2 },
-
-  noteCard: {
-    flexDirection: 'row', gap: 10, padding: 14,
-    backgroundColor: colors.surface, borderWidth: 1,
-    borderColor: colors.border, borderRadius: radius.md, marginTop: 8,
-  },
-  noteText: { flex: 1, fontSize: 13, color: colors.textMuted, lineHeight: 19 },
-
-  bottomBar: {
-    position: 'absolute', bottom: 0, left: 0, right: 0,
-    padding: 16, paddingBottom: 32,
-    backgroundColor: colors.bg,
-    borderTopWidth: 1, borderTopColor: colors.border,
-  },
-  finishBtn: {
-    flexDirection: 'row', alignItems: 'center', justifyContent: 'center', gap: 8,
-    backgroundColor: ACCENT, paddingVertical: 16, borderRadius: radius.md,
-  },
-  finishBtnText: { fontSize: 16, fontWeight: '900', color: '#fff' },
+  generateBtnText: { fontSize: 16, fontWeight: '900', color: '#fff' },
 });

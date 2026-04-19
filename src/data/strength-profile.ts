@@ -20,20 +20,69 @@ export type BaseballPosition = 'outfielder' | 'infielder' | 'catcher';
 export type MovementDeficiency = 'hip_mobility' | 'shoulder_stability' | 'acceleration_weakness';
 export type DaysPerWeek = 1 | 2 | 3 | 4 | 5;
 export type SeasonPhase = 'IN_SEASON' | 'PRESEASON' | 'OFFSEASON';
+export type ProgramDuration = 1 | 2 | 3 | 4 | 5 | 6 | 7 | 8 | 9 | 10 | 11 | 12;
+export type PrimaryGoal = 'get_stronger' | 'get_faster' | 'maintain_in_season' | 'improve_mobility' | 'return_from_layoff';
+export type GymAccess = 'full_gym' | 'limited_gym' | 'home_bodyweight';
 
 export interface StrengthProfile {
   archetype: StrengthArchetype;
   position: BaseballPosition;
   deficiency: MovementDeficiency;
-  daysPerWeek?: DaysPerWeek;    // optional for backward compat
-  seasonPhase?: SeasonPhase;    // optional for backward compat
-  updatedAt: string; // ISO date
+  daysPerWeek?: DaysPerWeek;
+  seasonPhase?: SeasonPhase;
+  /** Program duration in months (1-12) */
+  programDurationMonths?: ProgramDuration;
+  /** Athlete's primary training goal */
+  primaryGoal?: PrimaryGoal;
+  /** Gym equipment access level */
+  gymAccess?: GymAccess;
+  /** Free-text injury/limitation notes */
+  limitations?: string;
+  updatedAt: string;
 }
 
 /** Safe defaults for older profiles missing new fields. */
 export const STRENGTH_PROFILE_DEFAULTS = {
   daysPerWeek: 3 as DaysPerWeek,
   seasonPhase: 'OFFSEASON' as SeasonPhase,
+  programDurationMonths: 6 as ProgramDuration,
+  primaryGoal: 'get_stronger' as PrimaryGoal,
+  gymAccess: 'full_gym' as GymAccess,
+};
+
+/* ─── Program Duration Metadata ─────────────────── */
+
+export const DURATION_OPTIONS: { value: ProgramDuration; label: string; description: string }[] = [
+  { value: 1, label: '1 Month', description: 'Quick focus block' },
+  { value: 2, label: '2 Months', description: 'Short development cycle' },
+  { value: 3, label: '3 Months', description: 'Standard training block' },
+  { value: 4, label: '4 Months', description: 'Extended development' },
+  { value: 5, label: '5 Months', description: 'Deep training phase' },
+  { value: 6, label: '6 Months', description: 'Full periodization cycle' },
+  { value: 7, label: '7 Months', description: 'Extended periodization' },
+  { value: 8, label: '8 Months', description: 'Long-range development' },
+  { value: 9, label: '9 Months', description: 'Full offseason + preseason' },
+  { value: 10, label: '10 Months', description: 'Nearly full year plan' },
+  { value: 11, label: '11 Months', description: 'Almost annual plan' },
+  { value: 12, label: '12 Months', description: 'Full annual plan' },
+];
+
+/* ─── Primary Goal Metadata ─────────────────────── */
+
+export const GOAL_META: Record<PrimaryGoal, { label: string; description: string; icon: string; color: string }> = {
+  get_stronger: { label: 'Get Stronger', description: 'Build force production, max strength, and overall power.', icon: 'barbell-outline', color: '#3b82f6' },
+  get_faster: { label: 'Get Faster', description: 'Improve sprint speed, acceleration, and reactive power.', icon: 'flash-outline', color: '#ef4444' },
+  maintain_in_season: { label: 'Maintain In-Season', description: 'Preserve strength and freshness during competition.', icon: 'shield-outline', color: '#22c55e' },
+  improve_mobility: { label: 'Improve Mobility', description: 'Restore movement access, reduce limitations, improve positions.', icon: 'body-outline', color: '#0891b2' },
+  return_from_layoff: { label: 'Return From Layoff', description: 'Rebuild safely after time off, injury, or detraining.', icon: 'medkit-outline', color: '#f59e0b' },
+};
+
+/* ─── Gym Access Metadata ───────────────────────── */
+
+export const GYM_ACCESS_META: Record<GymAccess, { label: string; description: string; icon: string }> = {
+  full_gym: { label: 'Full Gym', description: 'Barbells, dumbbells, machines, cables, racks.', icon: 'barbell-outline' },
+  limited_gym: { label: 'Limited Gym', description: 'Dumbbells, bands, some machines. No full rack.', icon: 'fitness-outline' },
+  home_bodyweight: { label: 'Home / Bodyweight', description: 'Minimal equipment. Bodyweight, bands, maybe dumbbells.', icon: 'home-outline' },
 };
 
 /* ─── Display Data ───────────────────────────────── */
